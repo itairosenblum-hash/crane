@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- v3 -->
+<!DOCTYPE html><!-- v4-redesign -->
 <html lang="he" dir="rtl">
 <head>
 <meta charset="UTF-8">
@@ -6,190 +6,377 @@
 <title>מערכת תסקירי בטיחות</title>
 <style>
 :root {
-  --primary: #1D9E75;
-  --primary-light: #E1F5EE;
-  --primary-dark: #0F6E56;
-  --danger: #E24B4A;
-  --danger-light: #FCEBEB;
-  --warning: #EF9F27;
-  --warning-light: #FAEEDA;
-  --text: #2C2C2A;
-  --text-muted: #5F5E5A;
-  --border: rgba(44,44,42,0.15);
-  --bg: #f7f7f5;
+  --blue-dark: #0a1628;
+  --blue-mid: #1a3a6b;
+  --blue: #1e4db7;
+  --blue-light: #2d6ae0;
+  --accent: #f59e0b;
+  --accent-light: #fef3c7;
+  --danger: #dc2626;
+  --danger-light: #fef2f2;
+  --success: #16a34a;
+  --success-light: #f0fdf4;
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --border: #e2e8f0;
+  --bg: #f1f5f9;
   --card: #ffffff;
   --radius: 12px;
   --radius-sm: 8px;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+/* ===== SVG GRAPHICS ===== */
+.crane-svg { display: block; }
+
+/* ===== NAV ===== */
 nav {
-  background: var(--card); border-bottom: 0.5px solid var(--border);
-  padding: 0 1.5rem; display: flex; align-items: center;
-  justify-content: space-between; height: 60px;
-  position: sticky; top: 0; z-index: 100;
+  background: var(--blue-dark);
+  padding: 0 1.5rem;
+  display: flex; align-items: center; justify-content: space-between;
+  height: 64px; position: sticky; top: 0; z-index: 100;
+  border-bottom: 3px solid var(--accent);
 }
-.nav-brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 17px; color: var(--primary-dark); }
-.nav-brand svg { width: 28px; height: 28px; }
+.nav-brand { display: flex; align-items: center; gap: 12px; color: white; font-weight: 700; font-size: 18px; }
+.nav-logo { width: 36px; height: 36px; }
+.nav-subtitle { font-size: 11px; color: #94a3b8; font-weight: 400; display: block; margin-top: -2px; }
 .nav-right { display: flex; align-items: center; gap: 12px; }
-.nav-user { font-size: 13px; color: var(--text-muted); }
-.sync-status { font-size: 12px; padding: 4px 10px; border-radius: 20px; }
-.sync-ok { background: var(--primary-light); color: var(--primary-dark); }
-.sync-err { background: var(--danger-light); color: var(--danger); }
-.sync-ing { background: var(--warning-light); color: #854F0B; }
-.btn-logout { background: none; border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 6px 14px; font-size: 13px; cursor: pointer; color: var(--text-muted); }
-.btn-logout:hover { background: var(--bg); }
-.page { display: none; padding: 1.5rem; max-width: 1100px; margin: 0 auto; }
+.nav-user { font-size: 13px; color: #94a3b8; }
+.sync-status { font-size: 12px; padding: 4px 10px; border-radius: 20px; font-weight: 500; }
+.sync-ok { background: rgba(22,163,74,0.2); color: #4ade80; border: 1px solid rgba(74,222,128,0.3); }
+.sync-err { background: rgba(220,38,38,0.2); color: #f87171; border: 1px solid rgba(248,113,113,0.3); }
+.sync-ing { background: rgba(245,158,11,0.2); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); }
+.btn-logout { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: var(--radius-sm); padding: 7px 16px; font-size: 13px; cursor: pointer; color: #cbd5e1; font-family: inherit; }
+.btn-logout:hover { background: rgba(255,255,255,0.15); color: white; }
+
+/* ===== PAGES ===== */
+.page { display: none; }
 .page.active { display: block; }
-#page-login { max-width: 420px; margin: 80px auto; padding: 2rem; }
-.login-card { background: var(--card); border-radius: var(--radius); border: 0.5px solid var(--border); padding: 2.5rem 2rem; }
-.login-logo { text-align: center; margin-bottom: 2rem; }
-.login-logo svg { width: 56px; height: 56px; }
-.login-logo h1 { font-size: 20px; font-weight: 600; color: var(--primary-dark); margin-top: 10px; }
-.login-logo p { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+
+/* ===== LOGIN ===== */
+#page-login {
+  min-height: 100vh;
+  background: var(--blue-dark);
+  display: flex; align-items: center; justify-content: center;
+  padding: 1rem;
+  position: relative; overflow: hidden;
+}
+.login-bg-graphic {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  opacity: 0.07; pointer-events: none;
+}
+.login-box {
+  background: var(--card); border-radius: 16px;
+  padding: 2.5rem 2rem; width: 100%; max-width: 420px;
+  position: relative; z-index: 1;
+  border-top: 4px solid var(--accent);
+  box-shadow: 0 25px 50px rgba(0,0,0,0.4);
+}
+.login-header { text-align: center; margin-bottom: 2rem; }
+.login-icon { width: 72px; height: 72px; margin: 0 auto 1rem; }
+.login-header h1 { font-size: 22px; font-weight: 700; color: var(--blue-dark); }
+.login-header p { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
 .form-group { margin-bottom: 1rem; }
-.form-group label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; color: var(--text-muted); }
+.form-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
 .form-group input, .form-group select, .form-group textarea {
-  width: 100%; padding: 10px 12px; border: 0.5px solid var(--border);
+  width: 100%; padding: 11px 14px; border: 1.5px solid var(--border);
   border-radius: var(--radius-sm); font-size: 15px; font-family: inherit;
-  background: var(--card); color: var(--text); outline: none;
+  background: var(--card); color: var(--text); outline: none; transition: border-color 0.2s;
 }
 .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
-  border-color: var(--primary); box-shadow: 0 0 0 3px rgba(29,158,117,0.1);
+  border-color: var(--blue-light); box-shadow: 0 0 0 3px rgba(30,77,183,0.1);
 }
-.btn-primary { width: 100%; padding: 11px; background: var(--primary); color: white; border: none; border-radius: var(--radius-sm); font-size: 15px; font-weight: 500; cursor: pointer; font-family: inherit; }
-.btn-primary:hover { background: var(--primary-dark); }
-.login-demo { margin-top: 1.5rem; padding: 1rem; background: var(--bg); border-radius: var(--radius-sm); font-size: 13px; color: var(--text-muted); line-height: 1.8; }
-.login-demo strong { color: var(--text); }
-.script-setup { background: var(--warning-light); border: 0.5px solid rgba(239,159,39,0.4); border-radius: var(--radius-sm); padding: 12px 16px; font-size: 13px; color: #633806; margin-bottom: 1rem; }
-.script-setup a { color: #854F0B; font-weight: 500; }
-.tabs { display: flex; gap: 4px; background: var(--bg); border-radius: var(--radius-sm); padding: 4px; margin-bottom: 1.5rem; overflow-x: auto; }
-.tab-btn { flex: 1; padding: 9px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; background: none; color: var(--text-muted); font-family: inherit; font-weight: 500; white-space: nowrap; }
-.tab-btn.active { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
-.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 1.5rem; }
-.stat-card { background: var(--card); border-radius: var(--radius-sm); border: 0.5px solid var(--border); padding: 1rem 1.25rem; }
-.stat-label { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
-.stat-value { font-size: 26px; font-weight: 600; color: var(--text); }
-.stat-card.danger .stat-value { color: var(--danger); }
-.stat-card.warning .stat-value { color: var(--warning); }
-.stat-card.success .stat-value { color: var(--primary); }
-.alerts-section { margin-bottom: 1.5rem; }
-.alert-item { display: flex; align-items: center; justify-content: space-between; background: var(--card); border-radius: var(--radius-sm); border: 0.5px solid var(--border); padding: 12px 16px; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
-.alert-item.red { border-right: 3px solid var(--danger); background: var(--danger-light); }
-.alert-item.orange { border-right: 3px solid var(--warning); background: var(--warning-light); }
-.alert-info { flex: 1; min-width: 180px; }
-.alert-name { font-size: 14px; font-weight: 500; }
+.btn-primary {
+  width: 100%; padding: 13px; background: var(--blue);
+  color: white; border: none; border-radius: var(--radius-sm);
+  font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit;
+  transition: background 0.2s; letter-spacing: 0.3px;
+}
+.btn-primary:hover { background: var(--blue-light); }
+
+/* ===== SETUP ===== */
+#page-setup { min-height: 100vh; background: var(--blue-dark); display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.setup-box { background: var(--card); border-radius: 16px; padding: 2rem; width: 100%; max-width: 620px; border-top: 4px solid var(--accent); }
+.setup-box h2 { font-size: 18px; font-weight: 700; margin-bottom: 0.5rem; }
+.setup-box p { font-size: 14px; color: var(--text-muted); margin-bottom: 1.5rem; }
+.setup-step { display: flex; gap: 14px; margin-bottom: 1rem; align-items: flex-start; }
+.step-num { background: var(--blue); color: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+.step-text { font-size: 14px; line-height: 1.6; padding-top: 3px; }
+.step-text code { background: var(--bg); padding: 2px 8px; border-radius: 4px; font-family: monospace; font-size: 12px; color: var(--blue); border: 1px solid var(--border); }
+
+/* ===== APP LAYOUT ===== */
+#page-app { min-height: calc(100vh - 64px); }
+.app-inner { max-width: 1140px; margin: 0 auto; padding: 1.5rem; }
+
+/* PAGE HEADER */
+.page-header {
+  background: linear-gradient(135deg, var(--blue-mid) 0%, var(--blue-dark) 100%);
+  border-radius: var(--radius); padding: 1.5rem 2rem;
+  margin-bottom: 1.5rem; display: flex; align-items: center;
+  justify-content: space-between; overflow: hidden; position: relative;
+}
+.page-header-graphic { position: absolute; left: -10px; top: -10px; opacity: 0.12; }
+.page-header h2 { color: white; font-size: 20px; font-weight: 700; position: relative; z-index: 1; }
+.page-header p { color: #94a3b8; font-size: 13px; margin-top: 3px; position: relative; z-index: 1; }
+
+/* TABS */
+.tabs-wrap { background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 1.5rem; display: flex; overflow: hidden; }
+.tab-btn {
+  flex: 1; padding: 14px 8px; border: none; background: none;
+  font-size: 14px; cursor: pointer; color: var(--text-muted);
+  font-family: inherit; font-weight: 500; transition: all 0.2s;
+  border-bottom: 3px solid transparent; display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.tab-btn:hover { background: var(--bg); color: var(--text); }
+.tab-btn.active { color: var(--blue); border-bottom-color: var(--blue); background: rgba(30,77,183,0.04); font-weight: 600; }
+.tab-icon { font-size: 16px; }
+
+/* STATS */
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+.stat-card {
+  background: var(--card); border-radius: var(--radius); border: 1px solid var(--border);
+  padding: 1.25rem 1.5rem; display: flex; align-items: center; gap: 1rem;
+  transition: box-shadow 0.2s;
+}
+.stat-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+.stat-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+.stat-icon.blue { background: rgba(30,77,183,0.1); }
+.stat-icon.red { background: rgba(220,38,38,0.1); }
+.stat-icon.amber { background: rgba(245,158,11,0.1); }
+.stat-icon.green { background: rgba(22,163,74,0.1); }
+.stat-info { flex: 1; }
+.stat-label { font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-value { font-size: 32px; font-weight: 700; line-height: 1.1; margin-top: 2px; }
+.stat-value.blue { color: var(--blue); }
+.stat-value.red { color: var(--danger); }
+.stat-value.amber { color: #d97706; }
+.stat-value.green { color: var(--success); }
+
+/* SECTION */
+.section-card { background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 1.5rem; overflow: hidden; }
+.section-head { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.section-head h3 { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.section-body { padding: 1rem 1.5rem; }
+
+/* ALERT ITEMS */
+.alert-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px; border-radius: var(--radius-sm);
+  margin-bottom: 8px; border: 1px solid;
+}
+.alert-item.red { background: var(--danger-light); border-color: #fecaca; }
+.alert-item.amber { background: var(--accent-light); border-color: #fde68a; }
+.alert-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.alert-dot.red { background: var(--danger); }
+.alert-dot.amber { background: var(--accent); }
+.alert-info { flex: 1; min-width: 0; }
+.alert-name { font-size: 14px; font-weight: 600; }
 .alert-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
-.alert-days { font-size: 13px; font-weight: 600; }
+.alert-days { font-size: 13px; font-weight: 700; white-space: nowrap; }
 .alert-days.red { color: var(--danger); }
-.alert-days.orange { color: var(--warning); }
-.btn-wa { display: flex; align-items: center; gap: 6px; background: #25D366; color: white; border: none; border-radius: var(--radius-sm); padding: 7px 14px; font-size: 13px; cursor: pointer; font-family: inherit; font-weight: 500; text-decoration: none; white-space: nowrap; }
-.btn-wa:hover { background: #1da851; }
-.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
-.section-header h2 { font-size: 17px; font-weight: 600; }
-.btn-add { display: flex; align-items: center; gap: 6px; background: var(--primary); color: white; border: none; border-radius: var(--radius-sm); padding: 8px 16px; font-size: 14px; cursor: pointer; font-family: inherit; font-weight: 500; }
-.btn-add:hover { background: var(--primary-dark); }
-.table-wrap { background: var(--card); border-radius: var(--radius); border: 0.5px solid var(--border); overflow: hidden; overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 600px; }
-th { background: var(--bg); padding: 11px 14px; text-align: right; font-size: 12px; font-weight: 600; color: var(--text-muted); border-bottom: 0.5px solid var(--border); }
-td { padding: 12px 14px; border-bottom: 0.5px solid var(--border); vertical-align: middle; }
-tr:last-child td { border-bottom: none; }
-tr:hover td { background: #fafaf8; }
-.badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
-.badge-ok { background: var(--primary-light); color: var(--primary-dark); }
-.badge-warn { background: var(--warning-light); color: #854F0B; }
-.badge-danger { background: var(--danger-light); color: #A32D2D; }
-.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; align-items: center; justify-content: center; z-index: 200; padding: 1rem; }
-.modal-overlay.open { display: flex; }
-.modal { background: var(--card); border-radius: var(--radius); border: 0.5px solid var(--border); width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; }
-.modal-header { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 1.5rem; border-bottom: 0.5px solid var(--border); }
-.modal-header h3 { font-size: 17px; font-weight: 600; }
-.btn-close { background: none; border: none; font-size: 22px; cursor: pointer; color: var(--text-muted); line-height: 1; }
-.modal-body { padding: 1.5rem; }
-.modal-footer { padding: 1rem 1.5rem; border-top: 0.5px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; }
-.btn-secondary { padding: 9px 18px; background: none; border: 0.5px solid var(--border); border-radius: var(--radius-sm); font-size: 14px; cursor: pointer; color: var(--text-muted); font-family: inherit; }
-.btn-secondary:hover { background: var(--bg); }
-.btn-primary-sm { padding: 9px 18px; background: var(--primary); color: white; border: none; border-radius: var(--radius-sm); font-size: 14px; font-weight: 500; cursor: pointer; font-family: inherit; }
-.btn-primary-sm:hover { background: var(--primary-dark); }
-.upload-zone { border: 2px dashed var(--border); border-radius: var(--radius-sm); padding: 2rem; text-align: center; cursor: pointer; margin-bottom: 1rem; transition: border-color 0.2s; }
-.upload-zone:hover, .upload-zone.drag { border-color: var(--primary); background: var(--primary-light); }
-.upload-zone input { display: none; }
-.upload-icon { font-size: 36px; margin-bottom: 8px; }
-.upload-text { font-size: 14px; color: var(--text-muted); }
-.upload-text strong { color: var(--primary); }
-.ai-result { background: var(--primary-light); border-radius: var(--radius-sm); border: 0.5px solid rgba(29,158,117,0.3); padding: 1rem; margin-bottom: 1rem; }
-.ai-result-header { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--primary-dark); margin-bottom: 10px; }
-.ai-badge { background: var(--primary); color: white; font-size: 10px; padding: 2px 7px; border-radius: 20px; }
-.loading { display: flex; align-items: center; gap: 10px; color: var(--primary); font-size: 14px; padding: 1rem 0; }
-.spinner { width: 20px; height: 20px; border: 2px solid var(--primary-light); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-.filter-row { display: flex; gap: 10px; margin-bottom: 1rem; flex-wrap: wrap; }
-.filter-row select, .filter-row input { padding: 8px 12px; border: 0.5px solid var(--border); border-radius: var(--radius-sm); font-size: 14px; background: var(--card); color: var(--text); font-family: inherit; outline: none; }
-.filter-row select:focus, .filter-row input:focus { border-color: var(--primary); }
-.settings-card { background: var(--card); border-radius: var(--radius); border: 0.5px solid var(--border); padding: 1.5rem; margin-bottom: 1rem; }
-.settings-card h3 { font-size: 15px; font-weight: 600; margin-bottom: 1rem; }
-.user-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 0.5px solid var(--border); }
-.user-row:last-child { border-bottom: none; }
-.btn-danger-sm { padding: 5px 12px; background: none; border: 0.5px solid var(--danger); color: var(--danger); border-radius: var(--radius-sm); font-size: 12px; cursor: pointer; font-family: inherit; }
-.api-notice { background: var(--warning-light); border: 0.5px solid rgba(239,159,39,0.4); border-radius: var(--radius-sm); padding: 12px 16px; font-size: 13px; color: #633806; margin-bottom: 1rem; }
-.api-notice a { color: #854F0B; }
-.img-preview { max-width: 100%; max-height: 200px; border-radius: var(--radius-sm); margin-bottom: 1rem; display: none; }
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.actions-cell { display: flex; gap: 6px; }
-.btn-icon { background: none; border: 0.5px solid var(--border); border-radius: 6px; padding: 5px 9px; cursor: pointer; font-size: 13px; color: var(--text-muted); }
-.btn-icon:hover { background: var(--bg); }
+.alert-days.amber { color: #b45309; }
+
+/* BUTTONS */
+.btn-add {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--blue); color: white; border: none;
+  border-radius: var(--radius-sm); padding: 9px 18px;
+  font-size: 14px; cursor: pointer; font-family: inherit; font-weight: 600;
+}
+.btn-add:hover { background: var(--blue-light); }
+.btn-secondary {
+  padding: 9px 18px; background: none; border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm); font-size: 14px; cursor: pointer;
+  color: var(--text-muted); font-family: inherit; font-weight: 500;
+}
+.btn-secondary:hover { border-color: var(--blue); color: var(--blue); background: rgba(30,77,183,0.04); }
+.btn-primary-sm {
+  padding: 9px 18px; background: var(--blue); color: white; border: none;
+  border-radius: var(--radius-sm); font-size: 14px; font-weight: 600;
+  cursor: pointer; font-family: inherit;
+}
+.btn-primary-sm:hover { background: var(--blue-light); }
+.btn-wa {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: #16a34a; color: white; border: none;
+  border-radius: var(--radius-sm); padding: 7px 14px;
+  font-size: 13px; cursor: pointer; font-family: inherit;
+  font-weight: 600; text-decoration: none; white-space: nowrap;
+}
+.btn-wa:hover { background: #15803d; }
+.btn-icon { background: none; border: 1.5px solid var(--border); border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 13px; color: var(--text-muted); transition: all 0.2s; }
+.btn-icon:hover { border-color: var(--blue); color: var(--blue); background: rgba(30,77,183,0.04); }
 .btn-icon.del:hover { border-color: var(--danger); color: var(--danger); background: var(--danger-light); }
-.toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%); background: #2C2C2A; color: white; padding: 10px 20px; border-radius: var(--radius-sm); font-size: 14px; z-index: 999; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+.btn-danger-sm { padding: 5px 12px; background: none; border: 1.5px solid var(--danger); color: var(--danger); border-radius: var(--radius-sm); font-size: 12px; cursor: pointer; font-family: inherit; }
+
+/* TABLE */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 640px; }
+th { padding: 11px 14px; text-align: right; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid var(--border); background: var(--bg); }
+td { padding: 13px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(30,77,183,0.02); }
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+.badge::before { content:''; width: 6px; height: 6px; border-radius: 50%; }
+.badge-ok { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+.badge-ok::before { background: #16a34a; }
+.badge-warn { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+.badge-warn::before { background: #d97706; }
+.badge-danger { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+.badge-danger::before { background: #dc2626; }
+.actions-cell { display: flex; gap: 6px; }
+
+/* FILTER */
+.filter-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 1rem; }
+.filter-row select, .filter-row input {
+  padding: 9px 12px; border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm); font-size: 14px;
+  background: var(--card); color: var(--text); font-family: inherit; outline: none;
+}
+.filter-row select:focus, .filter-row input:focus { border-color: var(--blue); }
+
+/* MODAL */
+.modal-overlay { position: fixed; inset: 0; background: rgba(10,22,40,0.7); display: none; align-items: center; justify-content: center; z-index: 200; padding: 1rem; backdrop-filter: blur(4px); }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--card); border-radius: 16px; width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; box-shadow: 0 25px 50px rgba(0,0,0,0.3); }
+.modal-header { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border); background: var(--blue-dark); border-radius: 16px 16px 0 0; }
+.modal-header h3 { font-size: 16px; font-weight: 700; color: white; }
+.btn-close { background: rgba(255,255,255,0.1); border: none; border-radius: 6px; width: 30px; height: 30px; font-size: 18px; cursor: pointer; color: white; display: flex; align-items: center; justify-content: center; }
+.btn-close:hover { background: rgba(255,255,255,0.2); }
+.modal-body { padding: 1.5rem; }
+.modal-footer { padding: 1rem 1.5rem; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; background: var(--bg); border-radius: 0 0 16px 16px; }
+
+/* UPLOAD */
+.upload-zone {
+  border: 2px dashed #cbd5e1; border-radius: var(--radius-sm);
+  padding: 2rem; text-align: center; cursor: pointer; transition: all 0.2s; margin-bottom: 1rem;
+  background: var(--bg);
+}
+.upload-zone:hover, .upload-zone.drag { border-color: var(--blue); background: rgba(30,77,183,0.04); }
+.upload-zone input { display: none; }
+.upload-crane { margin: 0 auto 12px; display: block; }
+.upload-text { font-size: 14px; color: var(--text-muted); }
+.upload-text strong { color: var(--blue); }
+.ai-result { background: rgba(30,77,183,0.05); border-radius: var(--radius-sm); border: 1.5px solid rgba(30,77,183,0.2); padding: 12px 16px; margin-bottom: 1rem; display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 600; color: var(--blue); }
+.ai-badge { background: var(--blue); color: white; font-size: 10px; padding: 3px 8px; border-radius: 20px; font-weight: 700; }
+.loading { display: flex; align-items: center; gap: 10px; color: var(--blue); font-size: 14px; padding: 0.75rem 0; }
+.spinner { width: 20px; height: 20px; border: 2px solid rgba(30,77,183,0.2); border-top-color: var(--blue); border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.img-preview { max-width: 100%; max-height: 180px; border-radius: var(--radius-sm); margin-bottom: 1rem; display: none; object-fit: cover; border: 1px solid var(--border); }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* SETTINGS */
+.settings-card { background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); padding: 1.5rem; margin-bottom: 1rem; }
+.settings-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px; }
+.user-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.user-row:last-child { border-bottom: none; }
+.api-notice { background: var(--accent-light); border: 1px solid #fde68a; border-radius: var(--radius-sm); padding: 10px 14px; font-size: 13px; color: #92400e; margin-bottom: 1rem; }
+.api-notice a { color: #b45309; font-weight: 600; }
+
+/* TOAST */
+.toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%); background: var(--blue-dark); color: white; padding: 12px 24px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 500; z-index: 999; opacity: 0; transition: opacity 0.3s; pointer-events: none; border-left: 4px solid var(--accent); }
 .toast.show { opacity: 1; }
-.setup-steps { counter-reset: step; }
-.setup-step { display: flex; gap: 12px; margin-bottom: 1rem; align-items: flex-start; }
-.setup-step-num { background: var(--primary); color: white; border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; flex-shrink: 0; margin-top: 2px; }
-.setup-step-text { font-size: 14px; line-height: 1.6; }
-.setup-step-text code { background: var(--bg); padding: 2px 7px; border-radius: 4px; font-family: monospace; font-size: 13px; color: var(--primary-dark); }
-@media (max-width: 600px) {
+
+/* PASSWORD EYE */
+.pass-wrap { position: relative; }
+.pass-wrap input { padding-left: 44px; }
+.eye-btn { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 4px; display: flex; align-items: center; }
+.eye-btn:hover { color: var(--blue); }
+
+/* MOBILE */
+@media (max-width: 640px) {
   nav { padding: 0 1rem; }
-  .page { padding: 1rem; }
+  .app-inner { padding: 1rem; }
   .stats-grid { grid-template-columns: 1fr 1fr; }
   .form-row { grid-template-columns: 1fr; }
-  .nav-brand span { display: none; }
+  .tab-btn { font-size: 12px; padding: 12px 4px; }
+  .tab-icon { display: none; }
+  .page-header { padding: 1rem; }
+  .nav-brand span.nav-subtitle { display: none; }
 }
 </style>
 </head>
 <body>
 
+<!-- ===== NAV ===== -->
 <nav id="main-nav" style="display:none">
   <div class="nav-brand">
-    <svg viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="8" fill="#1D9E75"/><path d="M7 14l5 5 9-9" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    <span>תסקירי בטיחות</span>
+    <svg class="nav-logo" viewBox="0 0 36 36" fill="none">
+      <!-- Crane icon -->
+      <rect width="36" height="36" rx="8" fill="#1e4db7"/>
+      <rect x="6" y="28" width="24" height="3" rx="1" fill="#f59e0b"/>
+      <rect x="9" y="10" width="3" height="18" rx="1" fill="white"/>
+      <rect x="9" y="10" width="18" height="3" rx="1" fill="white"/>
+      <rect x="24" y="13" width="2" height="10" rx="1" fill="#f59e0b"/>
+      <circle cx="26" cy="24" r="2" fill="#f59e0b"/>
+      <rect x="6" y="10" width="5" height="3" rx="1" fill="#f59e0b"/>
+    </svg>
+    <div>
+      <div>מערכת תסקירי בטיחות</div>
+      <span class="nav-subtitle">ניהול אמצעי הרמה ובטיחות</span>
+    </div>
   </div>
   <div class="nav-right">
-    <span class="sync-status sync-ok" id="sync-status">מחובר ל-Sheets ✓</span>
+    <span class="sync-status sync-ok" id="sync-status">● מחובר</span>
     <span class="nav-user" id="nav-user-name"></span>
     <button class="btn-logout" onclick="logout()">יציאה</button>
   </div>
 </nav>
 
-<!-- LOGIN -->
-<div id="page-login" class="page active" style="max-width:440px;margin:60px auto;padding:1rem">
-  <div class="login-card">
-    <div class="login-logo">
-      <svg viewBox="0 0 56 56" fill="none"><rect width="56" height="56" rx="16" fill="#E1F5EE"/><path d="M14 28l10 10 18-18" stroke="#1D9E75" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <h1>תסקירי בטיחות</h1>
-      <p>מערכת ניהול אמצעי בטיחות</p>
+<!-- ===== LOGIN ===== -->
+<div id="page-login" class="page active">
+  <!-- Background graphic -->
+  <svg class="login-bg-graphic" viewBox="0 0 1200 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- Crane 1 -->
+    <rect x="80" y="80" width="16" height="180" fill="white"/>
+    <rect x="80" y="80" width="200" height="16" fill="white"/>
+    <rect x="260" y="96" width="12" height="120" fill="#f59e0b"/>
+    <circle cx="272" cy="220" r="14" fill="none" stroke="#f59e0b" stroke-width="8"/>
+    <rect x="40" y="80" width="56" height="16" fill="#f59e0b"/>
+    <rect x="96" y="240" width="40" height="20" rx="4" fill="white" opacity="0.5"/>
+    <!-- Forklift -->
+    <rect x="500" y="200" width="120" height="60" rx="8" fill="white"/>
+    <rect x="460" y="210" width="50" height="10" fill="white"/>
+    <rect x="460" y="200" width="10" height="60" fill="#f59e0b"/>
+    <circle cx="530" cy="265" r="20" fill="none" stroke="#f59e0b" stroke-width="10"/>
+    <circle cx="600" cy="265" r="20" fill="none" stroke="#f59e0b" stroke-width="10"/>
+    <!-- Crane 2 -->
+    <rect x="900" y="60" width="14" height="200" fill="white"/>
+    <rect x="900" y="60" width="180" height="14" fill="white"/>
+    <rect x="1062" y="74" width="10" height="100" fill="#f59e0b"/>
+    <circle cx="1072" cy="178" r="12" fill="none" stroke="#f59e0b" stroke-width="6"/>
+    <rect x="860" y="60" width="48" height="14" fill="#f59e0b"/>
+  </svg>
+
+  <div class="login-box">
+    <div class="login-header">
+      <!-- Crane logo big -->
+      <svg class="login-icon" viewBox="0 0 72 72" fill="none">
+        <rect width="72" height="72" rx="16" fill="#0a1628"/>
+        <rect x="12" y="56" width="48" height="6" rx="2" fill="#f59e0b"/>
+        <rect x="18" y="20" width="6" height="36" rx="2" fill="white"/>
+        <rect x="18" y="20" width="36" height="6" rx="2" fill="white"/>
+        <rect x="48" y="26" width="4" height="20" rx="1" fill="#f59e0b"/>
+        <circle cx="52" cy="48" r="5" fill="none" stroke="#f59e0b" stroke-width="3"/>
+        <rect x="10" y="20" width="12" height="6" rx="2" fill="#f59e0b"/>
+      </svg>
+      <h1>מערכת תסקירי בטיחות</h1>
+      <p>ניהול אמצעי הרמה ובטיחות תעשייתית</p>
     </div>
-    <div id="no-script-warning" class="script-setup" style="display:none">
-      ⚠️ טרם הוגדר חיבור ל-Google Sheets. <a href="#" onclick="showPage('page-setup');return false">לחץ כאן להגדרה</a>
+    <div id="no-script-warning" style="display:none;background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;font-size:13px;color:#92400e;margin-bottom:1rem">
+      ⚠️ טרם הוגדר חיבור ל-Google Sheets. <a href="#" onclick="showPage('page-setup');return false" style="color:#b45309;font-weight:600">לחץ כאן להגדרה</a>
     </div>
     <div class="form-group">
       <label>שם משתמש</label>
-      <input type="text" id="login-user" placeholder="שם משתמש">
+      <input type="text" id="login-user" placeholder="הזן שם משתמש" onkeydown="if(event.key==='Enter')doLogin()">
     </div>
     <div class="form-group">
       <label>סיסמה</label>
-      <div style="position:relative">
-        <input type="password" id="login-pass" placeholder="סיסמה" onkeydown="if(event.key==='Enter')doLogin()" style="padding-left:44px">
-        <button type="button" onclick="togglePass()" id="eye-btn" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px;display:flex;align-items:center" aria-label="הצג סיסמה">
-          <svg id="eye-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      <div class="pass-wrap">
+        <input type="password" id="login-pass" placeholder="הזן סיסמה" onkeydown="if(event.key==='Enter')doLogin()">
+        <button class="eye-btn" type="button" onclick="togglePass()" aria-label="הצג סיסמה">
+          <svg id="eye-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
         </button>
       </div>
     </div>
@@ -197,18 +384,15 @@ tr:hover td { background: #fafaf8; }
   </div>
 </div>
 
-<!-- SETUP PAGE -->
-<div id="page-setup" class="page" style="max-width:640px;margin:40px auto;padding:1rem">
-  <div class="settings-card">
-    <h3>⚙️ הגדרת חיבור ל-Google Sheets</h3>
-    <p style="font-size:14px;color:var(--text-muted);margin-bottom:1.5rem">בצע את השלבים הבאים פעם אחת בלבד כדי לחבר את האפליקציה ל-Google Sheets שלך</p>
-    <div class="setup-steps">
-      <div class="setup-step"><div class="setup-step-num">1</div><div class="setup-step-text">פתח את ה-<a href="https://docs.google.com/spreadsheets/d/1idc8O_sK4PkeObhKADT-WwFRA_V38w0ZSJ8QDG0I-6A" target="_blank" style="color:var(--primary)">Google Sheet שלך</a></div></div>
-      <div class="setup-step"><div class="setup-step-num">2</div><div class="setup-step-text">לחץ על <code>Extensions</code> → <code>Apps Script</code></div></div>
-      <div class="setup-step"><div class="setup-step-num">3</div><div class="setup-step-text">מחק את הקוד הקיים והדבק את הקוד מהקובץ <code>apps-script.js</code> שהורדת</div></div>
-      <div class="setup-step"><div class="setup-step-num">4</div><div class="setup-step-text">לחץ <code>Deploy</code> → <code>New deployment</code> → בחר <code>Web app</code> → הגדר <code>Execute as: Me</code> ו-<code>Who has access: Anyone</code> → לחץ <code>Deploy</code></div></div>
-      <div class="setup-step"><div class="setup-step-num">5</div><div class="setup-step-text">העתק את ה-URL שהתקבל (נראה כך: <code>https://script.google.com/macros/s/.../exec</code>) והדבק כאן:</div></div>
-    </div>
+<!-- ===== SETUP ===== -->
+<div id="page-setup" class="page">
+  <div class="setup-box">
+    <h2>⚙️ הגדרת חיבור ל-Google Sheets</h2>
+    <p>בצע את השלבים הבאים פעם אחת בלבד</p>
+    <div class="setup-step"><div class="step-num">1</div><div class="step-text">פתח את <a href="https://docs.google.com/spreadsheets/d/1idc8O_sK4PkeObhKADT-WwFRA_V38w0ZSJ8QDG0I-6A" target="_blank" style="color:var(--blue)">Google Sheet שלך</a></div></div>
+    <div class="setup-step"><div class="step-num">2</div><div class="step-text">לחץ <code>Extensions</code> → <code>Apps Script</code> → הדבק את הקוד</div></div>
+    <div class="setup-step"><div class="step-num">3</div><div class="step-text">לחץ <code>Deploy</code> → <code>New deployment</code> → <code>Web app</code> → Anyone → Deploy</div></div>
+    <div class="setup-step"><div class="step-num">4</div><div class="step-text">העתק את ה-URL והדבק כאן:</div></div>
     <div class="form-group" style="margin-top:1rem">
       <label>Web App URL</label>
       <input type="text" id="script-url-input" placeholder="https://script.google.com/macros/s/.../exec">
@@ -216,101 +400,133 @@ tr:hover td { background: #fafaf8; }
     <div style="display:flex;gap:10px;margin-top:1rem">
       <button class="btn-primary-sm" onclick="saveScriptUrl()">שמור וחבר</button>
       <button class="btn-secondary" onclick="testConnection()">בדוק חיבור</button>
-      <button class="btn-secondary" onclick="showPage('page-login')">חזור להתחברות</button>
+      <button class="btn-secondary" onclick="showPage('page-login')">חזור</button>
     </div>
     <div id="conn-result" style="margin-top:1rem;font-size:13px"></div>
   </div>
 </div>
 
-<!-- MAIN APP -->
-<div id="page-app" class="page" style="max-width:1100px">
-  <div class="tabs" id="main-tabs">
-    <button class="tab-btn active" onclick="showTab('dashboard',this)">לוח בקרה</button>
-    <button class="tab-btn" onclick="showTab('equipment',this)">אמצעים</button>
-    <button class="tab-btn" id="tab-sites-btn" onclick="showTab('sites',this)">אתרים</button>
-    <button class="tab-btn" id="tab-settings-btn" onclick="showTab('settings',this)">הגדרות</button>
-  </div>
+<!-- ===== MAIN APP ===== -->
+<div id="page-app" class="page">
+  <div class="app-inner">
 
-  <!-- DASHBOARD -->
-  <div id="tab-dashboard">
-    <div class="stats-grid" id="stats-grid"></div>
-    <div class="alerts-section">
-      <div class="section-header"><h2>⚠️ התרעות קרובות</h2><button class="btn-secondary" onclick="loadData()" style="font-size:13px">🔄 רענן</button></div>
-      <div id="alerts-list"></div>
+    <!-- TABS -->
+    <div class="tabs-wrap">
+      <button class="tab-btn active" onclick="showTab('dashboard',this)"><span class="tab-icon">📊</span> לוח בקרה</button>
+      <button class="tab-btn" onclick="showTab('equipment',this)"><span class="tab-icon">🏗️</span> אמצעים</button>
+      <button class="tab-btn" id="tab-sites-btn" onclick="showTab('sites',this)"><span class="tab-icon">📍</span> אתרים</button>
+      <button class="tab-btn" id="tab-settings-btn" onclick="showTab('settings',this)"><span class="tab-icon">⚙️</span> הגדרות</button>
     </div>
-  </div>
 
-  <!-- EQUIPMENT -->
-  <div id="tab-equipment" style="display:none">
-    <div class="section-header">
-      <h2>רשימת אמצעים</h2>
-      <button class="btn-add" id="btn-add-eq" onclick="openAddModal()" style="display:none">+ הוסף אמצעי</button>
-    </div>
-    <div class="filter-row">
-      <select id="filter-site" onchange="renderEquipmentTable()"><option value="">כל האתרים</option></select>
-      <select id="filter-status" onchange="renderEquipmentTable()">
-        <option value="">כל הסטטוסים</option>
-        <option value="ok">תקין</option>
-        <option value="warn">קרוב לבדיקה</option>
-        <option value="danger">דחוף</option>
-      </select>
-      <input type="text" id="filter-search" placeholder="חיפוש..." onkeyup="renderEquipmentTable()" style="flex:1;min-width:120px">
-    </div>
-    <div class="table-wrap">
-      <table>
-        <thead><tr>
-          <th>מספר מזהה</th><th>שם האמצעי</th><th>סוג</th><th>אתר</th>
-          <th>בדיקה אחרונה</th><th>בדיקה הבאה</th><th>סטטוס</th><th>פעולות</th>
-        </tr></thead>
-        <tbody id="eq-tbody"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- SITES -->
-  <div id="tab-sites-content" style="display:none">
-    <div class="section-header">
-      <h2>ניהול אתרים</h2>
-      <button class="btn-add" onclick="openSiteModal()">+ הוסף אתר</button>
-    </div>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>שם האתר</th><th>מיקום</th><th>אחראי</th><th>טלפון</th><th>אמצעים</th><th>פעולות</th></tr></thead>
-        <tbody id="sites-tbody"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- SETTINGS -->
-  <div id="tab-settings-content" style="display:none">
-    <div class="settings-card">
-      <h3>🔗 חיבור Google Sheets</h3>
-      <div class="form-group">
-        <label>Web App URL</label>
-        <input type="text" id="script-url-settings" placeholder="https://script.google.com/macros/s/.../exec">
+    <!-- DASHBOARD -->
+    <div id="tab-dashboard">
+      <div class="page-header">
+        <svg class="page-header-graphic" width="160" height="120" viewBox="0 0 160 120" fill="none">
+          <rect x="20" y="20" width="8" height="80" rx="2" fill="white"/>
+          <rect x="20" y="20" width="80" height="8" rx="2" fill="white"/>
+          <rect x="90" y="28" width="5" height="50" rx="1" fill="#f59e0b"/>
+          <circle cx="95" cy="80" r="8" fill="none" stroke="#f59e0b" stroke-width="4"/>
+          <rect x="10" y="20" width="16" height="8" rx="2" fill="#f59e0b"/>
+          <rect x="0" y="95" width="120" height="6" rx="2" fill="white" opacity="0.3"/>
+        </svg>
+        <div><h2>לוח בקרה</h2><p>סקירה כללית של מצב האמצעים</p></div>
+        <button class="btn-secondary" onclick="loadData()" style="color:#94a3b8;border-color:rgba(255,255,255,0.2)">🔄 רענן</button>
       </div>
-      <div style="display:flex;gap:10px">
-        <button class="btn-primary-sm" onclick="saveScriptUrlFromSettings()">עדכן URL</button>
-        <button class="btn-secondary" onclick="testConnection()">בדוק חיבור</button>
+      <div class="stats-grid" id="stats-grid"></div>
+      <div class="section-card">
+        <div class="section-head">
+          <h3>⚠️ התרעות קרובות</h3>
+        </div>
+        <div class="section-body" id="alerts-list"></div>
       </div>
     </div>
-    <div class="settings-card">
-      <h3>🔑 OpenRouter API Key (לזיהוי תמונות)</h3>
-      <div class="api-notice">נשמר מקומית על המכשיר שלך בלבד. קבל מפתח חינמי: <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a></div>
-      <div class="form-group">
-        <input type="password" id="api-key-input" placeholder="sk-or-...">
+
+    <!-- EQUIPMENT -->
+    <div id="tab-equipment" style="display:none">
+      <div class="page-header">
+        <svg class="page-header-graphic" width="160" height="120" viewBox="0 0 160 120" fill="none">
+          <rect x="10" y="80" width="60" height="30" rx="6" fill="white" opacity="0.15"/>
+          <rect x="5" y="85" width="25" height="6" rx="2" fill="#f59e0b"/>
+          <rect x="5" y="78" width="6" height="32" rx="1" fill="#f59e0b"/>
+          <circle cx="25" cy="113" r="9" fill="none" stroke="#f59e0b" stroke-width="5"/>
+          <circle cx="55" cy="113" r="9" fill="none" stroke="#f59e0b" stroke-width="5"/>
+          <rect x="90" y="40" width="6" height="60" rx="2" fill="white"/>
+          <rect x="90" y="40" width="55" height="6" rx="2" fill="white"/>
+          <rect x="138" y="46" width="4" height="35" rx="1" fill="#f59e0b"/>
+          <circle cx="142" cy="83" r="6" fill="none" stroke="#f59e0b" stroke-width="3"/>
+        </svg>
+        <div><h2>אמצעי הרמה ובטיחות</h2><p>ניהול ומעקב אחר כלל האמצעים</p></div>
+        <button class="btn-add" id="btn-add-eq" onclick="openAddModal()" style="display:none">+ הוסף אמצעי</button>
       </div>
-      <button class="btn-primary-sm" onclick="saveApiKey()">שמור מפתח</button>
+      <div class="section-card">
+        <div class="section-head">
+          <div class="filter-row" style="margin:0">
+            <select id="filter-site" onchange="renderEquipmentTable()"><option value="">כל האתרים</option></select>
+            <select id="filter-status" onchange="renderEquipmentTable()">
+              <option value="">כל הסטטוסים</option>
+              <option value="ok">תקין</option>
+              <option value="warn">קרוב לבדיקה</option>
+              <option value="danger">דחוף</option>
+            </select>
+            <input type="text" id="filter-search" placeholder="🔍 חיפוש..." onkeyup="renderEquipmentTable()" style="flex:1;min-width:140px">
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>מ. מזהה</th><th>שם האמצעי</th><th>סוג</th><th>אתר</th>
+              <th>בדיקה אחרונה</th><th>בדיקה הבאה</th><th>סטטוס</th><th>פעולות</th>
+            </tr></thead>
+            <tbody id="eq-tbody"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
-    <div class="settings-card" id="user-mgmt-card">
-      <h3>👥 ניהול משתמשים</h3>
-      <div id="users-list"></div>
-      <button class="btn-add" style="margin-top:1rem" onclick="openUserModal()">+ הוסף משתמש</button>
+
+    <!-- SITES -->
+    <div id="tab-sites-content" style="display:none">
+      <div class="page-header">
+        <div><h2>ניהול אתרים</h2><p>רשימת אתרים ומשתמשים אחראים</p></div>
+        <button class="btn-add" onclick="openSiteModal()">+ הוסף אתר</button>
+      </div>
+      <div class="section-card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>שם האתר</th><th>מיקום</th><th>אחראי</th><th>טלפון</th><th>אמצעים</th><th>פעולות</th></tr></thead>
+            <tbody id="sites-tbody"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
+
+    <!-- SETTINGS -->
+    <div id="tab-settings-content" style="display:none">
+      <div class="page-header">
+        <div><h2>הגדרות מערכת</h2><p>ניהול משתמשים וחיבורים</p></div>
+      </div>
+      <div class="settings-card">
+        <h3>🔗 חיבור Google Sheets</h3>
+        <div class="form-group"><label>Web App URL</label><input type="text" id="script-url-settings" placeholder="https://script.google.com/macros/s/.../exec"></div>
+        <div style="display:flex;gap:10px"><button class="btn-primary-sm" onclick="saveScriptUrlFromSettings()">עדכן</button><button class="btn-secondary" onclick="testConnection()">בדוק חיבור</button></div>
+      </div>
+      <div class="settings-card">
+        <h3>🤖 OpenRouter API Key (זיהוי תמונות AI)</h3>
+        <div class="api-notice">נשמר מקומית בלבד. קבל מפתח חינמי: <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a></div>
+        <div class="form-group"><input type="password" id="api-key-input" placeholder="sk-or-..."></div>
+        <button class="btn-primary-sm" onclick="saveApiKey()">שמור מפתח</button>
+      </div>
+      <div class="settings-card">
+        <h3>👥 ניהול משתמשים</h3>
+        <div id="users-list"></div>
+        <button class="btn-add" style="margin-top:1rem" onclick="openUserModal()">+ הוסף משתמש</button>
+      </div>
+    </div>
+
   </div>
 </div>
 
-<!-- ADD EQUIPMENT MODAL -->
+<!-- ===== MODALS ===== -->
+<!-- ADD EQUIPMENT -->
 <div class="modal-overlay" id="modal-add-eq">
   <div class="modal">
     <div class="modal-header">
@@ -323,17 +539,25 @@ tr:hover td { background: #fafaf8; }
            ondragleave="this.classList.remove('drag')"
            ondrop="handleDrop(event)">
         <input type="file" id="file-input" accept="image/*" onchange="handleFile(this.files[0])">
-        <div class="upload-icon">📷</div>
+        <svg class="upload-crane" width="56" height="48" viewBox="0 0 56 48" fill="none">
+          <rect x="10" y="8" width="5" height="32" rx="2" fill="#1e4db7"/>
+          <rect x="10" y="8" width="30" height="5" rx="2" fill="#1e4db7"/>
+          <rect x="35" y="13" width="3" height="18" rx="1" fill="#f59e0b"/>
+          <circle cx="38" cy="33" r="4" fill="none" stroke="#f59e0b" stroke-width="2.5"/>
+          <rect x="5" y="8" width="10" height="5" rx="1" fill="#f59e0b"/>
+          <rect x="2" y="38" width="52" height="4" rx="2" fill="#1e4db7" opacity="0.3"/>
+          <rect x="14" y="40" width="10" height="4" rx="1" fill="#1e4db7" opacity="0.5"/>
+        </svg>
         <div class="upload-text"><strong>העלה תמונת תסקיר</strong><br>לחץ או גרור — AI יזהה פרטים אוטומטית</div>
       </div>
       <img id="img-preview" class="img-preview">
       <div id="ai-loading" style="display:none"><div class="loading"><div class="spinner"></div>AI מנתח את התמונה...</div></div>
       <div id="ai-result-box" style="display:none">
-        <div class="ai-result"><div class="ai-result-header"><span class="ai-badge">Gemini AI</span>פרטים שזוהו אוטומטית — ניתן לערוך</div></div>
+        <div class="ai-result"><span class="ai-badge">AI</span>פרטים שזוהו — ניתן לערוך</div>
       </div>
       <div class="form-row">
         <div class="form-group"><label>מספר מזהה *</label><input type="text" id="eq-id" placeholder="EQ-001"></div>
-        <div class="form-group"><label>סוג האמצעי</label><input type="text" id="eq-type" placeholder="מטף / ספרינקלר..."></div>
+        <div class="form-group"><label>סוג האמצעי</label><input type="text" id="eq-type" placeholder="מלגזה / מנוף..."></div>
       </div>
       <div class="form-group"><label>שם / תיאור *</label><input type="text" id="eq-name" placeholder="תיאור האמצעי"></div>
       <div class="form-group"><label>אתר *</label><select id="eq-site"></select></div>
@@ -346,12 +570,12 @@ tr:hover td { background: #fafaf8; }
     </div>
     <div class="modal-footer">
       <button class="btn-secondary" onclick="closeModal('modal-add-eq')">ביטול</button>
-      <button class="btn-primary-sm" onclick="saveEquipment()">שמור</button>
+      <button class="btn-primary-sm" onclick="saveEquipment()">💾 שמור</button>
     </div>
   </div>
 </div>
 
-<!-- ADD SITE MODAL -->
+<!-- ADD SITE -->
 <div class="modal-overlay" id="modal-add-site">
   <div class="modal" style="max-width:420px">
     <div class="modal-header"><h3>הוספת אתר</h3><button class="btn-close" onclick="closeModal('modal-add-site')">×</button></div>
@@ -368,7 +592,7 @@ tr:hover td { background: #fafaf8; }
   </div>
 </div>
 
-<!-- ADD USER MODAL -->
+<!-- ADD USER -->
 <div class="modal-overlay" id="modal-add-user">
   <div class="modal" style="max-width:420px">
     <div class="modal-header"><h3>הוספת משתמש</h3><button class="btn-close" onclick="closeModal('modal-add-user')">×</button></div>
@@ -376,7 +600,7 @@ tr:hover td { background: #fafaf8; }
       <div class="form-group"><label>שם משתמש *</label><input type="text" id="new-username" placeholder="user3"></div>
       <div class="form-group"><label>שם מלא</label><input type="text" id="new-fullname" placeholder="ישראל ישראלי"></div>
       <div class="form-group"><label>סיסמה *</label><input type="password" id="new-password" placeholder="••••••"></div>
-      <div class="form-group"><label>אתר משויך</label><select id="new-user-site"><option value="">כל האתרים (Admin)</option></select></div>
+      <div class="form-group"><label>אתר משויך</label><select id="new-user-site"><option value="">כל האתרים</option></select></div>
       <div class="form-group"><label>טלפון WhatsApp</label><input type="tel" id="new-user-phone" placeholder="0501234567"></div>
     </div>
     <div class="modal-footer">
@@ -386,7 +610,7 @@ tr:hover td { background: #fafaf8; }
   </div>
 </div>
 
-<!-- VIEW MODAL -->
+<!-- VIEW EQ -->
 <div class="modal-overlay" id="modal-view-eq">
   <div class="modal">
     <div class="modal-header"><h3>פרטי אמצעי</h3><button class="btn-close" onclick="closeModal('modal-view-eq')">×</button></div>
@@ -398,205 +622,113 @@ tr:hover td { background: #fafaf8; }
 <div class="toast" id="toast"></div>
 
 <script>
-// ============ CONFIG ============
 const GEMINI_KEY_STORE = 'safety_or_key';
 const SCRIPT_URL_STORE = 'safety_script_url';
-const DEFAULT_GEMINI_KEY = '';
+const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzF1RbTKJrqnZjgK-r4gxg2l-swF-5xL-YLdoCqncjT9rPsVso4iv3DMtvLpDSQJ5IqVg/exec';
 
 let appData = { sites: [], equipment: [], users: [] };
 let currentUser = null;
 let editingEqId = null;
 
-function getScriptUrl() { return localStorage.getItem(SCRIPT_URL_STORE) || ''; }
-function getApiKey() { return localStorage.getItem(GEMINI_KEY_STORE) || DEFAULT_GEMINI_KEY; }
+function getScriptUrl() { return localStorage.getItem(SCRIPT_URL_STORE) || DEFAULT_SCRIPT_URL; }
+function getApiKey() { return localStorage.getItem(GEMINI_KEY_STORE) || ''; }
 
-// ============ API ============
+// ===== API =====
 async function apiGet(params) {
-  const url = getScriptUrl();
-  if (!url) throw new Error('לא הוגדר Script URL');
   const qs = new URLSearchParams(params).toString();
-  const resp = await fetch(url + '?' + qs);
+  const resp = await fetch(getScriptUrl() + '?' + qs);
   return resp.json();
 }
-
 async function apiPost(body) {
-  const url = getScriptUrl();
-  if (!url) throw new Error('לא הוגדר Script URL');
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+  const resp = await fetch(getScriptUrl(), {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   });
   return resp.json();
 }
 
-// ============ DATA ============
+// ===== DATA =====
 async function loadData() {
-  setSyncStatus('ing', 'טוען...');
+  setSyncStatus('ing', '● מתחבר...');
   try {
     const data = await apiGet({ action: 'getAll' });
-    appData.sites = (data.sites || []).map(s => ({ ...s, id: parseInt(s.id), phone: String(s.phone||''), manager: String(s.manager||'') }));
-    appData.equipment = (data.equipment || []).map(e => ({ ...e, id: parseInt(e.id), siteId: parseInt(e.siteId), phone: String(e.phone||''), eqId: String(e.eqId||''), name: String(e.name||''), type: String(e.type||''), notes: String(e.notes||''), lastCheck: String(e.lastCheck||''), nextCheck: String(e.nextCheck||'') }));
+    appData.sites = (data.sites || []).map(s => ({ ...s, id: parseInt(s.id), phone: String(s.phone||''), manager: String(s.manager||''), name: String(s.name||''), location: String(s.location||'') }));
+    appData.equipment = (data.equipment || []).map(e => ({ ...e, id: parseInt(e.id), siteId: parseInt(e.siteId), phone: String(e.phone == null ? '' : e.phone), eqId: String(e.eqId||''), name: String(e.name||''), type: String(e.type||''), notes: String(e.notes||''), lastCheck: String(e.lastCheck||''), nextCheck: String(e.nextCheck||'') }));
     appData.users = data.users || [];
-    setSyncStatus('ok', 'מחובר ל-Sheets ✓');
+    setSyncStatus('ok', '● מחובר');
     refreshCurrentTab();
-  } catch(e) {
-    setSyncStatus('err', 'שגיאת חיבור ✗');
-  }
+  } catch(e) { setSyncStatus('err', '● שגיאה'); }
 }
+function setSyncStatus(t, txt) { const el = document.getElementById('sync-status'); el.className = 'sync-status sync-' + t; el.textContent = txt; }
 
-function setSyncStatus(type, txt) {
-  const el = document.getElementById('sync-status');
-  el.className = 'sync-status sync-' + type;
-  el.textContent = txt;
-}
-
-// ============ AUTH ============
-function togglePass() {
-  const inp = document.getElementById('login-pass');
-  const icon = document.getElementById('eye-icon');
-  if (inp.type === 'password') {
-    inp.type = 'text';
-    icon.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/>';
-  } else {
-    inp.type = 'password';
-    icon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
-  }
-}
+// ===== AUTH =====
 async function doLogin() {
   const username = document.getElementById('login-user').value.trim();
   const password = document.getElementById('login-pass').value;
-  if (!getScriptUrl()) { showPage('page-setup'); return; }
-  setSyncStatus('ing', 'מתחבר...');
+  if (!username || !password) { alert('נא למלא שם משתמש וסיסמה'); return; }
+  setSyncStatus('ing', '● מתחבר...');
   try {
     const res = await apiGet({ action: 'login', username, password });
-    if (!res.ok) { alert(res.msg || 'שגיאה'); setSyncStatus('err', 'שגיאת כניסה'); return; }
+    if (!res.ok) { alert(res.msg || 'שגיאה'); setSyncStatus('err', '● שגיאה'); return; }
     currentUser = res.user;
-    document.getElementById('nav-user-name').textContent = currentUser.fullname + (currentUser.role === 'admin' ? ' (מנהל)' : '');
+    document.getElementById('nav-user-name').textContent = currentUser.fullname + (currentUser.role === 'admin' ? ' 👑' : '');
     document.getElementById('main-nav').style.display = 'flex';
     if (currentUser.role !== 'admin') {
       document.getElementById('tab-sites-btn').style.display = 'none';
       document.getElementById('tab-settings-btn').style.display = 'none';
     } else {
-      document.getElementById('tab-sites-btn').style.display = '';
-      document.getElementById('tab-settings-btn').style.display = '';
       document.getElementById('btn-add-eq').style.display = '';
     }
     showPage('page-app');
     await loadData();
     showTab('dashboard', document.querySelector('.tab-btn'));
-  } catch(e) {
-    alert('שגיאת חיבור: ' + e.message);
-    setSyncStatus('err', 'שגיאת חיבור');
+  } catch(e) { alert('שגיאת חיבור: ' + e.message); setSyncStatus('err', '● שגיאה'); }
+}
+function logout() { currentUser = null; document.getElementById('main-nav').style.display = 'none'; showPage('page-login'); }
+function togglePass() {
+  const inp = document.getElementById('login-pass');
+  const icon = document.getElementById('eye-icon');
+  if (inp.type === 'password') {
+    inp.type = 'text';
+    icon.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>';
+  } else {
+    inp.type = 'password';
+    icon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
   }
 }
 
-function logout() {
-  currentUser = null;
-  document.getElementById('main-nav').style.display = 'none';
-  showPage('page-login');
-}
-
-// ============ SETUP ============
-async function testConnection() {
-  const url = (document.getElementById('script-url-input') || document.getElementById('script-url-settings')).value.trim() || getScriptUrl();
-  if (!url) { alert('נא להזין URL'); return; }
-  const res = document.getElementById('conn-result');
-  if (res) res.innerHTML = '<span style="color:var(--warning)">בודק חיבור...</span>';
-  try {
-    const resp = await fetch(url + '?action=getAll');
-    const data = await resp.json();
-    const msg = data.sites !== undefined ? '✅ חיבור תקין! נמצאו ' + (data.sites||[]).length + ' אתרים.' : '⚠️ תשובה לא צפויה';
-    if (res) res.innerHTML = '<span style="color:var(--primary)">' + msg + '</span>';
-    else alert(msg);
-  } catch(e) {
-    const msg = '❌ שגיאה: ' + e.message;
-    if (res) res.innerHTML = '<span style="color:var(--danger)">' + msg + '</span>';
-    else alert(msg);
-  }
-}
-
-function saveScriptUrl() {
-  const val = document.getElementById('script-url-input').value.trim();
-  if (!val) { alert('נא להזין URL'); return; }
-  localStorage.setItem(SCRIPT_URL_STORE, val);
-  showToast('URL נשמר בהצלחה');
-  showPage('page-login');
-}
-function saveScriptUrlFromSettings() {
-  const val = document.getElementById('script-url-settings').value.trim();
-  if (!val) { alert('נא להזין URL'); return; }
-  localStorage.setItem(SCRIPT_URL_STORE, val);
-  showToast('URL עודכן');
-}
-function saveApiKey() {
-  const val = document.getElementById('api-key-input').value.trim();
-  if (!val || val.startsWith('•')) { alert('נא להזין מפתח חדש'); return; }
-  localStorage.setItem(GEMINI_KEY_STORE, val);
-  showToast('מפתח Gemini נשמר ✓');
-}
-
-// ============ PAGES / TABS ============
-function showPage(id) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-  if (id === 'page-setup') {
-    document.getElementById('script-url-input').value = getScriptUrl();
-  }
-}
+// ===== PAGES / TABS =====
+function showPage(id) { document.querySelectorAll('.page').forEach(p => p.classList.remove('active')); document.getElementById(id).classList.add('active'); if (id === 'page-setup') document.getElementById('script-url-input').value = getScriptUrl(); }
 let currentTab = 'dashboard';
 function showTab(tab, btn) {
   currentTab = tab;
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  document.getElementById('tab-dashboard').style.display = 'none';
-  document.getElementById('tab-equipment').style.display = 'none';
-  document.getElementById('tab-sites-content').style.display = 'none';
-  document.getElementById('tab-settings-content').style.display = 'none';
+  ['tab-dashboard','tab-equipment','tab-sites-content','tab-settings-content'].forEach(id => document.getElementById(id).style.display = 'none');
   if (tab === 'dashboard') { document.getElementById('tab-dashboard').style.display = ''; renderDashboard(); }
   if (tab === 'equipment') { document.getElementById('tab-equipment').style.display = ''; renderEquipmentTable(); populateSiteFilter(); }
   if (tab === 'sites') { document.getElementById('tab-sites-content').style.display = ''; renderSites(); }
-  if (tab === 'settings') {
-    document.getElementById('tab-settings-content').style.display = '';
-    document.getElementById('script-url-settings').value = getScriptUrl();
-    renderSettings();
-  }
+  if (tab === 'settings') { document.getElementById('tab-settings-content').style.display = ''; document.getElementById('script-url-settings').value = getScriptUrl(); renderSettings(); }
 }
-function refreshCurrentTab() {
-  if (currentTab === 'dashboard') renderDashboard();
-  else if (currentTab === 'equipment') { renderEquipmentTable(); populateSiteFilter(); }
-  else if (currentTab === 'sites') renderSites();
-}
+function refreshCurrentTab() { showTab(currentTab, document.querySelector('.tab-btn.active')); }
 
-// ============ UTILS ============
+// ===== UTILS =====
 function daysUntil(d) {
-  if (!d || String(d).trim() === '') return 9999;
+  if (!d || String(d).trim() === '' || String(d).trim() === 'null') return 9999;
   const today = new Date(); today.setHours(0,0,0,0);
   const parsed = new Date(String(d).trim());
   if (isNaN(parsed)) return 9999;
   return Math.round((parsed - today) / 86400000);
 }
-function formatDate(s) {
-  if (!s) return '—';
-  const d = new Date(s);
-  return isNaN(d) ? s : d.toLocaleDateString('he-IL');
-}
-function getStatus(next) {
-  const d = daysUntil(next);
-  if (d <= 14) return 'danger';
-  if (d <= 30) return 'warn';
-  return 'ok';
-}
+function formatDate(s) { if (!s || s === 'null') return '—'; const d = new Date(String(s).trim()); return isNaN(d) ? s : d.toLocaleDateString('he-IL'); }
+function getStatus(next) { const d = daysUntil(next); if (d <= 14) return 'danger'; if (d <= 30) return 'warn'; return 'ok'; }
 function statusBadge(st, days) {
   const L = { ok:'תקין', warn:'קרוב לבדיקה', danger: days < 0 ? 'פג תוקף!' : 'דחוף' };
   const C = { ok:'badge-ok', warn:'badge-warn', danger:'badge-danger' };
   return `<span class="badge ${C[st]}">${L[st]}</span>`;
 }
 function getSiteName(id) { const s = appData.sites.find(x => x.id == id); return s ? s.name : '—'; }
-function getUserEquipment() {
-  if (!currentUser || currentUser.role === 'admin') return appData.equipment;
-  return appData.equipment.filter(e => e.siteId == currentUser.siteId);
-}
+function getUserEquipment() { if (!currentUser || currentUser.role === 'admin') return appData.equipment; return appData.equipment.filter(e => e.siteId == currentUser.siteId); }
 function waLink(phone, name, siteId, nextCheck) {
   const p = String(phone == null ? '' : phone).replace(/^0/,'972').replace(/\D/g,'');
   if (!p) return '';
@@ -606,45 +738,39 @@ function waLink(phone, name, siteId, nextCheck) {
     WhatsApp
   </a>`;
 }
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2500);
-}
+function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500); }
 
-// ============ DASHBOARD ============
+// ===== DASHBOARD =====
 function renderDashboard() {
   const eqs = getUserEquipment();
   const danger = eqs.filter(e => getStatus(e.nextCheck) === 'danger').length;
   const warn = eqs.filter(e => getStatus(e.nextCheck) === 'warn').length;
+  const ok = eqs.length - danger - warn;
   document.getElementById('stats-grid').innerHTML = `
-    <div class="stat-card"><div class="stat-label">סה"כ אמצעים</div><div class="stat-value">${eqs.length}</div></div>
-    <div class="stat-card danger"><div class="stat-label">דחוף / פג תוקף</div><div class="stat-value">${danger}</div></div>
-    <div class="stat-card warning"><div class="stat-label">קרוב לבדיקה (30 יום)</div><div class="stat-value">${warn}</div></div>
-    <div class="stat-card success"><div class="stat-label">תקין</div><div class="stat-value">${eqs.length - danger - warn}</div></div>`;
+    <div class="stat-card"><div class="stat-icon blue">🏗️</div><div class="stat-info"><div class="stat-label">סה"כ אמצעים</div><div class="stat-value blue">${eqs.length}</div></div></div>
+    <div class="stat-card"><div class="stat-icon red">🚨</div><div class="stat-info"><div class="stat-label">דחוף / פג תוקף</div><div class="stat-value red">${danger}</div></div></div>
+    <div class="stat-card"><div class="stat-icon amber">⏰</div><div class="stat-info"><div class="stat-label">קרוב לבדיקה</div><div class="stat-value amber">${warn}</div></div></div>
+    <div class="stat-card"><div class="stat-icon green">✅</div><div class="stat-info"><div class="stat-label">תקין</div><div class="stat-value green">${ok}</div></div></div>`;
   const alerts = eqs.filter(e => e.nextCheck && String(e.nextCheck).trim() !== '' && daysUntil(e.nextCheck) <= 30).sort((a,b) => daysUntil(a.nextCheck) - daysUntil(b.nextCheck));
-  if (!alerts.length) {
-    document.getElementById('alerts-list').innerHTML = '<div style="color:var(--text-muted);font-size:14px;padding:1rem 0">אין התרעות פעילות — כל האמצעים תקינים ✓</div>';
-    return;
-  }
+  if (!alerts.length) { document.getElementById('alerts-list').innerHTML = '<div style="color:var(--text-muted);font-size:14px;padding:0.5rem 0;display:flex;align-items:center;gap:8px"><span style="font-size:20px">✅</span> אין התרעות פעילות — כל האמצעים תקינים</div>'; return; }
   document.getElementById('alerts-list').innerHTML = alerts.map(e => {
     const days = daysUntil(e.nextCheck);
     const st = getStatus(e.nextCheck);
-    const cls = st === 'danger' ? 'red' : 'orange';
+    const cls = st === 'danger' ? 'red' : 'amber';
     const daysTxt = days < 0 ? `פג לפני ${Math.abs(days)} ימים` : days === 0 ? 'היום!' : `${days} ימים`;
     return `<div class="alert-item ${cls}">
+      <div class="alert-dot ${cls}"></div>
       <div class="alert-info">
-        <div class="alert-name">${e.name} <span style="color:var(--text-muted);font-size:12px">(${e.eqId})</span></div>
-        <div class="alert-meta">${getSiteName(e.siteId)} · בדיקה הבאה: ${formatDate(e.nextCheck)}</div>
+        <div class="alert-name">${e.name} <span style="color:var(--text-muted);font-size:12px;font-weight:400">(${e.eqId})</span></div>
+        <div class="alert-meta">📍 ${getSiteName(e.siteId)} · 📅 בדיקה הבאה: ${formatDate(e.nextCheck)}</div>
       </div>
-      <span class="alert-days ${cls}" style="margin:0 12px">${daysTxt}</span>
+      <span class="alert-days ${cls}">${daysTxt}</span>
       ${waLink(e.phone, e.name, e.siteId, e.nextCheck)}
     </div>`;
   }).join('');
 }
 
-// ============ EQUIPMENT ============
+// ===== EQUIPMENT =====
 function populateSiteFilter() {
   const sites = currentUser.role === 'admin' ? appData.sites : appData.sites.filter(s => s.id == currentUser.siteId);
   document.getElementById('filter-site').innerHTML = '<option value="">כל האתרים</option>' + sites.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
@@ -659,46 +785,37 @@ function renderEquipmentTable() {
   if (q) eqs = eqs.filter(e => (e.name||'').toLowerCase().includes(q) || (e.eqId||'').toLowerCase().includes(q));
   const isAdmin = currentUser.role === 'admin';
   document.getElementById('eq-tbody').innerHTML = eqs.map(e => {
-    const days = daysUntil(e.nextCheck);
-    const st = getStatus(e.nextCheck);
+    const days = daysUntil(e.nextCheck); const st = getStatus(e.nextCheck);
     return `<tr>
-      <td><strong>${e.eqId||'—'}</strong></td><td>${e.name}</td><td>${e.type||'—'}</td>
-      <td>${getSiteName(e.siteId)}</td><td>${formatDate(e.lastCheck)}</td><td>${formatDate(e.nextCheck)}</td>
+      <td><strong style="color:var(--blue)">${e.eqId||'—'}</strong></td>
+      <td>${e.name}</td><td><span style="color:var(--text-muted)">${e.type||'—'}</span></td>
+      <td>📍 ${getSiteName(e.siteId)}</td>
+      <td>${formatDate(e.lastCheck)}</td><td>${formatDate(e.nextCheck)}</td>
       <td>${statusBadge(st,days)}</td>
       <td><div class="actions-cell">
-        <button class="btn-icon" onclick="viewEquipment(${e.id})">👁</button>
-        ${isAdmin ? `<button class="btn-icon" onclick="editEquipment(${e.id})">✏️</button>` : ''}
-        ${isAdmin ? `<button class="btn-icon del" onclick="deleteEquipment(${e.id})">🗑</button>` : ''}
+        <button class="btn-icon" onclick="viewEquipment(${e.id})" title="פרטים">👁</button>
+        ${isAdmin ? `<button class="btn-icon" onclick="editEquipment(${e.id})" title="עריכה">✏️</button>` : ''}
+        ${isAdmin ? `<button class="btn-icon del" onclick="deleteEquipment(${e.id})" title="מחיקה">🗑</button>` : ''}
       </div></td>
     </tr>`;
   }).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:2rem">לא נמצאו אמצעים</td></tr>';
 }
-
 function viewEquipment(id) {
   const e = appData.equipment.find(x => x.id === id);
   if (!e) return;
-  const days = daysUntil(e.nextCheck);
+  const days = daysUntil(e.nextCheck); const st = getStatus(e.nextCheck);
   document.getElementById('view-eq-body').innerHTML = `
-    ${e.imageData ? `<img src="${e.imageData}" style="width:100%;max-height:180px;object-fit:cover;border-radius:8px;margin-bottom:1rem">` : ''}
+    ${e.imageData ? `<img src="${e.imageData}" style="width:100%;max-height:180px;object-fit:cover;border-radius:8px;margin-bottom:1rem;border:1px solid var(--border)">` : ''}
     <table style="width:100%;font-size:14px;border-collapse:collapse">
-      ${[['מספר מזהה', e.eqId],['שם',e.name],['סוג',e.type||'—'],['אתר',getSiteName(e.siteId)],
-         ['בדיקה אחרונה',formatDate(e.lastCheck)],['בדיקה הבאה',formatDate(e.nextCheck)],
-         ['סטטוס',statusBadge(getStatus(e.nextCheck),days)],['הערות',e.notes||'—']
-        ].map((r,i) => `<tr><td style="color:var(--text-muted);padding:8px 0;width:40%;${i>0?'border-top:0.5px solid var(--border)':''}">${r[0]}</td><td style="${i>0?'border-top:0.5px solid var(--border)':''}">${r[1]}</td></tr>`).join('')}
+      ${[['מספר מזהה',`<strong style="color:var(--blue)">${e.eqId}</strong>`],['שם',e.name],['סוג',e.type||'—'],['אתר','📍 '+getSiteName(e.siteId)],['בדיקה אחרונה',formatDate(e.lastCheck)],['בדיקה הבאה',formatDate(e.nextCheck)],['סטטוס',statusBadge(st,days)],['הערות',e.notes||'—']].map((r,i)=>`<tr><td style="color:var(--text-muted);padding:9px 0;width:40%;${i>0?'border-top:1px solid var(--border)':''};font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">${r[0]}</td><td style="${i>0?'border-top:1px solid var(--border)':''}padding:9px 0">${r[1]}</td></tr>`).join('')}
     </table>
-    <div style="margin-top:1rem">${waLink(e.phone, e.name, e.siteId, e.nextCheck)}</div>`;
+    <div style="margin-top:1rem">${waLink(e.phone,e.name,e.siteId,e.nextCheck)}</div>`;
   openModal('modal-view-eq');
 }
-
 async function deleteEquipment(id) {
   if (!confirm('האם למחוק אמצעי זה?')) return;
-  try {
-    await apiPost({ action: 'deleteEquipment', data: { id } });
-    showToast('אמצעי נמחק');
-    await loadData();
-  } catch(e) { alert('שגיאה: ' + e.message); }
+  try { await apiPost({ action: 'deleteEquipment', data: { id } }); showToast('אמצעי נמחק'); await loadData(); } catch(e) { alert('שגיאה: '+e.message); }
 }
-
 function editEquipment(id) {
   editingEqId = id;
   const e = appData.equipment.find(x => x.id === id);
@@ -719,7 +836,7 @@ function editEquipment(id) {
   openModal('modal-add-eq');
 }
 
-// ============ ADD MODAL ============
+// ===== ADD MODAL =====
 function openAddModal() {
   editingEqId = null;
   document.getElementById('modal-eq-title').textContent = 'הוספת אמצעי חדש';
@@ -735,51 +852,22 @@ function populateEqSites() {
   document.getElementById('eq-site').innerHTML = appData.sites.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
   if (currentUser.siteId) document.getElementById('eq-site').value = currentUser.siteId;
 }
-
 async function saveEquipment() {
   const eqId = document.getElementById('eq-id').value.trim();
   const name = document.getElementById('eq-name').value.trim();
   if (!eqId || !name) { alert('נא למלא מספר מזהה ושם'); return; }
-  const imgSrc = document.getElementById('img-preview').src;
-  const imageData = imgSrc && !imgSrc.endsWith(window.location.href) && imgSrc.startsWith('data:') ? imgSrc : (editingEqId ? (appData.equipment.find(e=>e.id===editingEqId)||{}).imageData||'' : '');
-  const data = {
-    id: editingEqId,
-    eqId, name, type: document.getElementById('eq-type').value,
-    siteId: parseInt(document.getElementById('eq-site').value),
-    lastCheck: document.getElementById('eq-last').value,
-    nextCheck: document.getElementById('eq-next').value,
-    phone: document.getElementById('eq-phone').value,
-    notes: document.getElementById('eq-notes').value,
-    imageData: imageData || ''
-  };
-  try {
-    await apiPost({ action: editingEqId ? 'updateEquipment' : 'addEquipment', data });
-    showToast(editingEqId ? 'אמצעי עודכן ✓' : 'אמצעי נוסף ✓');
-    closeModal('modal-add-eq');
-    await loadData();
-  } catch(e) { alert('שגיאה: ' + e.message); }
+  const imgEl = document.getElementById('img-preview');
+  const imageData = imgEl.style.display !== 'none' && imgEl.src.startsWith('data:') ? imgEl.src : (editingEqId ? (appData.equipment.find(e=>e.id===editingEqId)||{}).imageData||'' : '');
+  const data = { id: editingEqId, eqId, name, type: document.getElementById('eq-type').value, siteId: parseInt(document.getElementById('eq-site').value), lastCheck: document.getElementById('eq-last').value, nextCheck: document.getElementById('eq-next').value, phone: document.getElementById('eq-phone').value, notes: document.getElementById('eq-notes').value, imageData: imageData||'' };
+  try { await apiPost({ action: editingEqId ? 'updateEquipment' : 'addEquipment', data }); showToast(editingEqId ? 'אמצעי עודכן ✓' : 'אמצעי נוסף ✓'); closeModal('modal-add-eq'); await loadData(); } catch(e) { alert('שגיאה: '+e.message); }
 }
 
-// ============ IMAGE / AI ============
-function handleDrop(e) {
-  e.preventDefault();
-  document.getElementById('upload-zone').classList.remove('drag');
-  const f = e.dataTransfer.files[0];
-  if (f && f.type.startsWith('image/')) handleFile(f);
-}
-function handleFile(file) {
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = ev => {
-    const img = document.getElementById('img-preview');
-    img.src = ev.target.result; img.style.display = 'block';
-    analyzeImage(ev.target.result);
-  };
-  reader.readAsDataURL(file);
-}
+// ===== IMAGE / AI =====
+function handleDrop(e) { e.preventDefault(); document.getElementById('upload-zone').classList.remove('drag'); const f = e.dataTransfer.files[0]; if (f && f.type.startsWith('image/')) handleFile(f); }
+function handleFile(file) { if (!file) return; const reader = new FileReader(); reader.onload = ev => { const img = document.getElementById('img-preview'); img.src = ev.target.result; img.style.display = 'block'; analyzeImage(ev.target.result); }; reader.readAsDataURL(file); }
 async function analyzeImage(dataUrl) {
   const apiKey = getApiKey();
-  if (!apiKey) { alert('נא להזין API Key בהגדרות'); return; }
+  if (!apiKey) { alert('נא להזין OpenRouter API Key בהגדרות'); return; }
   document.getElementById('ai-loading').style.display = 'flex';
   document.getElementById('ai-result-box').style.display = 'none';
   const base64 = dataUrl.split(',')[1];
@@ -787,56 +875,24 @@ async function analyzeImage(dataUrl) {
   try {
     const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + apiKey,
-        'HTTP-Referer': 'https://itairosenblum-hash.github.io/crane/',
-        'X-Title': 'Safety Inspector'
-      },
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey, 'HTTP-Referer': 'https://itairosenblum-hash.github.io/crane/', 'X-Title': 'Safety Inspector' },
       body: JSON.stringify({
         model: 'meta-llama/llama-3.2-11b-vision-instruct',
         messages: [
-          {
-            role: 'system',
-            content: 'You are a safety document parser. Always respond with valid JSON only, no markdown, no explanation.'
-          },
-          {
-            role: 'user',
-            content: [
-              { type: 'image_url', image_url: { url: 'data:' + mediaType + ';base64,' + base64 } },
-              { type: 'text', text: 'This is a safety inspection document in Hebrew. Extract these fields and return ONLY a JSON object with no markdown or extra text:\n{"eqId":"equipment ID number","type":"equipment type","name":"equipment name/description","lastCheck":"last inspection date as YYYY-MM-DD or null","nextCheck":"next inspection date as YYYY-MM-DD or null","notes":"any relevant notes"}\nIf a field is unclear write null.' }
-            ]
-          }
+          { role: 'system', content: 'You are a safety document parser. Always respond with valid JSON only, no markdown, no explanation.' },
+          { role: 'user', content: [
+            { type: 'image_url', image_url: { url: 'data:' + mediaType + ';base64,' + base64 } },
+            { type: 'text', text: 'This is a safety inspection document in Hebrew. Extract these fields and return ONLY a JSON object:\n{"eqId":"equipment ID number","type":"equipment type","name":"equipment name/description","lastCheck":"YYYY-MM-DD or null","nextCheck":"YYYY-MM-DD or null","notes":"any notes"}' }
+          ]}
         ],
-        temperature: 0.1,
-        max_tokens: 600
+        temperature: 0.1, max_tokens: 600
       })
     });
     const data = await resp.json();
     if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
     const rawText = data.choices[0].message.content.trim();
-    console.log('AI raw response:', rawText);
-    // Extract JSON from response robustly
     let parsed = {};
-    try {
-      // Try direct parse first
-      parsed = JSON.parse(rawText);
-    } catch {
-      try {
-        // Try extracting JSON block
-        const match = rawText.match(/\{[\s\S]*\}/);
-        if (match) parsed = JSON.parse(match[0]);
-      } catch {
-        // Try removing markdown fences
-        try {
-          const clean = rawText.replace(/```json|```/g,'').trim();
-          parsed = JSON.parse(clean);
-        } catch(e) {
-          console.error('Parse failed:', e, rawText);
-        }
-      }
-    }
-    const text = rawText;
+    try { parsed = JSON.parse(rawText); } catch { try { const m = rawText.match(/\{[\s\S]*\}/); if (m) parsed = JSON.parse(m[0]); } catch { try { parsed = JSON.parse(rawText.replace(/```json|```/g,'').trim()); } catch(e) { console.error('Parse failed:', rawText); } } }
     document.getElementById('ai-loading').style.display = 'none';
     document.getElementById('ai-result-box').style.display = 'block';
     if (parsed.eqId) document.getElementById('eq-id').value = parsed.eqId;
@@ -845,106 +901,69 @@ async function analyzeImage(dataUrl) {
     if (parsed.lastCheck && parsed.lastCheck !== 'null') document.getElementById('eq-last').value = parsed.lastCheck;
     if (parsed.nextCheck && parsed.nextCheck !== 'null') document.getElementById('eq-next').value = parsed.nextCheck;
     if (parsed.notes) document.getElementById('eq-notes').value = parsed.notes;
-    showToast('AI זיהה פרטים בהצלחה ✓');
-  } catch(err) {
-    document.getElementById('ai-loading').style.display = 'none';
-    alert('שגיאה בניתוח: ' + err.message);
-  }
+    showToast('AI זיהה פרטים ✓');
+  } catch(err) { document.getElementById('ai-loading').style.display = 'none'; alert('שגיאה: ' + err.message); }
 }
 
-// ============ SITES ============
+// ===== SITES =====
 function renderSites() {
   document.getElementById('sites-tbody').innerHTML = appData.sites.map(s => {
     const cnt = appData.equipment.filter(e => e.siteId == s.id).length;
-    return `<tr><td><strong>${s.name}</strong></td><td>${s.location||'—'}</td><td>${s.manager||'—'}</td><td>${s.phone||'—'}</td><td>${cnt}</td>
-      <td><button class="btn-icon del" onclick="deleteSite(${s.id})">🗑</button></td></tr>`;
+    return `<tr><td><strong>${s.name}</strong></td><td>${s.location||'—'}</td><td>${s.manager||'—'}</td><td>${s.phone||'—'}</td><td><span class="badge badge-ok">${cnt} אמצעים</span></td><td><button class="btn-icon del" onclick="deleteSite(${s.id})">🗑</button></td></tr>`;
   }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:2rem">לא נמצאו אתרים</td></tr>';
 }
-function openSiteModal() {
-  ['site-name','site-location','site-manager','site-phone'].forEach(id => document.getElementById(id).value = '');
-  openModal('modal-add-site');
-}
+function openSiteModal() { ['site-name','site-location','site-manager','site-phone'].forEach(id => document.getElementById(id).value = ''); openModal('modal-add-site'); }
 async function saveSite() {
   const name = document.getElementById('site-name').value.trim();
   if (!name) { alert('נא להזין שם אתר'); return; }
-  try {
-    await apiPost({ action: 'addSite', data: { name, location: document.getElementById('site-location').value, manager: document.getElementById('site-manager').value, phone: document.getElementById('site-phone').value } });
-    showToast('אתר נוסף ✓');
-    closeModal('modal-add-site');
-    await loadData();
-  } catch(e) { alert('שגיאה: ' + e.message); }
+  try { await apiPost({ action: 'addSite', data: { name, location: document.getElementById('site-location').value, manager: document.getElementById('site-manager').value, phone: document.getElementById('site-phone').value } }); showToast('אתר נוסף ✓'); closeModal('modal-add-site'); await loadData(); } catch(e) { alert('שגיאה: '+e.message); }
 }
 async function deleteSite(id) {
   if (!confirm('למחוק אתר זה?')) return;
-  try {
-    await apiPost({ action: 'deleteSite', data: { id } });
-    showToast('אתר נמחק');
-    await loadData();
-  } catch(e) { alert('שגיאה: ' + e.message); }
+  try { await apiPost({ action: 'deleteSite', data: { id } }); showToast('אתר נמחק'); await loadData(); } catch(e) { alert('שגיאה: '+e.message); }
 }
 
-// ============ SETTINGS ============
+// ===== SETTINGS =====
 function renderSettings() {
-  const key = getApiKey();
-  document.getElementById('api-key-input').value = key && key !== DEFAULT_GEMINI_KEY ? '••••••••••••••••' : '';
+  document.getElementById('api-key-input').value = getApiKey() ? '••••••••••••••••' : '';
   document.getElementById('users-list').innerHTML = appData.users.map(u => `
     <div class="user-row">
       <div>
-        <div style="font-size:14px;font-weight:500">${u.fullname||u.username} <span style="font-size:12px;color:var(--text-muted)">(${u.username})</span></div>
-        <div style="font-size:12px;color:var(--text-muted)">${u.role==='admin'?'מנהל':'משתמש'} · ${u.siteId ? getSiteName(u.siteId) : 'כל האתרים'}</div>
+        <div style="font-size:14px;font-weight:600">${u.fullname||u.username} <span style="font-size:12px;color:var(--text-muted);font-weight:400">(${u.username})</span></div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${u.role==='admin'?'👑 מנהל':'👤 משתמש'} · ${u.siteId ? getSiteName(u.siteId) : 'כל האתרים'}</div>
       </div>
       ${u.username !== 'admin' ? `<button class="btn-danger-sm" onclick="deleteUser('${u.username}')">הסר</button>` : ''}
     </div>`).join('');
 }
-function openUserModal() {
-  ['new-username','new-fullname','new-password','new-user-phone'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('new-user-site').innerHTML = '<option value="">כל האתרים</option>' + appData.sites.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-  openModal('modal-add-user');
+function saveScriptUrl() { const val = document.getElementById('script-url-input').value.trim(); if (!val) { alert('נא להזין URL'); return; } localStorage.setItem(SCRIPT_URL_STORE, val); showToast('URL נשמר'); showPage('page-login'); }
+function saveScriptUrlFromSettings() { const val = document.getElementById('script-url-settings').value.trim(); if (!val) return; localStorage.setItem(SCRIPT_URL_STORE, val); showToast('URL עודכן'); }
+async function testConnection() {
+  const url = (document.getElementById('script-url-input') || document.getElementById('script-url-settings')).value.trim() || getScriptUrl();
+  const res = document.getElementById('conn-result');
+  if (res) res.innerHTML = '<span style="color:var(--accent)">בודק...</span>';
+  try { const r = await fetch(url + '?action=getAll'); const d = await r.json(); const msg = d.sites !== undefined ? `✅ חיבור תקין! ${(d.sites||[]).length} אתרים` : '⚠️ תשובה לא צפויה'; if (res) res.innerHTML = `<span style="color:var(--success)">${msg}</span>`; else alert(msg); } catch(e) { const msg = '❌ שגיאה: ' + e.message; if (res) res.innerHTML = `<span style="color:var(--danger)">${msg}</span>`; else alert(msg); }
 }
+function saveApiKey() { const val = document.getElementById('api-key-input').value.trim(); if (!val || val.startsWith('•')) { alert('נא להזין מפתח חדש'); return; } localStorage.setItem(GEMINI_KEY_STORE, val); showToast('מפתח נשמר ✓'); }
+function openUserModal() { ['new-username','new-fullname','new-password','new-user-phone'].forEach(id => document.getElementById(id).value = ''); document.getElementById('new-user-site').innerHTML = '<option value="">כל האתרים</option>' + appData.sites.map(s => `<option value="${s.id}">${s.name}</option>`).join(''); openModal('modal-add-user'); }
 async function saveUser() {
   const username = document.getElementById('new-username').value.trim();
   const password = document.getElementById('new-password').value;
   if (!username || !password) { alert('נא למלא שם משתמש וסיסמה'); return; }
-  try {
-    const res = await apiPost({ action: 'addUser', data: {
-      username, password, fullname: document.getElementById('new-fullname').value || username,
-      role: 'user', phone: document.getElementById('new-user-phone').value,
-      siteId: document.getElementById('new-user-site').value || ''
-    }});
-    if (!res.ok) { alert(res.msg); return; }
-    showToast('משתמש נוסף ✓');
-    closeModal('modal-add-user');
-    await loadData();
-    renderSettings();
-  } catch(e) { alert('שגיאה: ' + e.message); }
+  try { const res = await apiPost({ action: 'addUser', data: { username, password, fullname: document.getElementById('new-fullname').value||username, role:'user', phone: document.getElementById('new-user-phone').value, siteId: document.getElementById('new-user-site').value||'' } }); if (!res.ok) { alert(res.msg); return; } showToast('משתמש נוסף ✓'); closeModal('modal-add-user'); await loadData(); renderSettings(); } catch(e) { alert('שגיאה: '+e.message); }
 }
 async function deleteUser(username) {
   if (!confirm(`למחוק משתמש ${username}?`)) return;
-  try {
-    await apiPost({ action: 'deleteUser', data: { username } });
-    showToast('משתמש הוסר');
-    await loadData(); renderSettings();
-  } catch(e) { alert('שגיאה: ' + e.message); }
+  try { await apiPost({ action:'deleteUser', data:{username} }); showToast('משתמש הוסר'); await loadData(); renderSettings(); } catch(e) { alert('שגיאה: '+e.message); }
 }
 
-// ============ MODALS ============
+// ===== MODALS =====
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
-document.querySelectorAll('.modal-overlay').forEach(m => {
-  m.addEventListener('click', function(e) { if (e.target === this) closeModal(this.id); });
-});
+document.querySelectorAll('.modal-overlay').forEach(m => { m.addEventListener('click', function(e) { if (e.target === this) closeModal(this.id); }); });
 
-// ============ INIT ============
-if (!localStorage.getItem(GEMINI_KEY_STORE)) {
-  localStorage.setItem(GEMINI_KEY_STORE, DEFAULT_GEMINI_KEY);
-}
-const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzF1RbTKJrqnZjgK-r4gxg2l-swF-5xL-YLdoCqncjT9rPsVso4iv3DMtvLpDSQJ5IqVg/exec';
-if (!localStorage.getItem(SCRIPT_URL_STORE)) {
-  localStorage.setItem(SCRIPT_URL_STORE, DEFAULT_SCRIPT_URL);
-}
-if (!getScriptUrl()) {
-  document.getElementById('no-script-warning').style.display = 'block';
-}
+// ===== INIT =====
+if (!localStorage.getItem(SCRIPT_URL_STORE)) localStorage.setItem(SCRIPT_URL_STORE, DEFAULT_SCRIPT_URL);
+if (!getScriptUrl()) document.getElementById('no-script-warning').style.display = 'block';
 </script>
 </body>
 </html>
