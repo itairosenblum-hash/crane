@@ -436,8 +436,8 @@ async function loadData() {
   setSyncStatus('ing', 'טוען...');
   try {
     const data = await apiGet({ action: 'getAll' });
-    appData.sites = (data.sites || []).map(s => ({ ...s, id: parseInt(s.id) }));
-    appData.equipment = (data.equipment || []).map(e => ({ ...e, id: parseInt(e.id), siteId: parseInt(e.siteId) }));
+    appData.sites = (data.sites || []).map(s => ({ ...s, id: parseInt(s.id), phone: String(s.phone||''), manager: String(s.manager||'') }));
+    appData.equipment = (data.equipment || []).map(e => ({ ...e, id: parseInt(e.id), siteId: parseInt(e.siteId), phone: String(e.phone||''), eqId: String(e.eqId||''), name: String(e.name||''), type: String(e.type||''), notes: String(e.notes||''), lastCheck: String(e.lastCheck||''), nextCheck: String(e.nextCheck||'') }));
     appData.users = data.users || [];
     setSyncStatus('ok', 'מחובר ל-Sheets ✓');
     refreshCurrentTab();
@@ -586,7 +586,7 @@ function getUserEquipment() {
   return appData.equipment.filter(e => e.siteId == currentUser.siteId);
 }
 function waLink(phone, name, siteId, nextCheck) {
-  const p = (phone||'').replace(/^0/,'972').replace(/\D/g,'');
+  const p = String(phone||'').replace(/^0/,'972').replace(/\D/g,'');
   if (!p) return '';
   const msg = encodeURIComponent(`שלום, תזכורת: האמצעי "${name}" באתר "${getSiteName(siteId)}" מיועד לבדיקה בתאריך ${formatDate(nextCheck)}. נא לתאם בדיקה.`);
   return `<a class="btn-wa" href="https://wa.me/${p}?text=${msg}" target="_blank">
