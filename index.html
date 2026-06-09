@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html><!-- v3 -->
 <html lang="he" dir="rtl">
 <head>
 <meta charset="UTF-8">
@@ -560,9 +560,11 @@ function refreshCurrentTab() {
 
 // ============ UTILS ============
 function daysUntil(d) {
-  if (!d) return 9999;
+  if (!d || String(d).trim() === '') return 9999;
   const today = new Date(); today.setHours(0,0,0,0);
-  return Math.round((new Date(d) - today) / 86400000);
+  const parsed = new Date(String(d).trim());
+  if (isNaN(parsed)) return 9999;
+  return Math.round((parsed - today) / 86400000);
 }
 function formatDate(s) {
   if (!s) return '—';
@@ -586,7 +588,7 @@ function getUserEquipment() {
   return appData.equipment.filter(e => e.siteId == currentUser.siteId);
 }
 function waLink(phone, name, siteId, nextCheck) {
-  const p = String(phone||'').replace(/^0/,'972').replace(/\D/g,'');
+  const p = String(phone == null ? '' : phone).replace(/^0/,'972').replace(/\D/g,'');
   if (!p) return '';
   const msg = encodeURIComponent(`שלום, תזכורת: האמצעי "${name}" באתר "${getSiteName(siteId)}" מיועד לבדיקה בתאריך ${formatDate(nextCheck)}. נא לתאם בדיקה.`);
   return `<a class="btn-wa" href="https://wa.me/${p}?text=${msg}" target="_blank">
@@ -611,7 +613,7 @@ function renderDashboard() {
     <div class="stat-card danger"><div class="stat-label">דחוף / פג תוקף</div><div class="stat-value">${danger}</div></div>
     <div class="stat-card warning"><div class="stat-label">קרוב לבדיקה (30 יום)</div><div class="stat-value">${warn}</div></div>
     <div class="stat-card success"><div class="stat-label">תקין</div><div class="stat-value">${eqs.length - danger - warn}</div></div>`;
-  const alerts = eqs.filter(e => daysUntil(e.nextCheck) <= 30).sort((a,b) => daysUntil(a.nextCheck) - daysUntil(b.nextCheck));
+  const alerts = eqs.filter(e => e.nextCheck && String(e.nextCheck).trim() !== '' && daysUntil(e.nextCheck) <= 30).sort((a,b) => daysUntil(a.nextCheck) - daysUntil(b.nextCheck));
   if (!alerts.length) {
     document.getElementById('alerts-list').innerHTML = '<div style="color:var(--text-muted);font-size:14px;padding:1rem 0">אין התרעות פעילות — כל האמצעים תקינים ✓</div>';
     return;
