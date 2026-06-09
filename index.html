@@ -560,8 +560,12 @@ tr:hover td { background: rgba(30,77,183,0.02); }
         <div class="ai-result"><span class="ai-badge">AI</span>פרטים שזוהו — ניתן לערוך</div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>מספר סידורי *</label><input type="text" id="eq-id" placeholder="136323/155589"></div>
+        <div class="form-group"><label>מספר תסקיר *</label><input type="text" id="eq-id" placeholder="136323/155589"></div>
+        <div class="form-group"><label>מספר סידורי אמצעי</label><input type="text" id="eq-serial" placeholder="7206179"></div>
+      </div>
+      <div class="form-row">
         <div class="form-group"><label>מספר פנימי</label><input type="text" id="eq-internal-id" placeholder="מספר פנימי"></div>
+        <div class="form-group"><label>מספר רישיון</label><input type="text" id="eq-license2" placeholder="מספר רישיון"></div>
       </div>
       <div class="form-row">
         <div class="form-group"><label>סוג האמצעי</label><input type="text" id="eq-type" placeholder="מלגזה / מנוף / עגורן..."></div>
@@ -585,7 +589,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
         <div class="form-group"><label>גובה / רדיוס (מטר)</label><input type="text" id="eq-height" placeholder="4.15"></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>מספר רישיון / תסקיר</label><input type="text" id="eq-license" placeholder="מספר רישיון"></div>
+        <div class="form-group"><label>שנת יצור</label><input type="text" id="eq-year" placeholder="2026"></div>
         <div class="form-group"><label>סוג בדיקה</label><input type="text" id="eq-inspection-type" placeholder="ראשונית / תקופתית"></div>
       </div>
       <div class="form-group"><label>שם הבודק</label><input type="text" id="eq-inspector" placeholder="שם הבודק"></div>
@@ -813,7 +817,7 @@ function renderEquipmentTable() {
   document.getElementById('eq-tbody').innerHTML = eqs.map(e => {
     const days = daysUntil(e.nextCheck); const st = getStatus(e.nextCheck);
     return `<tr>
-      <td><strong style="color:var(--blue)">${e.eqId||'—'}</strong></td>
+      <td><strong style="color:var(--blue)">${e.eqId||'—'}</strong><br><span style='font-size:11px;color:var(--text-muted)'>${e.serialNumber||''}</span></td>
       <td>${e.name}</td><td><span style="color:var(--text-muted)">${e.type||'—'}</span></td>
       <td>📍 ${getSiteName(e.siteId)}</td>
       <td>${formatDate(e.lastCheck)}</td><td>${formatDate(e.nextCheck)}</td>
@@ -834,8 +838,11 @@ function viewEquipment(id) {
     ${e.imageData ? `<img src="${e.imageData}" style="width:100%;max-height:180px;object-fit:cover;border-radius:8px;margin-bottom:1rem;border:1px solid var(--border)">` : ''}
     <table style="width:100%;font-size:14px;border-collapse:collapse">
       ${[
-      ['מספר סידורי',`<strong style="color:var(--blue)">${e.eqId||'—'}</strong>`],
+      ['מספר תסקיר',`<strong style="color:var(--blue)">${e.eqId||'—'}</strong>`],
+      ['מספר סידורי אמצעי', e.serialNumber||'—'],
       ['מספר פנימי', e.internalId||'—'],
+      ['מספר רישיון', e.licenseNumber||'—'],
+      ['שנת יצור', e.manufacturingYear||'—'],
       ['סוג', e.type||'—'],
       ['יצרן / דגם', [e.manufacturer,e.name].filter(Boolean).join(' ')||'—'],
       ['מיקום', e.location||'—'],
@@ -847,7 +854,6 @@ function viewEquipment(id) {
       ['עומס מקסימלי', e.maxLoad ? e.maxLoad+' טון' : '—'],
       ['עומס בחון', e.testLoad ? e.testLoad+' טון' : '—'],
       ['גובה / רדיוס', e.height ? e.height+' מ׳' : '—'],
-      ['מספר רישיון', e.licenseNumber||'—'],
       ['סוג בדיקה', e.inspectionType||'—'],
       ['שם הבודק', e.inspectorName||'—'],
       ['הערות',e.notes||'—']
@@ -867,15 +873,16 @@ function editEquipment(id) {
   document.getElementById('modal-eq-title').textContent = 'עריכת אמצעי';
   populateEqSites();
   const sv = (id, val) => { const el = document.getElementById(id); if(el) el.value = val||''; };
-  sv('eq-id', e.eqId); sv('eq-internal-id', e.internalId);
+  sv('eq-id', e.eqId); sv('eq-serial', e.serialNumber);
+  sv('eq-internal-id', e.internalId); sv('eq-license2', e.licenseNumber);
   sv('eq-type', e.type); sv('eq-manufacturer', e.manufacturer);
   sv('eq-name', e.name); sv('eq-location', e.location);
+  sv('eq-year', e.manufacturingYear);
   document.getElementById('eq-site').value = e.siteId;
   sv('eq-last', e.lastCheck); sv('eq-next', e.nextCheck);
   sv('eq-swl', e.safeWorkLoad); sv('eq-max-load', e.maxLoad);
   sv('eq-test-load', e.testLoad); sv('eq-height', e.height);
-  sv('eq-license', e.licenseNumber); sv('eq-inspection-type', e.inspectionType);
-  sv('eq-inspector', e.inspectorName);
+  sv('eq-inspection-type', e.inspectionType); sv('eq-inspector', e.inspectorName);
   sv('eq-phone', e.phone); sv('eq-notes', e.notes);
   const img = document.getElementById('img-preview');
   if (e.imageData) { img.src = e.imageData; img.style.display = 'block'; } else { img.style.display = 'none'; }
@@ -887,7 +894,7 @@ function editEquipment(id) {
 function openAddModal() {
   editingEqId = null;
   document.getElementById('modal-eq-title').textContent = 'הוספת אמצעי חדש';
-  ['eq-id','eq-internal-id','eq-type','eq-manufacturer','eq-name','eq-location','eq-last','eq-next','eq-swl','eq-max-load','eq-test-load','eq-height','eq-license','eq-inspection-type','eq-inspector','eq-phone','eq-notes'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  ['eq-id','eq-serial','eq-internal-id','eq-license2','eq-type','eq-manufacturer','eq-name','eq-location','eq-year','eq-last','eq-next','eq-swl','eq-max-load','eq-test-load','eq-height','eq-inspection-type','eq-inspector','eq-phone','eq-notes'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
   document.getElementById('img-preview').style.display = 'none';
   document.getElementById('ai-result-box').style.display = 'none';
   document.getElementById('ai-loading').style.display = 'none';
@@ -908,9 +915,12 @@ async function saveEquipment() {
   const gv = id => { const el = document.getElementById(id); return el ? el.value : ''; };
   const data = {
     id: editingEqId, eqId, name,
+    serialNumber: gv('eq-serial'),
     type: gv('eq-type'),
     manufacturer: gv('eq-manufacturer'),
     internalId: gv('eq-internal-id'),
+    licenseNumber: gv('eq-license2'),
+    manufacturingYear: gv('eq-year'),
     location: gv('eq-location'),
     siteId: parseInt(document.getElementById('eq-site').value),
     lastCheck: gv('eq-last'),
@@ -919,7 +929,6 @@ async function saveEquipment() {
     maxLoad: gv('eq-max-load'),
     testLoad: gv('eq-test-load'),
     height: gv('eq-height'),
-    licenseNumber: gv('eq-license'),
     inspectionType: gv('eq-inspection-type'),
     inspectorName: gv('eq-inspector'),
     phone: gv('eq-phone'),
@@ -949,36 +958,60 @@ async function analyzeImage(dataUrl) {
           { role: 'system', content: 'You are a safety document parser. Always respond with valid JSON only, no markdown, no explanation.' },
           { role: 'user', content: [
             { type: 'image_url', image_url: { url: 'data:' + mediaType + ';base64,' + base64 } },
-            { type: 'text', text: `You are analyzing a Hebrew safety inspection certificate ("תסקיר בדיקה וניסוי") for lifting equipment in Israel (מכונות הרמה).
+            { type: 'text', text: `You are analyzing a Hebrew safety inspection certificate called "תסקיר בדיקה וניסוי מכונות-הרמה" (Israeli lifting equipment inspection report).
 
-Look carefully at the ENTIRE document and extract ALL of these fields. Return ONLY a valid JSON object, no markdown, no text before or after.
+Study the document carefully. Here is exactly where each field appears:
 
+TOP-LEFT BOX of the document contains:
+- "מספר תסקיר:" = inspectionNumber (e.g. 136323/155589)
+- "תאריך בדיקה מוכחת:" = lastCheck date (format DD/MM/YYYY → convert to YYYY-MM-DD)
+- "תאריך בדיקה הבאה:" = nextCheck date (format DD/MM/YYYY → convert to YYYY-MM-DD)
+
+SECTION 2 - "תיאור המתקן" TABLE contains:
+- "מספר רישיון" column = licenseNumber
+- "שנת יצור" = manufacturingYear  
+- "מספר פנימי" column = internalId
+- "מספר סידורי" column (in the equipment rows) = serialNumber (e.g. 7206179) - THIS IS THE EQUIPMENT SERIAL NUMBER
+- "יצרן, דגם" column = manufacturer and model (e.g. TOYOTA SWE145)
+- "תיאור" column = description of equipment
+- "רדיוס עומס (מטר)" = radius/height
+- "עומס מקסימלי (טון)" = maxLoad (e.g. 1.4)  
+- "עומס עבודה בטוח (טון)" = safeWorkLoad (e.g. 1.2)
+- "עומס מבחן (טון)" = testLoad (e.g. 0.6)
+
+SECTION 1 - "פרטי לקוח" contains:
+- "כתובת:" = location/address
+- "ישוב:" = city
+
+SECTION 4 - "הערות נוספות" = notes/restrictions
+
+Return ONLY this JSON object, nothing else, no markdown:
 {
-  "eqId": "Serial number - look for מספר סידורי or מספר פנימי in the equipment table (section 2)",
-  "internalId": "Internal number - מספר פנימי",
-  "type": "Equipment type in Hebrew - e.g. מלגזה, מנוף, עגורן, גונדולה - look in section 2 תיאור המתקן",
-  "name": "Manufacturer + model - look for יצרן, דגם, מכונת הרמה name e.g. TOYOTA SWE145",
-  "manufacturer": "Manufacturer name only",
-  "model": "Model number only",
-  "location": "Location - look for מיקום, כתובת",
-  "lastCheck": "THIS inspection date - look for תאריך בדיקה קודמת or top of document date - convert DD/MM/YYYY to YYYY-MM-DD",
-  "nextCheck": "NEXT inspection date - look for תאריך בדיקה הבאה - convert DD/MM/YYYY to YYYY-MM-DD",
-  "safeWorkLoad": "Safe working load - עומס עבודה בטוח (טון) from the equipment table",
-  "maxLoad": "Maximum load - עומס מקסימלי (טון)",
-  "testLoad": "Test load - עומס בחון (טון)",
-  "height": "Working height or radius - גובה/רדיוס (מטר)",
-  "licenseNumber": "License number - מספר רישיון or מספר תסקיר",
-  "inspectorName": "Inspector name - שם הבודק",
-  "inspectionType": "Type of inspection - סוג בדיקה (ראשונית/תקופתית)",
-  "notes": "Any defects, restrictions or important notes from section 3 or 4 - תקלות, הגבלות, הערות"
+  "inspectionNumber": "מספר תסקיר from top-left box",
+  "serialNumber": "מספר סידורי from section 2 equipment table row",
+  "internalId": "מספר פנימי from section 2",
+  "licenseNumber": "מספר רישיון from section 2",
+  "manufacturingYear": "שנת יצור",
+  "type": "equipment type in Hebrew e.g. מלגזה",
+  "manufacturer": "manufacturer name e.g. TOYOTA",
+  "model": "model number e.g. SWE145",
+  "description": "full equipment description from תיאור column",
+  "location": "address + city from section 1",
+  "lastCheck": "תאריך בדיקה מוכחת converted to YYYY-MM-DD",
+  "nextCheck": "תאריך בדיקה הבאה converted to YYYY-MM-DD",
+  "safeWorkLoad": "עומס עבודה בטוח numeric value only",
+  "maxLoad": "עומס מקסימלי numeric value only",
+  "testLoad": "עומס מבחן numeric value only",
+  "height": "רדיוס/גובה numeric value only",
+  "inspectionType": "סוג בדיקה e.g. ראשונית",
+  "notes": "content of section 4 הערות נוספות"
 }
 
-CRITICAL date rules:
-- Israeli format is DD/MM/YYYY - so 15/03/2026 = 2026-03-15
-- תאריך בדיקה קודמת = lastCheck
-- תאריך בדיקה הבאה = nextCheck
-- Return null for any field not found
-- Return ONLY the JSON, nothing else` }
+CRITICAL: 
+- DD/MM/YYYY dates: 15/03/2026 = 2026-03-15, 15/05/2027 = 2027-05-15
+- serialNumber is in the equipment TABLE rows under "מספר סידורי" column - NOT the inspection number
+- inspectionNumber is in the top-left box next to "מספר תסקיר:"
+- Return null for missing fields` }
           ]}
         ],
         temperature: 0.1, max_tokens: 600
@@ -991,23 +1024,25 @@ CRITICAL date rules:
     try { parsed = JSON.parse(rawText); } catch { try { const m = rawText.match(/\{[\s\S]*\}/); if (m) parsed = JSON.parse(m[0]); } catch { try { parsed = JSON.parse(rawText.replace(/```json|```/g,'').trim()); } catch(e) { console.error('Parse failed:', rawText); } } }
     document.getElementById('ai-loading').style.display = 'none';
     document.getElementById('ai-result-box').style.display = 'block';
-    const setF = (id, val) => { const el = document.getElementById(id); if(el && val && val !== 'null') el.value = val; };
-    setF('eq-id', parsed.eqId);
+    const setF = (id, val) => { const el = document.getElementById(id); if(el && val && String(val) !== 'null' && String(val).trim() !== '') el.value = val; };
+    setF('eq-id', parsed.inspectionNumber);
+    setF('eq-serial', parsed.serialNumber);
     setF('eq-internal-id', parsed.internalId);
+    setF('eq-license2', parsed.licenseNumber);
     setF('eq-type', parsed.type);
     setF('eq-manufacturer', parsed.manufacturer);
-    setF('eq-name', parsed.name || (parsed.manufacturer && parsed.model ? parsed.manufacturer + ' ' + parsed.model : null));
+    setF('eq-name', parsed.model || parsed.name || (parsed.manufacturer && parsed.model ? parsed.manufacturer+' '+parsed.model : null));
     setF('eq-location', parsed.location);
+    setF('eq-year', parsed.manufacturingYear);
     setF('eq-last', parsed.lastCheck);
     setF('eq-next', parsed.nextCheck);
     setF('eq-swl', parsed.safeWorkLoad);
     setF('eq-max-load', parsed.maxLoad);
     setF('eq-test-load', parsed.testLoad);
     setF('eq-height', parsed.height);
-    setF('eq-license', parsed.licenseNumber);
     setF('eq-inspection-type', parsed.inspectionType);
     setF('eq-inspector', parsed.inspectorName);
-    setF('eq-notes', parsed.notes);
+    setF('eq-notes', parsed.notes || parsed.description);
     showToast('AI זיהה פרטים ✓');
   } catch(err) { document.getElementById('ai-loading').style.display = 'none'; alert('שגיאה: ' + err.message); }
 }
