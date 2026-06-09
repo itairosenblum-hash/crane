@@ -295,10 +295,10 @@ tr:hover td { background: #fafaf8; }
       </div>
     </div>
     <div class="settings-card">
-      <h3>🔑 Gemini API Key (לזיהוי תמונות)</h3>
-      <div class="api-notice">נשמר מקומית על המכשיר שלך בלבד. קבל מפתח חינמי: <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a></div>
+      <h3>🔑 OpenRouter API Key (לזיהוי תמונות)</h3>
+      <div class="api-notice">נשמר מקומית על המכשיר שלך בלבד. קבל מפתח חינמי: <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a></div>
       <div class="form-group">
-        <input type="password" id="api-key-input" placeholder="AIzaSy...">
+        <input type="password" id="api-key-input" placeholder="sk-or-...">
       </div>
       <button class="btn-primary-sm" onclick="saveApiKey()">שמור מפתח</button>
     </div>
@@ -324,10 +324,10 @@ tr:hover td { background: #fafaf8; }
            ondrop="handleDrop(event)">
         <input type="file" id="file-input" accept="image/*" onchange="handleFile(this.files[0])">
         <div class="upload-icon">📷</div>
-        <div class="upload-text"><strong>העלה תמונת תסקיר</strong><br>לחץ או גרור — Gemini AI יזהה פרטים אוטומטית</div>
+        <div class="upload-text"><strong>העלה תמונת תסקיר</strong><br>לחץ או גרור — AI יזהה פרטים אוטומטית</div>
       </div>
       <img id="img-preview" class="img-preview">
-      <div id="ai-loading" style="display:none"><div class="loading"><div class="spinner"></div>Gemini AI מנתח את התמונה...</div></div>
+      <div id="ai-loading" style="display:none"><div class="loading"><div class="spinner"></div>AI מנתח את התמונה...</div></div>
       <div id="ai-result-box" style="display:none">
         <div class="ai-result"><div class="ai-result-header"><span class="ai-badge">Gemini AI</span>פרטים שזוהו אוטומטית — ניתן לערוך</div></div>
       </div>
@@ -399,7 +399,7 @@ tr:hover td { background: #fafaf8; }
 
 <script>
 // ============ CONFIG ============
-const GEMINI_KEY_STORE = 'safety_gemini_key';
+const GEMINI_KEY_STORE = 'safety_or_key';
 const SCRIPT_URL_STORE = 'safety_script_url';
 const DEFAULT_GEMINI_KEY = '';
 
@@ -779,26 +779,36 @@ function handleFile(file) {
 }
 async function analyzeImage(dataUrl) {
   const apiKey = getApiKey();
-  if (!apiKey) { alert('נא להזין Gemini API Key בהגדרות'); return; }
+  if (!apiKey) { alert('נא להזין API Key בהגדרות'); return; }
   document.getElementById('ai-loading').style.display = 'flex';
   document.getElementById('ai-result-box').style.display = 'none';
   const base64 = dataUrl.split(',')[1];
   const mediaType = dataUrl.split(';')[0].split(':')[1];
   try {
-    const resp = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
+    const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + apiKey,
+        'HTTP-Referer': 'https://itairosenblum-hash.github.io/crane/',
+        'X-Title': 'Safety Inspector'
+      },
       body: JSON.stringify({
-        contents: [{ parts: [
-          { inline_data: { mime_type: mediaType, data: base64 } },
-          { text: `זהו תסקיר בטיחות. חלץ פרטים בJSON בלבד ללא markdown:\n{"eqId":"מספר מזהה","type":"סוג האמצעי","name":"שם האמצעי","lastCheck":"YYYY-MM-DD או null","nextCheck":"YYYY-MM-DD או null","notes":"הערות"}` }
-        ]}],
-        generationConfig: { temperature: 0.1, maxOutputTokens: 600 }
+        model: 'google/gemini-2.0-flash-exp:free',
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image_url', image_url: { url: 'data:' + mediaType + ';base64,' + base64 } },
+            { type: 'text', text: 'זהו תסקיר בטיחות. חלץ פרטים בJSON בלבד ללא markdown:\n{"eqId":"מספר מזהה","type":"סוג האמצעי","name":"שם האמצעי","lastCheck":"YYYY-MM-DD או null","nextCheck":"YYYY-MM-DD או null","notes":"הערות"}' }
+          ]
+        }],
+        temperature: 0.1,
+        max_tokens: 600
       })
     });
     const data = await resp.json();
-    if (data.error) throw new Error(data.error.message);
-    const text = data.candidates[0].content.parts[0].text.trim();
+    if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+    const text = data.choices[0].message.content.trim();
     let parsed = {};
     try { parsed = JSON.parse(text.replace(/```json|```/g,'').trim()); } catch {}
     document.getElementById('ai-loading').style.display = 'none';
