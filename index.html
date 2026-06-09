@@ -538,6 +538,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
       <button class="btn-close" onclick="closeModal('modal-add-eq')">×</button>
     </div>
     <div class="modal-body">
+      <form autocomplete="off" style="display:contents">
       <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()"
            ondragover="event.preventDefault();this.classList.add('drag')"
            ondragleave="this.classList.remove('drag')"
@@ -560,35 +561,36 @@ tr:hover td { background: rgba(30,77,183,0.02); }
         <div class="ai-result"><span class="ai-badge">AI</span>פרטים שזוהו — ניתן לערוך</div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>מספר תסקיר *</label><input type="text" id="eq-id" placeholder="136323/155589"></div>
-        <div class="form-group"><label>מספר סידורי אמצעי</label><input type="text" id="eq-serial" placeholder="7206179"></div>
+        <div class="form-group"><label>מספר תסקיר *</label><input type="text" id="eq-id" placeholder="136323/155589" autocomplete="off"></div>
+        <div class="form-group"><label>מספר סידורי אמצעי</label><input type="text" id="eq-serial" placeholder="7206179" autocomplete="off"></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>סוג האמצעי</label><input type="text" id="eq-type" placeholder="מלגזה / מנוף / עגורן..."></div>
-        <div class="form-group"><label>יצרן</label><input type="text" id="eq-manufacturer" placeholder="TOYOTA"></div>
+        <div class="form-group"><label>סוג האמצעי</label><input type="text" id="eq-type" placeholder="מלגזה / מנוף / עגורן..." autocomplete="off"></div>
+        <div class="form-group"><label>יצרן</label><input type="text" id="eq-manufacturer" placeholder="TOYOTA" autocomplete="off"></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>דגם *</label><input type="text" id="eq-name" placeholder="SWE145"></div>
-        <div class="form-group"><label>שנת יצור</label><input type="text" id="eq-year" placeholder="2026"></div>
+        <div class="form-group"><label>דגם *</label><input type="text" id="eq-name" placeholder="SWE145" autocomplete="off"></div>
+        <div class="form-group"><label>שנת יצור</label><input type="text" id="eq-year" placeholder="2026" autocomplete="off"></div>
       </div>
       <div class="form-group"><label>אתר *</label><select id="eq-site"></select></div>
       <div class="form-row">
-        <div class="form-group"><label>בדיקה אחרונה (DD/MM/YYYY)</label><input type="text" id="eq-last" placeholder="15/03/2026"></div>
-        <div class="form-group"><label>בדיקה הבאה (DD/MM/YYYY)</label><input type="text" id="eq-next" placeholder="15/05/2027"></div>
+        <div class="form-group"><label>בדיקה אחרונה (DD/MM/YYYY)</label><input type="text" id="eq-last" placeholder="15/03/2026" autocomplete="off"></div>
+        <div class="form-group"><label>בדיקה הבאה (DD/MM/YYYY)</label><input type="text" id="eq-next" placeholder="15/05/2027" autocomplete="off"></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>עומס עבודה בטוח (טון)</label><input type="text" id="eq-swl" placeholder="1.2"></div>
-        <div class="form-group"><label>עומס מקסימלי (טון)</label><input type="text" id="eq-max-load" placeholder="1.4"></div>
+        <div class="form-group"><label>עומס עבודה בטוח (טון)</label><input type="text" id="eq-swl" placeholder="1.2" autocomplete="off"></div>
+        <div class="form-group"><label>עומס מקסימלי (טון)</label><input type="text" id="eq-max-load" placeholder="1.4" autocomplete="off"></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>עומס בחון (טון)</label><input type="text" id="eq-test-load" placeholder="0.6"></div>
-        <div class="form-group"><label>רדיוס / גובה (מטר)</label><input type="text" id="eq-height" placeholder="4.15"></div>
+        <div class="form-group"><label>עומס בחון (טון)</label><input type="text" id="eq-test-load" placeholder="0.6" autocomplete="off"></div>
+        <div class="form-group"><label>רדיוס / גובה (מטר)</label><input type="text" id="eq-height" placeholder="4.15" autocomplete="off"></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>סוג בדיקה</label><input type="text" id="eq-inspection-type" placeholder="ראשונית / תקופתית"></div>
-        <div class="form-group"><label>שם הבודק</label><input type="text" id="eq-inspector" placeholder="שם הבודק"></div>
+        <div class="form-group"><label>סוג בדיקה</label><input type="text" id="eq-inspection-type" placeholder="ראשונית / תקופתית" autocomplete="off"></div>
+        <div class="form-group"><label>שם הבודק</label><input type="text" id="eq-inspector" placeholder="שם הבודק" autocomplete="off"></div>
       </div>
-      <div class="form-group"><label>הערות / תקלות / הגבלות</label><textarea id="eq-notes" rows="3" placeholder="הערות, תקלות, הגבלות..."></textarea></div>
+      <div class="form-group"><label>הערות / תקלות / הגבלות</label><textarea id="eq-notes" rows="3" placeholder="הערות, תקלות, הגבלות..." autocomplete="off"></textarea></div>
+    </form>
     </div>
     <div class="modal-footer">
       <button class="btn-secondary" onclick="closeModal('modal-add-eq')">ביטול</button>
