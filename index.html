@@ -537,61 +537,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
       <h3 id="modal-eq-title">הוספת אמצעי חדש</h3>
       <button class="btn-close" onclick="closeModal('modal-add-eq')">×</button>
     </div>
-    <div class="modal-body">
-      <form autocomplete="off" style="display:contents">
-      <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()"
-           ondragover="event.preventDefault();this.classList.add('drag')"
-           ondragleave="this.classList.remove('drag')"
-           ondrop="handleDrop(event)">
-        <input type="file" id="file-input" accept="image/*" onchange="handleFile(this.files[0])">
-        <svg class="upload-crane" width="56" height="48" viewBox="0 0 56 48" fill="none">
-          <rect x="10" y="8" width="5" height="32" rx="2" fill="#1e4db7"/>
-          <rect x="10" y="8" width="30" height="5" rx="2" fill="#1e4db7"/>
-          <rect x="35" y="13" width="3" height="18" rx="1" fill="#f59e0b"/>
-          <circle cx="38" cy="33" r="4" fill="none" stroke="#f59e0b" stroke-width="2.5"/>
-          <rect x="5" y="8" width="10" height="5" rx="1" fill="#f59e0b"/>
-          <rect x="2" y="38" width="52" height="4" rx="2" fill="#1e4db7" opacity="0.3"/>
-          <rect x="14" y="40" width="10" height="4" rx="1" fill="#1e4db7" opacity="0.5"/>
-        </svg>
-        <div class="upload-text"><strong>העלה תמונת תסקיר</strong><br>לחץ או גרור — AI יזהה פרטים אוטומטית</div>
-      </div>
-      <img id="img-preview" class="img-preview">
-      <div id="ai-loading" style="display:none"><div class="loading"><div class="spinner"></div>AI מנתח את התמונה...</div></div>
-      <div id="ai-result-box" style="display:none">
-        <div class="ai-result"><span class="ai-badge">AI</span>פרטים שזוהו — ניתן לערוך</div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label>מספר תסקיר *</label><input type="text" id="eq-id" placeholder="136323/155589" autocomplete="off"></div>
-        <div class="form-group"><label>מספר סידורי אמצעי</label><input type="text" id="eq-serial" placeholder="7206179" autocomplete="off"></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label>סוג האמצעי</label><input type="text" id="eq-type" placeholder="מלגזה / מנוף / עגורן..." autocomplete="off"></div>
-        <div class="form-group"><label>יצרן</label><input type="text" id="eq-manufacturer" placeholder="TOYOTA" autocomplete="off"></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label>דגם *</label><input type="text" id="eq-name" placeholder="SWE145" autocomplete="off"></div>
-        <div class="form-group"><label>שנת יצור</label><input type="text" id="eq-year" placeholder="2026" autocomplete="off"></div>
-      </div>
-      <div class="form-group"><label>אתר *</label><select id="eq-site"></select></div>
-      <div class="form-row">
-        <div class="form-group"><label>בדיקה אחרונה (DD/MM/YYYY)</label><input type="text" id="eq-last" placeholder="15/03/2026" autocomplete="off"></div>
-        <div class="form-group"><label>בדיקה הבאה (DD/MM/YYYY)</label><input type="text" id="eq-next" placeholder="15/05/2027" autocomplete="off"></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label>עומס עבודה בטוח (טון)</label><input type="text" id="eq-swl" placeholder="1.2" autocomplete="off"></div>
-        <div class="form-group"><label>עומס מקסימלי (טון)</label><input type="text" id="eq-max-load" placeholder="1.4" autocomplete="off"></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label>עומס בחון (טון)</label><input type="text" id="eq-test-load" placeholder="0.6" autocomplete="off"></div>
-        <div class="form-group"><label>רדיוס / גובה (מטר)</label><input type="text" id="eq-height" placeholder="4.15" autocomplete="off"></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label>סוג בדיקה</label><input type="text" id="eq-inspection-type" placeholder="ראשונית / תקופתית" autocomplete="off"></div>
-        <div class="form-group"><label>שם הבודק</label><input type="text" id="eq-inspector" placeholder="שם הבודק" autocomplete="off"></div>
-      </div>
-      <div class="form-group"><label>הערות / תקלות / הגבלות</label><textarea id="eq-notes" rows="3" placeholder="הערות, תקלות, הגבלות..." autocomplete="off"></textarea></div>
-    </form>
-    </div>
+    <div class="modal-body" id="modal-eq-body"></div>
     <div class="modal-footer">
       <button class="btn-secondary" onclick="closeModal('modal-add-eq')">ביטול</button>
       <button class="btn-primary-sm" onclick="saveEquipment()">💾 שמור</button>
@@ -902,31 +848,77 @@ function editEquipment(id) {
 }
 
 // ===== ADD MODAL =====
+const MODAL_EQ_TEMPLATE = `<div class="modal-body">
+      <form autocomplete="off" style="display:contents">
+      <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()"
+           ondragover="event.preventDefault();this.classList.add('drag')"
+           ondragleave="this.classList.remove('drag')"
+           ondrop="handleDrop(event)">
+        <input type="file" id="file-input" accept="image/*" onchange="handleFile(this.files[0])">
+        <svg class="upload-crane" width="56" height="48" viewBox="0 0 56 48" fill="none">
+          <rect x="10" y="8" width="5" height="32" rx="2" fill="#1e4db7"/>
+          <rect x="10" y="8" width="30" height="5" rx="2" fill="#1e4db7"/>
+          <rect x="35" y="13" width="3" height="18" rx="1" fill="#f59e0b"/>
+          <circle cx="38" cy="33" r="4" fill="none" stroke="#f59e0b" stroke-width="2.5"/>
+          <rect x="5" y="8" width="10" height="5" rx="1" fill="#f59e0b"/>
+          <rect x="2" y="38" width="52" height="4" rx="2" fill="#1e4db7" opacity="0.3"/>
+          <rect x="14" y="40" width="10" height="4" rx="1" fill="#1e4db7" opacity="0.5"/>
+        </svg>
+        <div class="upload-text"><strong>העלה תמונת תסקיר</strong><br>לחץ או גרור — AI יזהה פרטים אוטומטית</div>
+      </div>
+      <img id="img-preview" class="img-preview">
+      <div id="ai-loading" style="display:none"><div class="loading"><div class="spinner"></div>AI מנתח את התמונה...</div></div>
+      <div id="ai-result-box" style="display:none">
+        <div class="ai-result"><span class="ai-badge">AI</span>פרטים שזוהו — ניתן לערוך</div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>מספר תסקיר *</label><input type="text" id="eq-id" placeholder="136323/155589" autocomplete="off"></div>
+        <div class="form-group"><label>מספר סידורי אמצעי</label><input type="text" id="eq-serial" placeholder="7206179" autocomplete="off"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>סוג האמצעי</label><input type="text" id="eq-type" placeholder="מלגזה / מנוף / עגורן..." autocomplete="off"></div>
+        <div class="form-group"><label>יצרן</label><input type="text" id="eq-manufacturer" placeholder="TOYOTA" autocomplete="off"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>דגם *</label><input type="text" id="eq-name" placeholder="SWE145" autocomplete="off"></div>
+        <div class="form-group"><label>שנת יצור</label><input type="text" id="eq-year" placeholder="2026" autocomplete="off"></div>
+      </div>
+      <div class="form-group"><label>אתר *</label><select id="eq-site"></select></div>
+      <div class="form-row">
+        <div class="form-group"><label>בדיקה אחרונה (DD/MM/YYYY)</label><input type="text" id="eq-last" placeholder="15/03/2026" autocomplete="off"></div>
+        <div class="form-group"><label>בדיקה הבאה (DD/MM/YYYY)</label><input type="text" id="eq-next" placeholder="15/05/2027" autocomplete="off"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>עומס עבודה בטוח (טון)</label><input type="text" id="eq-swl" placeholder="1.2" autocomplete="off"></div>
+        <div class="form-group"><label>עומס מקסימלי (טון)</label><input type="text" id="eq-max-load" placeholder="1.4" autocomplete="off"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>עומס בחון (טון)</label><input type="text" id="eq-test-load" placeholder="0.6" autocomplete="off"></div>
+        <div class="form-group"><label>רדיוס / גובה (מטר)</label><input type="text" id="eq-height" placeholder="4.15" autocomplete="off"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>סוג בדיקה</label><input type="text" id="eq-inspection-type" placeholder="ראשונית / תקופתית" autocomplete="off"></div>
+        <div class="form-group"><label>שם הבודק</label><input type="text" id="eq-inspector" placeholder="שם הבודק" autocomplete="off"></div>
+      </div>
+      <div class="form-group"><label>הערות / תקלות / הגבלות</label><textarea id="eq-notes" rows="3" placeholder="הערות, תקלות, הגבלות..." autocomplete="off"></textarea></div>
+    </form>
+    </div>`;
+
+function rebuildModalBody() {
+  const container = document.getElementById('modal-eq-body');
+  container.innerHTML = MODAL_EQ_TEMPLATE;
+  // Re-attach upload zone events
+  const zone = document.getElementById('upload-zone');
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+  zone.addEventListener('drop', handleDrop);
+  populateEqSites();
+}
+
 function openAddModal() {
   editingEqId = null;
   document.getElementById('modal-eq-title').textContent = 'הוספת אמצעי חדש';
-
-  // Clear all text inputs and textareas
-  document.querySelectorAll('#modal-add-eq input:not([type=file]), #modal-add-eq textarea').forEach(el => el.value = '');
-
-  // Reset image preview
-  const img = document.getElementById('img-preview');
-  img.style.display = 'none';
-  img.src = '';
-
-  // Completely replace the file input to prevent browser from re-firing onchange
-  const oldInput = document.getElementById('file-input');
-  const newInput = document.createElement('input');
-  newInput.type = 'file';
-  newInput.id = 'file-input';
-  newInput.accept = 'image/*';
-  newInput.onchange = function() { handleFile(this.files[0]); };
-  oldInput.parentNode.replaceChild(newInput, oldInput);
-
-  document.getElementById('ai-result-box').style.display = 'none';
-  document.getElementById('ai-loading').style.display = 'none';
-  document.getElementById('upload-zone').classList.remove('drag');
-  populateEqSites();
+  rebuildModalBody();
   openModal('modal-add-eq');
 }
 function populateEqSites() {
