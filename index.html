@@ -1179,7 +1179,20 @@ async function deleteUser(username) {
 
 // ===== MODALS =====
 function openModal(id) { document.getElementById(id).classList.add('open'); }
-function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+  // If closing the equipment modal, reset it fully
+  if (id === 'modal-add-eq') {
+    editingEqId = null;
+    document.querySelectorAll('#modal-add-eq input:not([type=file]), #modal-add-eq textarea').forEach(el => el.value = '');
+    const img = document.getElementById('img-preview');
+    img.style.display = 'none'; img.src = '';
+    document.getElementById('ai-result-box').style.display = 'none';
+    document.getElementById('ai-loading').style.display = 'none';
+    document.getElementById('file-input').value = '';
+    document.getElementById('modal-eq-title').textContent = 'הוספת אמצעי חדש';
+  }
+}
 document.querySelectorAll('.modal-overlay').forEach(m => { m.addEventListener('click', function(e) { if (e.target === this) closeModal(this.id); }); });
 
 // ===== INIT =====
