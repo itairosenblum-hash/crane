@@ -795,22 +795,48 @@ async function analyzeImage(dataUrl) {
       },
       body: JSON.stringify({
         model: 'meta-llama/llama-3.2-11b-vision-instruct',
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image_url', image_url: { url: 'data:' + mediaType + ';base64,' + base64 } },
-            { type: 'text', text: 'זהו תסקיר בטיחות. חלץ פרטים בJSON בלבד ללא markdown:\n{"eqId":"מספר מזהה","type":"סוג האמצעי","name":"שם האמצעי","lastCheck":"YYYY-MM-DD או null","nextCheck":"YYYY-MM-DD או null","notes":"הערות"}' }
-          ]
-        }],
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a safety document parser. Always respond with valid JSON only, no markdown, no explanation.'
+          },
+          {
+            role: 'user',
+            content: [
+              { type: 'image_url', image_url: { url: 'data:' + mediaType + ';base64,' + base64 } },
+              { type: 'text', text: 'This is a safety inspection document in Hebrew. Extract these fields and return ONLY a JSON object with no markdown or extra text:\n{"eqId":"equipment ID number","type":"equipment type","name":"equipment name/description","lastCheck":"last inspection date as YYYY-MM-DD or null","nextCheck":"next inspection date as YYYY-MM-DD or null","notes":"any relevant notes"}\nIf a field is unclear write null.' }
+            ]
+          }
+        ],
         temperature: 0.1,
         max_tokens: 600
       })
     });
     const data = await resp.json();
     if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
-    const text = data.choices[0].message.content.trim();
+    const rawText = data.choices[0].message.content.trim();
+    console.log('AI raw response:', rawText);
+    // Extract JSON from response robustly
     let parsed = {};
-    try { parsed = JSON.parse(text.replace(/```json|```/g,'').trim()); } catch {}
+    try {
+      // Try direct parse first
+      parsed = JSON.parse(rawText);
+    } catch {
+      try {
+        // Try extracting JSON block
+        const match = rawText.match(/\{[\s\S]*\}/);
+        if (match) parsed = JSON.parse(match[0]);
+      } catch {
+        // Try removing markdown fences
+        try {
+          const clean = rawText.replace(/```json|```/g,'').trim();
+          parsed = JSON.parse(clean);
+        } catch(e) {
+          console.error('Parse failed:', e, rawText);
+        }
+      }
+    }
+    const text = rawText;
     document.getElementById('ai-loading').style.display = 'none';
     document.getElementById('ai-result-box').style.display = 'block';
     if (parsed.eqId) document.getElementById('eq-id').value = parsed.eqId;
