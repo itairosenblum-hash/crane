@@ -564,21 +564,17 @@ tr:hover td { background: rgba(30,77,183,0.02); }
         <div class="form-group"><label>מספר סידורי אמצעי</label><input type="text" id="eq-serial" placeholder="7206179"></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>מספר פנימי</label><input type="text" id="eq-internal-id" placeholder="מספר פנימי"></div>
-        <div class="form-group"><label>מספר רישיון</label><input type="text" id="eq-license2" placeholder="מספר רישיון"></div>
-      </div>
-      <div class="form-row">
         <div class="form-group"><label>סוג האמצעי</label><input type="text" id="eq-type" placeholder="מלגזה / מנוף / עגורן..."></div>
         <div class="form-group"><label>יצרן</label><input type="text" id="eq-manufacturer" placeholder="TOYOTA"></div>
       </div>
       <div class="form-row">
         <div class="form-group"><label>דגם *</label><input type="text" id="eq-name" placeholder="SWE145"></div>
-        <div class="form-group"><label>מיקום</label><input type="text" id="eq-location" placeholder="מיקום האמצעי"></div>
+        <div class="form-group"><label>שנת יצור</label><input type="text" id="eq-year" placeholder="2026"></div>
       </div>
       <div class="form-group"><label>אתר *</label><select id="eq-site"></select></div>
       <div class="form-row">
-        <div class="form-group"><label>בדיקה אחרונה</label><input type="date" id="eq-last"></div>
-        <div class="form-group"><label>בדיקה הבאה</label><input type="date" id="eq-next"></div>
+        <div class="form-group"><label>בדיקה אחרונה (DD/MM/YYYY)</label><input type="text" id="eq-last" placeholder="15/03/2026"></div>
+        <div class="form-group"><label>בדיקה הבאה (DD/MM/YYYY)</label><input type="text" id="eq-next" placeholder="15/05/2027"></div>
       </div>
       <div class="form-row">
         <div class="form-group"><label>עומס עבודה בטוח (טון)</label><input type="text" id="eq-swl" placeholder="1.2"></div>
@@ -586,14 +582,12 @@ tr:hover td { background: rgba(30,77,183,0.02); }
       </div>
       <div class="form-row">
         <div class="form-group"><label>עומס בחון (טון)</label><input type="text" id="eq-test-load" placeholder="0.6"></div>
-        <div class="form-group"><label>גובה / רדיוס (מטר)</label><input type="text" id="eq-height" placeholder="4.15"></div>
+        <div class="form-group"><label>רדיוס / גובה (מטר)</label><input type="text" id="eq-height" placeholder="4.15"></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>שנת יצור</label><input type="text" id="eq-year" placeholder="2026"></div>
         <div class="form-group"><label>סוג בדיקה</label><input type="text" id="eq-inspection-type" placeholder="ראשונית / תקופתית"></div>
+        <div class="form-group"><label>שם הבודק</label><input type="text" id="eq-inspector" placeholder="שם הבודק"></div>
       </div>
-      <div class="form-group"><label>שם הבודק</label><input type="text" id="eq-inspector" placeholder="שם הבודק"></div>
-      <div class="form-group"><label>טלפון אחראי (WhatsApp)</label><input type="tel" id="eq-phone" placeholder="0501234567"></div>
       <div class="form-group"><label>הערות / תקלות / הגבלות</label><textarea id="eq-notes" rows="3" placeholder="הערות, תקלות, הגבלות..."></textarea></div>
     </div>
     <div class="modal-footer">
@@ -743,14 +737,33 @@ function showTab(tab, btn) {
 function refreshCurrentTab() { showTab(currentTab, document.querySelector('.tab-btn.active')); }
 
 // ===== UTILS =====
+function parseDate(d) {
+  if (!d || String(d).trim() === '' || String(d).trim() === 'null') return null;
+  const s = String(d).trim();
+  // Handle DD/MM/YYYY format
+  const ddmmyyyy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (ddmmyyyy) return new Date(parseInt(ddmmyyyy[3]), parseInt(ddmmyyyy[2])-1, parseInt(ddmmyyyy[1]));
+  // Handle YYYY-MM-DD
+  const iso = new Date(s);
+  return isNaN(iso) ? null : iso;
+}
 function daysUntil(d) {
-  if (!d || String(d).trim() === '' || String(d).trim() === 'null') return 9999;
+  const parsed = parseDate(d);
+  if (!parsed) return 9999;
   const today = new Date(); today.setHours(0,0,0,0);
-  const parsed = new Date(String(d).trim());
-  if (isNaN(parsed)) return 9999;
   return Math.round((parsed - today) / 86400000);
 }
-function formatDate(s) { if (!s || s === 'null') return '—'; const d = new Date(String(s).trim()); return isNaN(d) ? s : d.toLocaleDateString('he-IL'); }
+function formatDate(s) {
+  if (!s || s === 'null' || String(s).trim() === '') return '—';
+  const str = String(s).trim();
+  // Already DD/MM/YYYY
+  if (str.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) return str;
+  // ISO format YYYY-MM-DD → convert to DD/MM/YYYY
+  const iso = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return iso[3]+'/'+iso[2]+'/'+iso[1];
+  const d = new Date(str);
+  return isNaN(d) ? str : d.toLocaleDateString('he-IL');
+}
 function getStatus(next) { const d = daysUntil(next); if (d <= 14) return 'danger'; if (d <= 30) return 'warn'; return 'ok'; }
 function statusBadge(st, days) {
   const L = { ok:'תקין', warn:'קרוב לבדיקה', danger: days < 0 ? 'פג תוקף!' : 'דחוף' };
@@ -839,9 +852,7 @@ function viewEquipment(id) {
     <table style="width:100%;font-size:14px;border-collapse:collapse">
       ${[
       ['מספר תסקיר',`<strong style="color:var(--blue)">${e.eqId||'—'}</strong>`],
-      ['מספר סידורי אמצעי', e.serialNumber||'—'],
-      ['מספר פנימי', e.internalId||'—'],
-      ['מספר רישיון', e.licenseNumber||'—'],
+      ['מספר סידורי', e.serialNumber||'—'],
       ['שנת יצור', e.manufacturingYear||'—'],
       ['סוג', e.type||'—'],
       ['יצרן / דגם', [e.manufacturer,e.name].filter(Boolean).join(' ')||'—'],
@@ -859,7 +870,7 @@ function viewEquipment(id) {
       ['הערות',e.notes||'—']
     ].map((r,i)=>`<tr><td style="color:var(--text-muted);padding:9px 0;width:40%;${i>0?'border-top:1px solid var(--border)':''};font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">${r[0]}</td><td style="${i>0?'border-top:1px solid var(--border)':''}padding:9px 0">${r[1]}</td></tr>`).join('')}
     </table>
-    <div style="margin-top:1rem">${waLink(e.phone,e.name,e.siteId,e.nextCheck)}</div>`;
+    </div>`;
   openModal('modal-view-eq');
 }
 async function deleteEquipment(id) {
@@ -874,16 +885,14 @@ function editEquipment(id) {
   populateEqSites();
   const sv = (id, val) => { const el = document.getElementById(id); if(el) el.value = val||''; };
   sv('eq-id', e.eqId); sv('eq-serial', e.serialNumber);
-  sv('eq-internal-id', e.internalId); sv('eq-license2', e.licenseNumber);
   sv('eq-type', e.type); sv('eq-manufacturer', e.manufacturer);
-  sv('eq-name', e.name); sv('eq-location', e.location);
-  sv('eq-year', e.manufacturingYear);
+  sv('eq-name', e.name); sv('eq-year', e.manufacturingYear);
   document.getElementById('eq-site').value = e.siteId;
   sv('eq-last', e.lastCheck); sv('eq-next', e.nextCheck);
   sv('eq-swl', e.safeWorkLoad); sv('eq-max-load', e.maxLoad);
   sv('eq-test-load', e.testLoad); sv('eq-height', e.height);
   sv('eq-inspection-type', e.inspectionType); sv('eq-inspector', e.inspectorName);
-  sv('eq-phone', e.phone); sv('eq-notes', e.notes);
+  sv('eq-notes', e.notes);
   const img = document.getElementById('img-preview');
   if (e.imageData) { img.src = e.imageData; img.style.display = 'block'; } else { img.style.display = 'none'; }
   document.getElementById('ai-result-box').style.display = 'none';
@@ -894,7 +903,7 @@ function editEquipment(id) {
 function openAddModal() {
   editingEqId = null;
   document.getElementById('modal-eq-title').textContent = 'הוספת אמצעי חדש';
-  ['eq-id','eq-serial','eq-internal-id','eq-license2','eq-type','eq-manufacturer','eq-name','eq-location','eq-year','eq-last','eq-next','eq-swl','eq-max-load','eq-test-load','eq-height','eq-inspection-type','eq-inspector','eq-phone','eq-notes'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  ['eq-id','eq-serial','eq-type','eq-manufacturer','eq-name','eq-year','eq-last','eq-next','eq-swl','eq-max-load','eq-test-load','eq-height','eq-inspection-type','eq-inspector','eq-notes'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
   document.getElementById('img-preview').style.display = 'none';
   document.getElementById('ai-result-box').style.display = 'none';
   document.getElementById('ai-loading').style.display = 'none';
@@ -918,10 +927,7 @@ async function saveEquipment() {
     serialNumber: gv('eq-serial'),
     type: gv('eq-type'),
     manufacturer: gv('eq-manufacturer'),
-    internalId: gv('eq-internal-id'),
-    licenseNumber: gv('eq-license2'),
     manufacturingYear: gv('eq-year'),
-    location: gv('eq-location'),
     siteId: parseInt(document.getElementById('eq-site').value),
     lastCheck: gv('eq-last'),
     nextCheck: gv('eq-next'),
@@ -931,7 +937,6 @@ async function saveEquipment() {
     height: gv('eq-height'),
     inspectionType: gv('eq-inspection-type'),
     inspectorName: gv('eq-inspector'),
-    phone: gv('eq-phone'),
     notes: gv('eq-notes'),
     imageData: imageData||''
   };
@@ -1007,10 +1012,11 @@ Return ONLY this JSON object, nothing else, no markdown:
   "notes": "content of section 4 הערות נוספות"
 }
 
-CRITICAL: 
-- DD/MM/YYYY dates: 15/03/2026 = 2026-03-15, 15/05/2027 = 2027-05-15
+CRITICAL RULES:
+- Return dates in DD/MM/YYYY format (do NOT convert) e.g. 15/03/2026 stays as "15/03/2026"
 - serialNumber is in the equipment TABLE rows under "מספר סידורי" column - NOT the inspection number
 - inspectionNumber is in the top-left box next to "מספר תסקיר:"
+- For loads: read the numeric values from the table columns carefully. The table columns are: עומס עבודה בטוח | עומס מבחן | רדיוס עומס | and the ROWS contain the actual numbers
 - Return null for missing fields` }
           ]}
         ],
@@ -1027,12 +1033,9 @@ CRITICAL:
     const setF = (id, val) => { const el = document.getElementById(id); if(el && val && String(val) !== 'null' && String(val).trim() !== '') el.value = val; };
     setF('eq-id', parsed.inspectionNumber);
     setF('eq-serial', parsed.serialNumber);
-    setF('eq-internal-id', parsed.internalId);
-    setF('eq-license2', parsed.licenseNumber);
     setF('eq-type', parsed.type);
     setF('eq-manufacturer', parsed.manufacturer);
-    setF('eq-name', parsed.model || parsed.name || (parsed.manufacturer && parsed.model ? parsed.manufacturer+' '+parsed.model : null));
-    setF('eq-location', parsed.location);
+    setF('eq-name', parsed.model || parsed.name);
     setF('eq-year', parsed.manufacturingYear);
     setF('eq-last', parsed.lastCheck);
     setF('eq-next', parsed.nextCheck);
