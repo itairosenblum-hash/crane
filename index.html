@@ -643,8 +643,10 @@ async function apiGet(params) {
   return resp.json();
 }
 async function apiPost(body) {
+  // Apps Script requires no-cors or form data for cross-origin POST
   const resp = await fetch(getScriptUrl(), {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
     body: JSON.stringify(body)
   });
   return resp.json();
@@ -929,14 +931,47 @@ IMPORTANT:
 function renderSites() {
   document.getElementById('sites-tbody').innerHTML = appData.sites.map(s => {
     const cnt = appData.equipment.filter(e => e.siteId == s.id).length;
-    return `<tr><td><strong>${s.name}</strong></td><td>${s.location||'—'}</td><td>${s.manager||'—'}</td><td>${s.phone||'—'}</td><td><span class="badge badge-ok">${cnt} אמצעים</span></td><td><button class="btn-icon del" onclick="deleteSite(${s.id})">🗑</button></td></tr>`;
+    return `<tr>
+      <td><strong>${s.name}</strong></td>
+      <td>${s.location||'—'}</td>
+      <td>${s.manager||'—'}</td>
+      <td>${s.phone||'—'}</td>
+      <td><span class="badge badge-ok">${cnt} אמצעים</span></td>
+      <td><div class="actions-cell">
+        <button class="btn-icon" onclick="editSite(${s.id})" title="עריכה">✏️</button>
+        <button class="btn-icon del" onclick="deleteSite(${s.id})" title="מחיקה">🗑</button>
+      </div></td>
+    </tr>`;
   }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:2rem">לא נמצאו אתרים</td></tr>';
 }
-function openSiteModal() { ['site-name','site-location','site-manager','site-phone'].forEach(id => document.getElementById(id).value = ''); openModal('modal-add-site'); }
+let editingSiteId = null;
+function editSite(id) {
+  const s = appData.sites.find(x => x.id === id);
+  if (!s) return;
+  editingSiteId = id;
+  document.getElementById('site-name').value = s.name || '';
+  document.getElementById('site-location').value = s.location || '';
+  document.getElementById('site-manager').value = s.manager || '';
+  document.getElementById('site-phone').value = s.phone || '';
+  document.querySelector('#modal-add-site .modal-header h3').textContent = 'עריכת אתר';
+  openModal('modal-add-site');
+}
+function openSiteModal() {
+  editingSiteId = null;
+  ['site-name','site-location','site-manager','site-phone'].forEach(id => document.getElementById(id).value = '');
+  document.querySelector('#modal-add-site .modal-header h3').textContent = 'הוספת אתר';
+  openModal('modal-add-site');
+}
 async function saveSite() {
   const name = document.getElementById('site-name').value.trim();
   if (!name) { alert('נא להזין שם אתר'); return; }
-  try { await apiPost({ action: 'addSite', data: { name, location: document.getElementById('site-location').value, manager: document.getElementById('site-manager').value, phone: document.getElementById('site-phone').value } }); showToast('אתר נוסף ✓'); closeModal('modal-add-site'); await loadData(); } catch(e) { alert('שגיאה: '+e.message); }
+  const data = { id: editingSiteId, name, location: document.getElementById('site-location').value, manager: document.getElementById('site-manager').value, phone: document.getElementById('site-phone').value };
+  try {
+    await apiPost({ action: editingSiteId ? 'updateSite' : 'addSite', data });
+    showToast(editingSiteId ? 'אתר עודכן ✓' : 'אתר נוסף ✓');
+    editingSiteId = null;
+    closeModal('modal-add-site'); await loadData();
+  } catch(e) { alert('שגיאה: '+e.message); }
 }
 async function deleteSite(id) {
   if (!confirm('למחוק אתר זה?')) return;
@@ -952,7 +987,10 @@ function renderSettings() {
         <div style="font-size:14px;font-weight:600">${u.fullname||u.username} <span style="font-size:12px;color:var(--text-muted);font-weight:400">(${u.username})</span></div>
         <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${u.role==='admin'?'👑 מנהל':'👤 משתמש'} · ${u.siteId ? getSiteName(u.siteId) : 'כל האתרים'}</div>
       </div>
-      ${u.username !== 'admin' ? `<button class="btn-danger-sm" onclick="deleteUser('${u.username}')">הסר</button>` : ''}
+      ${u.username !== 'admin' ? `<div style="display:flex;gap:6px">
+        <button class="btn-icon" onclick="editUser('${u.username}')" title="עריכה">✏️</button>
+        <button class="btn-danger-sm" onclick="deleteUser('${u.username}')">הסר</button>
+      </div>` : ''}
     </div>`).join('');
 }
 function saveScriptUrl() { const val = document.getElementById('script-url-input').value.trim(); if (!val) { alert('נא להזין URL'); return; } localStorage.setItem(SCRIPT_URL_STORE, val); showToast('URL נשמר'); showPage('page-login'); }
@@ -964,12 +1002,45 @@ async function testConnection() {
   try { const r = await fetch(url + '?action=getAll'); const d = await r.json(); const msg = d.sites !== undefined ? `✅ חיבור תקין! ${(d.sites||[]).length} אתרים` : '⚠️ תשובה לא צפויה'; if (res) res.innerHTML = `<span style="color:var(--success)">${msg}</span>`; else alert(msg); } catch(e) { const msg = '❌ שגיאה: ' + e.message; if (res) res.innerHTML = `<span style="color:var(--danger)">${msg}</span>`; else alert(msg); }
 }
 function saveApiKey() { const val = document.getElementById('api-key-input').value.trim(); if (!val || val.startsWith('•')) { alert('נא להזין מפתח חדש'); return; } localStorage.setItem(GEMINI_KEY_STORE, val); showToast('מפתח נשמר ✓'); }
-function openUserModal() { ['new-username','new-fullname','new-password','new-user-phone'].forEach(id => document.getElementById(id).value = ''); document.getElementById('new-user-site').innerHTML = '<option value="">כל האתרים</option>' + appData.sites.map(s => `<option value="${s.id}">${s.name}</option>`).join(''); openModal('modal-add-user'); }
+function openUserModal() {
+  editingUsername = null;
+  document.getElementById('new-username').disabled = false;
+  document.querySelector('#modal-add-user .modal-header h3').textContent = 'הוספת משתמש';
+  ['new-username','new-fullname','new-password','new-user-phone'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('new-user-site').innerHTML = '<option value="">כל האתרים</option>' + appData.sites.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+  openModal('modal-add-user');
+}
+let editingUsername = null;
+function editUser(username) {
+  const u = appData.users.find(x => x.username === username);
+  if (!u) return;
+  editingUsername = username;
+  document.getElementById('new-username').value = u.username;
+  document.getElementById('new-username').disabled = true;
+  document.getElementById('new-fullname').value = u.fullname || '';
+  document.getElementById('new-password').value = '';
+  document.getElementById('new-user-phone').value = u.phone || '';
+  document.getElementById('new-user-site').innerHTML = '<option value="">כל האתרים</option>' + appData.sites.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+  if (u.siteId) document.getElementById('new-user-site').value = u.siteId;
+  document.querySelector('#modal-add-user .modal-header h3').textContent = 'עריכת משתמש';
+  openModal('modal-add-user');
+}
 async function saveUser() {
   const username = document.getElementById('new-username').value.trim();
   const password = document.getElementById('new-password').value;
-  if (!username || !password) { alert('נא למלא שם משתמש וסיסמה'); return; }
-  try { const res = await apiPost({ action: 'addUser', data: { username, password, fullname: document.getElementById('new-fullname').value||username, role:'user', phone: document.getElementById('new-user-phone').value, siteId: document.getElementById('new-user-site').value||'' } }); if (!res.ok) { alert(res.msg); return; } showToast('משתמש נוסף ✓'); closeModal('modal-add-user'); await loadData(); renderSettings(); } catch(e) { alert('שגיאה: '+e.message); }
+  if (!username) { alert('נא למלא שם משתמש'); return; }
+  if (!editingUsername && !password) { alert('נא למלא סיסמה'); return; }
+  const data = { username, fullname: document.getElementById('new-fullname').value||username, role:'user', phone: document.getElementById('new-user-phone').value, siteId: document.getElementById('new-user-site').value||'' };
+  if (password) data.password = password;
+  try {
+    const res = await apiPost({ action: editingUsername ? 'updateUser' : 'addUser', data });
+    if (!res.ok) { alert(res.msg); return; }
+    showToast(editingUsername ? 'משתמש עודכן ✓' : 'משתמש נוסף ✓');
+    editingUsername = null;
+    document.getElementById('new-username').disabled = false;
+    document.querySelector('#modal-add-user .modal-header h3').textContent = 'הוספת משתמש';
+    closeModal('modal-add-user'); await loadData(); renderSettings();
+  } catch(e) { alert('שגיאה: '+e.message); }
 }
 async function deleteUser(username) {
   if (!confirm(`למחוק משתמש ${username}?`)) return;
