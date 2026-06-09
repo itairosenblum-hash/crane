@@ -51,14 +51,16 @@ nav {
 .btn-logout:hover { background: rgba(255,255,255,0.15); color: white; }
 
 /* ===== PAGES ===== */
-.page { display: none; }
-.page.active { display: block; }
+.page { display: none !important; }
+.page.active { display: block !important; }
+#page-login.active { display: flex !important; }
+#page-setup.active { display: flex !important; }
 
 /* ===== LOGIN ===== */
 #page-login {
   min-height: 100vh;
   background: var(--blue-dark);
-  display: flex; align-items: center; justify-content: center;
+  align-items: center; justify-content: center;
   padding: 1rem;
   position: relative; overflow: hidden;
 }
@@ -96,7 +98,7 @@ nav {
 .btn-primary:hover { background: var(--blue-light); }
 
 /* ===== SETUP ===== */
-#page-setup { min-height: 100vh; background: var(--blue-dark); display: flex; align-items: center; justify-content: center; padding: 1rem; }
+#page-setup { min-height: 100vh; background: var(--blue-dark); align-items: center; justify-content: center; padding: 1rem; }
 .setup-box { background: var(--card); border-radius: 16px; padding: 2rem; width: 100%; max-width: 620px; border-top: 4px solid var(--accent); }
 .setup-box h2 { font-size: 18px; font-weight: 700; margin-bottom: 0.5rem; }
 .setup-box p { font-size: 14px; color: var(--text-muted); margin-bottom: 1.5rem; }
