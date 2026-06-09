@@ -885,7 +885,24 @@ async function analyzeImage(dataUrl) {
           { role: 'system', content: 'You are a safety document parser. Always respond with valid JSON only, no markdown, no explanation.' },
           { role: 'user', content: [
             { type: 'image_url', image_url: { url: 'data:' + mediaType + ';base64,' + base64 } },
-            { type: 'text', text: 'This is a safety inspection document in Hebrew. Extract these fields and return ONLY a JSON object:\n{"eqId":"equipment ID number","type":"equipment type","name":"equipment name/description","lastCheck":"YYYY-MM-DD or null","nextCheck":"YYYY-MM-DD or null","notes":"any notes"}' }
+            { type: 'text', text: `You are analyzing a Hebrew safety inspection certificate (תעודת בדיקה / תסקיר בטיחות) for lifting equipment in Israel.
+
+Extract ONLY these fields and return a single JSON object with no markdown, no explanation:
+
+{
+  "eqId": "The equipment serial/ID number - look for: מספר סידורי, מ.ס., מספר זיהוי, מ.ז., or any prominent number",
+  "type": "Equipment type - look for: סוג האמצעי, סוג הציוד (e.g. מלגזה, מנוף, גונדולה, עגורן, מעלית)",
+  "name": "Equipment model/make - look for: דגם, יצרן, תיאור",
+  "lastCheck": "Date of THIS inspection - look for: תאריך בדיקה, נבדק בתאריך, תאריך ביצוע - convert to YYYY-MM-DD",
+  "nextCheck": "Date NEXT inspection due - look for: תאריך בדיקה הבאה, בתוקף עד, תאריך פקיעה - convert to YYYY-MM-DD",
+  "notes": "Any important notes - load capacity (עומס מותר/מקסימלי), license number (רישיון), inspector name (בודק)"
+}
+
+IMPORTANT: 
+- Israeli dates are usually DD/MM/YYYY - convert correctly to YYYY-MM-DD
+- If you see "26/3/2025" that means 2025-03-26
+- Return null for fields you cannot find
+- Return ONLY the JSON object, nothing else` }
           ]}
         ],
         temperature: 0.1, max_tokens: 600
