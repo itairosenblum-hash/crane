@@ -903,11 +903,18 @@ function editEquipment(id) {
 function openAddModal() {
   editingEqId = null;
   document.getElementById('modal-eq-title').textContent = 'הוספת אמצעי חדש';
-  ['eq-id','eq-serial','eq-type','eq-manufacturer','eq-name','eq-year','eq-last','eq-next','eq-swl','eq-max-load','eq-test-load','eq-height','eq-inspection-type','eq-inspector','eq-notes'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
-  document.getElementById('img-preview').style.display = 'none';
+  // Clear ALL inputs and textareas inside the modal
+  document.querySelectorAll('#modal-add-eq input, #modal-add-eq textarea, #modal-add-eq select').forEach(el => {
+    if (el.type === 'file') { el.value = ''; return; }
+    if (el.tagName === 'SELECT') return; // select handled by populateEqSites
+    el.value = '';
+  });
+  const img = document.getElementById('img-preview');
+  img.style.display = 'none';
+  img.src = '';
   document.getElementById('ai-result-box').style.display = 'none';
   document.getElementById('ai-loading').style.display = 'none';
-  document.getElementById('file-input').value = '';
+  document.getElementById('upload-zone').classList.remove('drag');
   populateEqSites();
   openModal('modal-add-eq');
 }
