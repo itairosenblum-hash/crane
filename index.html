@@ -119,7 +119,8 @@ nav {
   margin-bottom: 1.5rem; display: flex; align-items: center;
   justify-content: space-between; overflow: hidden; position: relative;
 }
-.page-header-graphic { position: absolute; left: -10px; top: -10px; opacity: 0.12; }
+.page-header > *:not(.page-header-graphic) { position: relative; z-index: 2; }
+.page-header-graphic { position: absolute; left: -10px; top: -10px; opacity: 0.12; pointer-events: none; }
 .page-header h2 { color: white; font-size: 20px; font-weight: 700; position: relative; z-index: 1; }
 .page-header p { color: #94a3b8; font-size: 13px; margin-top: 3px; position: relative; z-index: 1; }
 
