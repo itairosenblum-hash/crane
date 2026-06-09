@@ -625,7 +625,7 @@ async function loadData() {
   try {
     const data = await apiGet({ action: 'getAll' });
     appData.sites = (data.sites || []).map(s => ({ ...s, id: parseInt(s.id), phone: String(s.phone||''), manager: String(s.manager||''), name: String(s.name||''), location: String(s.location||'') }));
-    appData.equipment = (data.equipment || []).map(e => ({ ...e, id: parseInt(e.id), siteId: parseInt(e.siteId), phone: String(e.phone == null ? '' : e.phone), eqId: String(e.eqId||''), name: String(e.name||''), type: String(e.type||''), notes: String(e.notes||''), lastCheck: String(e.lastCheck||''), nextCheck: String(e.nextCheck||'') }));
+    appData.equipment = (data.equipment || []).map(e => ({ ...e, id: parseInt(e.id), siteId: parseInt(e.siteId), eqId: String(e.eqId||''), name: String(e.name||''), type: String(e.type||''), notes: String(e.notes||''), lastCheck: String(e.lastCheck||''), nextCheck: String(e.nextCheck||''), imageUrl: String(e.imageUrl||'') }));
     appData.users = data.users || [];
     setSyncStatus('ok', '● מחובר');
     refreshCurrentTab();
@@ -796,7 +796,7 @@ function viewEquipment(id) {
   if (!e) return;
   const days = daysUntil(e.nextCheck); const st = getStatus(e.nextCheck);
   document.getElementById('view-eq-body').innerHTML = `
-    ${e.imageData ? `<img src="${e.imageData}" style="width:100%;max-height:180px;object-fit:cover;border-radius:8px;margin-bottom:1rem;border:1px solid var(--border)">` : ''}
+    ${e.imageUrl ? `<img src="${e.imageUrl}" style="width:100%;max-height:180px;object-fit:cover;border-radius:8px;margin-bottom:1rem;border:1px solid var(--border)" onerror="this.style.display='none'">` : ''}
     <table style="width:100%;font-size:14px;border-collapse:collapse">
       ${[
       ['מספר תסקיר',`<strong style="color:var(--blue)">${e.eqId||'—'}</strong>`],
@@ -842,7 +842,7 @@ function editEquipment(id) {
   sv('eq-inspection-type', e.inspectionType); sv('eq-inspector', e.inspectorName);
   sv('eq-notes', e.notes);
   const img = document.getElementById('img-preview');
-  if (e.imageData) { img.src = e.imageData; img.style.display = 'block'; } else { img.style.display = 'none'; }
+  if (e.imageUrl) { img.src = e.imageUrl; img.style.display = 'block'; } else { img.style.display = 'none'; }
   document.getElementById('ai-result-box').style.display = 'none';
   openModal('modal-add-eq');
 }
@@ -930,7 +930,9 @@ async function saveEquipment() {
   const name = document.getElementById('eq-name').value.trim();
   if (!eqId || !name) { alert('נא למלא מספר מזהה ושם'); return; }
   const imgEl = document.getElementById('img-preview');
-  const imageData = imgEl.style.display !== 'none' && imgEl.src.startsWith('data:') ? imgEl.src : (editingEqId ? (appData.equipment.find(e=>e.id===editingEqId)||{}).imageData||'' : '');
+  const hasNewImage = imgEl.style.display !== 'none' && imgEl.src.startsWith('data:');
+  const imageData = hasNewImage ? imgEl.src : '';
+  const imageUrl = !hasNewImage && editingEqId ? (appData.equipment.find(e=>e.id===editingEqId)||{}).imageUrl||'' : '';
   const gv = id => { const el = document.getElementById(id); return el ? el.value : ''; };
   const data = {
     id: editingEqId, eqId, name,
@@ -948,7 +950,8 @@ async function saveEquipment() {
     inspectionType: gv('eq-inspection-type'),
     inspectorName: gv('eq-inspector'),
     notes: gv('eq-notes'),
-    imageData: imageData||''
+    imageData: imageData||'',
+    imageUrl: imageUrl||''
   };
   try { await apiPost({ action: editingEqId ? 'updateEquipment' : 'addEquipment', data }); showToast(editingEqId ? 'אמצעי עודכן ✓' : 'אמצעי נוסף ✓'); closeModal('modal-add-eq'); await loadData(); } catch(e) { alert('שגיאה: '+e.message); }
 }
