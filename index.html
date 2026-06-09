@@ -51,10 +51,11 @@ nav {
 .btn-logout:hover { background: rgba(255,255,255,0.15); color: white; }
 
 /* ===== PAGES ===== */
-.page { display: none !important; }
-.page.active { display: block !important; }
-#page-login.active { display: flex !important; }
-#page-setup.active { display: flex !important; }
+/* Page isolation */
+#page-login, #page-setup, #page-app { display: none; }
+#page-login.active { display: flex !important; min-height: 100vh; }
+#page-setup.active { display: flex !important; min-height: 100vh; }
+#page-app.active { display: block !important; }
 
 /* ===== LOGIN ===== */
 #page-login {
