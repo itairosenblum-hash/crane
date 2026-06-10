@@ -917,16 +917,11 @@ function rebuildModalBody() {
   zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
   zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
   zone.addEventListener('drop', handleDrop);
-  // Anti-autofill: set readonly then remove after Chrome finishes autofill attempt
-  const inputs = container.querySelectorAll('input:not([type=file])');
-  inputs.forEach(el => { el.setAttribute('readonly', true); });
-  setTimeout(() => {
-    inputs.forEach(el => {
-      el.removeAttribute('readonly');
-      el.value = '';
-    });
-    container.querySelectorAll('textarea').forEach(el => el.value = '');
-  }, 200);
+  // Anti-autofill: give each input a random name so browser can't match saved values
+  container.querySelectorAll('input:not([type=file]), textarea').forEach(el => {
+    el.setAttribute('name', 'field_' + Math.random().toString(36).substr(2,9));
+    el.value = '';
+  });
   populateEqSites();
 }
 
