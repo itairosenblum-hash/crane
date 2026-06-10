@@ -1092,21 +1092,37 @@ function editEquipment(id) {
 // ===== ADD MODAL =====
 const MODAL_EQ_TEMPLATE = `<div class="modal-body">
       <form autocomplete="off" style="display:contents">
-      <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()"
+      <!-- Hidden inputs -->
+      <input type="file" id="file-input-camera" accept="image/*" capture="environment" style="display:none">
+      <input type="file" id="file-input-gallery" accept="image/*" style="display:none">
+      <input type="file" id="file-input-pdf" accept="application/pdf,image/*" style="display:none">
+      <div id="upload-zone"
            ondragover="event.preventDefault();this.classList.add('drag')"
            ondragleave="this.classList.remove('drag')"
-           ondrop="handleDrop(event)">
-        <input type="file" id="file-input" accept="image/*" onchange="handleFile(this.files[0])">
-        <svg class="upload-crane" width="56" height="48" viewBox="0 0 56 48" fill="none">
+           ondrop="handleDrop(event)"
+           style="border:2px dashed #cbd5e1;border-radius:var(--radius-sm);padding:1.25rem;margin-bottom:1rem;background:var(--bg)">
+        <svg width="48" height="42" viewBox="0 0 56 48" fill="none" style="display:block;margin:0 auto 10px">
           <rect x="10" y="8" width="5" height="32" rx="2" fill="#1e4db7"/>
           <rect x="10" y="8" width="30" height="5" rx="2" fill="#1e4db7"/>
           <rect x="35" y="13" width="3" height="18" rx="1" fill="#f59e0b"/>
           <circle cx="38" cy="33" r="4" fill="none" stroke="#f59e0b" stroke-width="2.5"/>
           <rect x="5" y="8" width="10" height="5" rx="1" fill="#f59e0b"/>
-          <rect x="2" y="38" width="52" height="4" rx="2" fill="#1e4db7" opacity="0.3"/>
-          <rect x="14" y="40" width="10" height="4" rx="1" fill="#1e4db7" opacity="0.5"/>
         </svg>
-        <div class="upload-text"><strong>העלה תסקיר</strong><br>תמונה או PDF — AI יזהה פרטים אוטומטית</div>
+        <div style="text-align:center;font-size:13px;color:var(--text-muted);margin-bottom:12px">בחר כיצד להעלות תסקיר</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+          <button type="button" onclick="document.getElementById('file-input-camera').click()"
+            style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 8px;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-family:inherit;font-size:13px;color:var(--text);font-weight:500">
+            <span style="font-size:26px">📷</span>מצלמה
+          </button>
+          <button type="button" onclick="document.getElementById('file-input-gallery').click()"
+            style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 8px;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-family:inherit;font-size:13px;color:var(--text);font-weight:500">
+            <span style="font-size:26px">🖼️</span>גלריה
+          </button>
+          <button type="button" onclick="document.getElementById('file-input-pdf').click()"
+            style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 8px;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-family:inherit;font-size:13px;color:var(--text);font-weight:500">
+            <span style="font-size:26px">📄</span>PDF
+          </button>
+        </div>
       </div>
       <img id="img-preview" class="img-preview">
       <div id="ai-loading" style="display:none"><div class="loading"><div class="spinner"></div>AI מנתח את התמונה...</div></div>
@@ -1149,12 +1165,19 @@ const MODAL_EQ_TEMPLATE = `<div class="modal-body">
 function rebuildModalBody() {
   const container = document.getElementById('modal-eq-body');
   container.innerHTML = MODAL_EQ_TEMPLATE;
-  // Re-attach upload zone events
+  // Re-attach file input handlers
+  ['file-input-camera','file-input-gallery','file-input-pdf'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.onchange = function() { handleFile(this.files[0]); };
+  });
+  // Re-attach drop zone events
   const zone = document.getElementById('upload-zone');
-  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
-  zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
-  zone.addEventListener('drop', handleDrop);
-  // Anti-autofill: give each input a random name so browser can't match saved values
+  if (zone) {
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+    zone.addEventListener('drop', handleDrop);
+  }
+  // Anti-autofill
   container.querySelectorAll('input:not([type=file]), textarea').forEach(el => {
     el.setAttribute('name', 'field_' + Math.random().toString(36).substr(2,9));
     el.value = '';
@@ -1559,7 +1582,7 @@ function closeModal(id) {
     img.style.display = 'none'; img.src = '';
     document.getElementById('ai-result-box').style.display = 'none';
     document.getElementById('ai-loading').style.display = 'none';
-    document.getElementById('file-input').value = '';
+    ['file-input-camera','file-input-gallery','file-input-pdf'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
     document.getElementById('modal-eq-title').textContent = 'הוספת אמצעי חדש';
   }
 }
