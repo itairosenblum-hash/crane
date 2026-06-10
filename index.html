@@ -354,29 +354,47 @@ tr:hover td { background: rgba(30,77,183,0.02); }
   .btn-wa { padding: 6px 10px; font-size: 12px; }
 
   /* TABLE → CARDS on mobile */
-  .table-wrap { overflow-x: visible; }
+  .table-wrap { overflow-x: visible; border: none; background: none; }
   table { min-width: unset; }
   table thead { display: none; }
   table tbody tr {
     display: block;
     background: var(--card);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius);
     border: 1px solid var(--border);
     margin-bottom: 10px;
-    padding: 12px;
+    padding: 14px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
   }
   table tbody tr:hover td { background: none; }
-  table tbody td {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13px;
+  /* Hide less important columns on mobile */
+  table tbody td { display: none; }
+  table tbody td:nth-child(1) { /* תסקיר */
+    display: block; font-size: 15px; font-weight: 700;
+    color: var(--blue); border-bottom: 1px solid var(--border);
+    padding-bottom: 8px; margin-bottom: 8px;
   }
-  table tbody td:last-child { border-bottom: none; padding-top: 10px; justify-content: flex-end; }
-  table tbody td::before {
-    content: attr(data-label);
-    font-weight: 600; color: var(--text-muted);
-    font-size: 11px; text-transform: uppercase;
-    flex-shrink: 0; margin-left: 8px;
+  table tbody td:nth-child(2) { /* שם */
+    display: block; font-size: 14px; color: var(--text);
+    padding: 2px 0;
   }
+  table tbody td:nth-child(4) { /* אתר */
+    display: block; font-size: 12px; color: var(--text-muted);
+    padding: 2px 0;
+  }
+  table tbody td:nth-child(6) { /* בדיקה הבאה */
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: var(--text-muted); padding: 2px 0;
+  }
+  table tbody td:nth-child(6)::before { content: "📅 "; }
+  table tbody td:nth-child(7) { /* סטטוס */
+    display: block; padding: 6px 0 4px;
+  }
+  table tbody td:nth-child(8) { /* פעולות */
+    display: flex; justify-content: flex-end; gap: 8px;
+    padding-top: 10px; border-top: 1px solid var(--border); margin-top: 4px;
+  }
+  table tbody td::before { display: none; }
 
   /* FORMS */
   .form-row { grid-template-columns: 1fr; gap: 8px; }
