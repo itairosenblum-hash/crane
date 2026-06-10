@@ -573,9 +573,9 @@ tr:hover td { background: rgba(30,77,183,0.02); }
         <div style="display:flex;gap:10px"><button class="btn-primary-sm" onclick="saveScriptUrlFromSettings()">עדכן</button><button class="btn-secondary" onclick="testConnection()">בדוק חיבור</button></div>
       </div>
       <div class="settings-card">
-        <h3>🤖 Gemini API Key (זיהוי תמונות AI)</h3>
-        <div class="api-notice">נשמר מקומית בלבד. קבל מפתח: <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a></div>
-        <div class="form-group"><input type="password" id="api-key-input" placeholder="AIzaSy... או AQ...."></div>
+        <h3>🤖 OpenRouter API Key (זיהוי תמונות AI)</h3>
+        <div class="api-notice">נשמר מקומית בלבד. קבל מפתח חינמי: <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a></div>
+        <div class="form-group"><input type="password" id="api-key-input" placeholder="sk-or-..."></div>
         <button class="btn-primary-sm" onclick="saveApiKey()">שמור מפתח</button>
       </div>
 
@@ -1146,49 +1146,34 @@ function handleDrop(e) { e.preventDefault(); document.getElementById('upload-zon
 function handleFile(file) { if (!file) return; const reader = new FileReader(); reader.onload = ev => { const img = document.getElementById('img-preview'); img.src = ev.target.result; img.style.display = 'block'; analyzeImage(ev.target.result); }; reader.readAsDataURL(file); }
 async function analyzeImage(dataUrl) {
   const apiKey = getApiKey();
-  if (!apiKey) { alert('נא להזין Gemini API Key בהגדרות'); return; }
+  if (!apiKey) { alert('נא להזין OpenRouter API Key בהגדרות'); return; }
   document.getElementById('ai-loading').style.display = 'flex';
   document.getElementById('ai-result-box').style.display = 'none';
   const base64 = dataUrl.split(',')[1];
   const mediaType = dataUrl.split(';')[0].split(':')[1];
   try {
-    const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { inline_data: { mime_type: mediaType, data: base64 } },
-            { text: `You are analyzing a Hebrew safety inspection certificate ("תסקיר בדיקה וניסוי מכונות-הרמה") for lifting equipment in Israel.
-
+    const PROMPT = `You are analyzing a Hebrew safety inspection certificate ("תסקיר בדיקה וניסוי מכונות-הרמה") for lifting equipment in Israel.
 Study the document carefully. Extract these fields and return ONLY a valid JSON object, no markdown:
-
-{
-  "inspectionNumber": "מספר תסקיר from top-left box next to מספר תסקיר:",
-  "serialNumber": "מספר סידורי from equipment table row (NOT the inspection number)",
-  "manufacturingYear": "שנת יצור",
-  "type": "equipment type in Hebrew e.g. מלגזה, מנוף, עגורן",
-  "manufacturer": "manufacturer name e.g. TOYOTA",
-  "model": "model number e.g. SWE145",
-  "lastCheck": "תאריך בדיקה מוכחת as DD/MM/YYYY",
-  "nextCheck": "תאריך בדיקה הבאה as DD/MM/YYYY",
-  "safeWorkLoad": "עומס עבודה בטוח numeric only",
-  "maxLoad": "עומס מקסימלי numeric only",
-  "testLoad": "עומס מבחן numeric only",
-  "height": "רדיוס/גובה numeric only",
-  "inspectionType": "סוג בדיקה e.g. ראשונית/תקופתית",
-  "notes": "section 4 הערות נוספות content"
-}
-
-Rules: dates stay as DD/MM/YYYY. Return null for missing fields. JSON only.` }
-          ]
-        }],
-        generationConfig: { temperature: 0.1, maxOutputTokens: 800 }
+{"inspectionNumber":"מספר תסקיר from top-left box","serialNumber":"מספר סידורי from equipment table (NOT inspection number)","manufacturingYear":"שנת יצור","type":"equipment type in Hebrew e.g. מלגזה","manufacturer":"manufacturer name","model":"model number","lastCheck":"תאריך בדיקה מוכחת as DD/MM/YYYY","nextCheck":"תאריך בדיקה הבאה as DD/MM/YYYY","safeWorkLoad":"עומס עבודה בטוח numeric only","maxLoad":"עומס מקסימלי numeric only","testLoad":"עומס מבחן numeric only","height":"רדיוס/גובה numeric only","inspectionType":"סוג בדיקה","notes":"section 4 הערות"}
+Rules: dates as DD/MM/YYYY, null for missing, JSON only.`;
+    const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey, 'HTTP-Referer': 'https://itairosenblum-hash.github.io/crane/', 'X-Title': 'Safety Inspector' },
+      body: JSON.stringify({
+        model: 'google/gemini-2.0-flash-exp:free',
+        messages: [
+          { role: 'system', content: 'You are a safety document parser. Respond with valid JSON only.' },
+          { role: 'user', content: [
+            { type: 'image_url', image_url: { url: 'data:' + mediaType + ';base64,' + base64 } },
+            { type: 'text', text: PROMPT }
+          ]}
+        ],
+        temperature: 0.1, max_tokens: 800
       })
     });
     const data = await resp.json();
     if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
-    const rawText = data.candidates[0].content.parts[0].text.trim();
+    const rawText = data.choices[0].message.content.trim();
     let parsed = {};
     try { parsed = JSON.parse(rawText); } catch { try { const m = rawText.match(/\{[\s\S]*\}/); if (m) parsed = JSON.parse(m[0]); } catch(e2) { console.error('Parse failed:', rawText); } }
     document.getElementById('ai-loading').style.display = 'none';
