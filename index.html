@@ -682,73 +682,102 @@ tr:hover td { background: rgba(30,77,183,0.02); }
     <!-- WHATSAPP -->
     <div id="tab-wa-content" style="display:none">
       <div class="page-header">
-        <div><h2>💬 שליחת הודעות WhatsApp</h2><p>שליחה ידנית של הודעות לאנשי קשר</p></div>
+        <div><h2>💬 הודעות WhatsApp</h2><p>בחר סוג הודעה לשליחה</p></div>
+      </div>
+
+      <!-- TYPE SELECTOR -->
+      <div class="section-card" style="margin-bottom:1rem">
+        <div class="section-body" style="padding:1rem">
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+            <button onclick="selectWaType('new-user')" id="wa-btn-new-user"
+              style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 8px;border-radius:var(--radius);border:2px solid var(--border);background:var(--card);cursor:pointer;font-family:inherit;transition:all 0.2s">
+              <span style="font-size:28px">👤</span>
+              <span style="font-size:13px;font-weight:600;color:var(--text)">משתמש חדש</span>
+              <span style="font-size:11px;color:var(--text-muted);text-align:center">שליחת פרטי כניסה</span>
+            </button>
+            <button onclick="selectWaType('reminders')" id="wa-btn-reminders"
+              style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 8px;border-radius:var(--radius);border:2px solid var(--border);background:var(--card);cursor:pointer;font-family:inherit;transition:all 0.2s">
+              <span style="font-size:28px">⏰</span>
+              <span style="font-size:13px;font-weight:600;color:var(--text)">תזכורות</span>
+              <span style="font-size:11px;color:var(--text-muted);text-align:center">תסקירים פגי תוקף</span>
+            </button>
+            <button onclick="selectWaType('general')" id="wa-btn-general"
+              style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 8px;border-radius:var(--radius);border:2px solid var(--border);background:var(--card);cursor:pointer;font-family:inherit;transition:all 0.2s">
+              <span style="font-size:28px">📢</span>
+              <span style="font-size:13px;font-weight:600;color:var(--text)">הודעה כללית</span>
+              <span style="font-size:11px;color:var(--text-muted);text-align:center">שליחה חופשית</span>
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- MSG TYPE 1: New User -->
-      <div class="section-card" style="margin-bottom:1rem">
-        <div class="section-head">
-          <h3>👤 הודעת משתמש חדש</h3>
-        </div>
-        <div class="section-body">
-          <p style="font-size:13px;color:var(--text-muted);margin-bottom:1rem">שלח למשתמש חדש את פרטי ההתחברות לאפליקציה</p>
-          <div class="form-row">
-            <div class="form-group">
-              <label>בחר משתמש</label>
-              <select id="wa-new-user-select" onchange="previewNewUserMsg()">
-                <option value="">-- בחר משתמש --</option>
-              </select>
+      <div id="wa-panel-new-user" style="display:none">
+        <div class="section-card">
+          <div class="section-head">
+            <h3>👤 הודעת משתמש חדש</h3>
+            <button class="btn-secondary" onclick="selectWaType(null)" style="font-size:12px">✕ סגור</button>
+          </div>
+          <div class="section-body">
+            <div class="form-row">
+              <div class="form-group">
+                <label>בחר משתמש</label>
+                <select id="wa-new-user-select" onchange="previewNewUserMsg()">
+                  <option value="">-- בחר משתמש --</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>טלפון</label>
+                <input type="tel" id="wa-new-user-phone" readonly style="background:var(--bg)">
+              </div>
             </div>
             <div class="form-group">
-              <label>טלפון (לשליחה)</label>
-              <input type="tel" id="wa-new-user-phone" placeholder="050-000-0000" readonly style="background:var(--bg)">
+              <label>תצוגה מקדימה</label>
+              <textarea id="wa-new-user-preview" rows="7" style="font-size:13px;direction:rtl" readonly></textarea>
             </div>
+            <button class="btn-wa" id="wa-new-user-btn" style="display:inline-flex;font-size:14px;padding:12px 24px" onclick="sendWaNewUser()" disabled>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.523 5.847L0 24l6.356-1.492A11.934 11.934 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.894a9.866 9.866 0 01-5.031-1.381l-.361-.214-3.741.878.936-3.619-.235-.372A9.855 9.855 0 012.106 12C2.106 6.58 6.58 2.106 12 2.106S21.894 6.58 21.894 12 17.42 21.894 12 21.894z"/></svg>
+              שלח WhatsApp
+            </button>
           </div>
-          <div class="form-group">
-            <label>תצוגה מקדימה של ההודעה</label>
-            <textarea id="wa-new-user-preview" rows="6" style="font-size:13px;direction:rtl" readonly></textarea>
-          </div>
-          <button class="btn-wa" id="wa-new-user-btn" style="display:inline-flex;font-size:14px;padding:10px 20px" onclick="sendWaNewUser()" disabled>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.523 5.847L0 24l6.356-1.492A11.934 11.934 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.894a9.866 9.866 0 01-5.031-1.381l-.361-.214-3.741.878.936-3.619-.235-.372A9.855 9.855 0 012.106 12C2.106 6.58 6.58 2.106 12 2.106S21.894 6.58 21.894 12 17.42 21.894 12 21.894z"/></svg>
-            שלח WhatsApp
-          </button>
         </div>
       </div>
 
       <!-- MSG TYPE 2: Expiry Reminders -->
-      <div class="section-card" style="margin-bottom:1rem">
-        <div class="section-head">
-          <h3>⏰ תזכורות תסקירים — חודש קרוב</h3>
-          <button class="btn-secondary" onclick="loadExpiryReminders()" style="font-size:13px">🔄 טען</button>
-        </div>
-        <div class="section-body">
-          <p style="font-size:13px;color:var(--text-muted);margin-bottom:1rem">אמצעים שבדיקתם פגה תוך 30 יום — שלח תזכורת לאחראי האתר</p>
-          <div id="wa-expiry-list">
-            <div style="color:var(--text-muted);font-size:13px">לחץ "טען" לרשימת אמצעים הדורשים תזכורת</div>
+      <div id="wa-panel-reminders" style="display:none">
+        <div class="section-card">
+          <div class="section-head">
+            <h3>⏰ תזכורות — תסקירים פגי תוקף</h3>
+            <div style="display:flex;gap:8px">
+              <button class="btn-secondary" onclick="loadExpiryReminders()" style="font-size:12px">🔄 טען</button>
+              <button class="btn-secondary" onclick="selectWaType(null)" style="font-size:12px">✕ סגור</button>
+            </div>
+          </div>
+          <div class="section-body">
+            <div id="wa-expiry-list" style="color:var(--text-muted);font-size:13px">לחץ "טען" לרשימה</div>
           </div>
         </div>
       </div>
 
-      <!-- MSG TYPE 3: General Message -->
-      <div class="section-card">
-        <div class="section-head">
-          <h3>📢 הודעה כללית למשתמשים</h3>
-        </div>
-        <div class="section-body">
-          <div class="form-group">
-            <label>בחר נמענים</label>
-            <select id="wa-general-recipients" multiple style="height:100px;padding:6px">
-            </select>
-            <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Ctrl+לחיצה לבחירת מספר נמענים</div>
+      <!-- MSG TYPE 3: General -->
+      <div id="wa-panel-general" style="display:none">
+        <div class="section-card">
+          <div class="section-head">
+            <h3>📢 הודעה כללית</h3>
+            <button class="btn-secondary" onclick="selectWaType(null)" style="font-size:12px">✕ סגור</button>
           </div>
-          <div class="form-group">
-            <label>תוכן ההודעה</label>
-            <textarea id="wa-general-msg" rows="4" placeholder="הקלד את ההודעה כאן..."></textarea>
+          <div class="section-body">
+            <div class="form-group">
+              <label>בחר נמענים</label>
+              <div id="wa-general-checks" style="border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:8px;max-height:150px;overflow-y:auto;background:var(--card)"></div>
+            </div>
+            <div class="form-group">
+              <label>תוכן ההודעה <span style="font-size:11px;color:var(--text-muted)">(השתמש ב-{שם} לשם אישי)</span></label>
+              <textarea id="wa-general-msg" rows="5" placeholder="שלום {שם}, ..."></textarea>
+            </div>
+            <div id="wa-general-links" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
+            <button class="btn-primary-sm" onclick="generateGeneralLinks()" style="margin-top:12px">📋 צור קישורי שליחה</button>
           </div>
-          <div id="wa-general-links" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
-          <button class="btn-primary-sm" onclick="generateGeneralLinks()" style="margin-top:12px">
-            📋 צור קישורי שליחה
-          </button>
         </div>
       </div>
     </div>
@@ -1717,6 +1746,37 @@ async function deleteUser(username) {
 // ===== WHATSAPP =====
 const SITE_URL = 'https://itairosenblum-hash.github.io/crane/';
 
+function selectWaType(type) {
+  // Reset all buttons
+  ['new-user','reminders','general'].forEach(t => {
+    const btn = document.getElementById('wa-btn-' + t);
+    const panel = document.getElementById('wa-panel-' + t);
+    if (btn) { btn.style.borderColor = 'var(--border)'; btn.style.background = 'var(--card)'; }
+    if (panel) panel.style.display = 'none';
+  });
+  if (!type) return;
+  // Highlight selected
+  const btn = document.getElementById('wa-btn-' + type);
+  const panel = document.getElementById('wa-panel-' + type);
+  if (btn) { btn.style.borderColor = 'var(--blue)'; btn.style.background = 'rgba(30,77,183,0.05)'; }
+  if (panel) { panel.style.display = 'block'; panel.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+  // Auto-load reminders
+  if (type === 'reminders') loadExpiryReminders();
+  // Populate general recipients checkboxes
+  if (type === 'general') {
+    const container = document.getElementById('wa-general-checks');
+    if (container) {
+      container.innerHTML = appData.users.filter(u => u.phone).map(u =>
+        `<label style="display:flex;align-items:center;gap:10px;padding:8px 6px;cursor:pointer;border-radius:6px" 
+           onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">
+          <input type="checkbox" value="${u.username}" style="width:18px;height:18px;accent-color:var(--blue);cursor:pointer">
+          <span style="font-size:14px">${u.fullname||u.username} — ${formatPhone(u.phone)}</span>
+        </label>`
+      ).join('');
+    }
+  }
+}
+
 function renderWaTab() {
   // Populate new user select
   const sel = document.getElementById('wa-new-user-select');
@@ -1818,8 +1878,8 @@ function loadExpiryReminders() {
 }
 
 function generateGeneralLinks() {
-  const sel = document.getElementById('wa-general-recipients');
-  const selected = Array.from(sel.selectedOptions).map(o => o.value);
+  const container = document.getElementById('wa-general-checks');
+  const selected = Array.from(container.querySelectorAll('input:checked')).map(cb => cb.value);
   const msg = document.getElementById('wa-general-msg').value.trim();
   if (!msg) { alert('נא להזין תוכן הודעה'); return; }
   if (!selected.length) { alert('נא לבחור לפחות נמען אחד'); return; }
