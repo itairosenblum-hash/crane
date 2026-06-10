@@ -926,8 +926,8 @@ async function loadData(silent = false) {
       name: String(e.name||''),
       type: String(e.type||''),
       notes: String(e.notes||''),
-      lastCheck: String(e.lastCheck||''),
-      nextCheck: String(e.nextCheck||''),
+      lastCheck: normalizeDate(e.lastCheck),
+      nextCheck: normalizeDate(e.nextCheck),
       imageUrl: (e.imageUrl && String(e.imageUrl) !== 'null' && String(e.imageUrl) !== 'undefined' && String(e.imageUrl).startsWith('http')) ? String(e.imageUrl) : ''
     }));
     console.log('Equipment with images:', appData.equipment.filter(e=>e.imageUrl).map(e=>({id:e.id,url:e.imageUrl})));
@@ -1032,15 +1032,33 @@ function refreshCurrentTab() {
 }
 
 // ===== UTILS =====
+function normalizeDate(d) {
+  if (!d || String(d).trim() === '' || d === null) return '';
+  const s = String(d).trim();
+  if (s === 'null' || s === 'undefined') return '';
+  // Already DD/MM/YYYY - keep as is
+  if (s.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) return s;
+  // ISO with time YYYY-MM-DDTHH:mm:ss.sssZ
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return iso[3]+'/'+iso[2]+'/'+iso[1];
+  // Try Date object
+  const dt = new Date(s);
+  if (!isNaN(dt)) {
+    const day = String(dt.getDate()).padStart(2,'0');
+    const month = String(dt.getMonth()+1).padStart(2,'0');
+    return day+'/'+month+'/'+dt.getFullYear();
+  }
+  return s;
+}
 function parseDate(d) {
   if (!d || String(d).trim() === '' || String(d).trim() === 'null') return null;
   const s = String(d).trim();
   // Handle DD/MM/YYYY format
   const ddmmyyyy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (ddmmyyyy) return new Date(parseInt(ddmmyyyy[3]), parseInt(ddmmyyyy[2])-1, parseInt(ddmmyyyy[1]));
-  // Handle YYYY-MM-DD
-  const iso = new Date(s);
-  return isNaN(iso) ? null : iso;
+  // Handle ISO format with time (from Sheets Date objects)
+  const isoDate = new Date(s);
+  return isNaN(isoDate) ? null : isoDate;
 }
 function daysUntil(d) {
   const parsed = parseDate(d);
@@ -1078,11 +1096,17 @@ function formatDate(s) {
   const str = String(s).trim();
   // Already DD/MM/YYYY
   if (str.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) return str;
-  // ISO format YYYY-MM-DD → convert to DD/MM/YYYY
+  // ISO format with or without time YYYY-MM-DDT... → convert to DD/MM/YYYY
   const iso = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (iso) return iso[3]+'/'+iso[2]+'/'+iso[1];
+  // Try as Date object
   const d = new Date(str);
-  return isNaN(d) ? str : d.toLocaleDateString('he-IL');
+  if (!isNaN(d)) {
+    const day = String(d.getDate()).padStart(2,'0');
+    const month = String(d.getMonth()+1).padStart(2,'0');
+    return day+'/'+month+'/'+d.getFullYear();
+  }
+  return str;
 }
 function getStatus(next) { const d = daysUntil(next); if (d <= 14) return 'danger'; if (d <= 30) return 'warn'; return 'ok'; }
 function statusBadge(st, days) {
@@ -1246,8 +1270,17 @@ function editEquipment(id) {
   sv('eq-inspection-type', e.inspectionType); sv('eq-inspector', e.inspectorName);
   sv('eq-notes', e.notes);
   const img = document.getElementById('img-preview');
-  if (e.imageUrl) { img.src = e.imageUrl; img.style.display = 'block'; } else { img.style.display = 'none'; }
-  document.getElementById('ai-result-box').style.display = 'none';
+  if (img) {
+    if (e.imageUrl && e.imageUrl.startsWith('http')) { 
+      img.src = e.imageUrl; 
+      img.style.display = 'block'; 
+    } else { 
+      img.style.display = 'none'; 
+      img.src = '';
+    }
+  }
+  const aiBox = document.getElementById('ai-result-box');
+  if (aiBox) aiBox.style.display = 'none';
   openModal('modal-add-eq');
 }
 
