@@ -1898,7 +1898,7 @@ function sendWaNewUser() {
 function loadExpiryReminders() {
   const eqs = appData.equipment.filter(e => {
     const d = daysUntil(e.nextCheck);
-    return d >= 0 && d <= 30;
+    return d <= 30; // Include expired (d < 0) AND expiring within 30 days
   }).sort((a,b) => daysUntil(a.nextCheck) - daysUntil(b.nextCheck));
 
   if (!eqs.length) {
@@ -1909,6 +1909,7 @@ function loadExpiryReminders() {
 
   document.getElementById('wa-expiry-list').innerHTML = eqs.map(e => {
     const days = daysUntil(e.nextCheck);
+    const daysLabel = days < 0 ? `פג לפני ${Math.abs(days)} ימים` : days === 0 ? 'היום!' : `בעוד ${days} ימים`;
     const site = appData.sites.find(s => s.id == e.siteId);
     // Find responsible user for this site
     const user = appData.users.find(u => u.siteId && String(u.siteId).split(',').includes(String(e.siteId)));
@@ -1925,13 +1926,13 @@ function loadExpiryReminders() {
 
 נא לתאם בדיקה חדשה בהקדם האפשרי.
 
-מערכת תסקירי הבטיחות — מדור צהר"מ זרוע הים`);
+מערכת תסקירי הבטיחות — מדור צהר"מ זרוע הים — מדור צהר"מ זרוע הים`);
 
-    return `<div class="alert-item ${days <= 7 ? 'red' : 'amber'}" style="margin-bottom:8px">
-      <div class="alert-dot ${days <= 7 ? 'red' : 'amber'}"></div>
+    return `<div class="alert-item ${days <= 0 ? 'red' : days <= 7 ? 'red' : 'amber'}" style="margin-bottom:8px">
+      <div class="alert-dot ${days <= 0 ? 'red' : days <= 7 ? 'red' : 'amber'}"></div>
       <div class="alert-info">
         <div class="alert-name">${e.name} <span style="font-size:12px;color:var(--text-muted)">(${e.eqId})</span></div>
-        <div class="alert-meta">📍 ${getSiteName(e.siteId)} · 📅 ${formatDate(e.nextCheck)} · ${days} ימים</div>
+        <div class="alert-meta">📍 ${getSiteName(e.siteId)} · 📅 ${formatDate(e.nextCheck)} · ${daysLabel}</div>
         ${user ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">אחראי: ${user.fullname||user.username} ${formatPhone(user.phone)}</div>` : '<div style="font-size:11px;color:var(--danger);margin-top:2px">⚠️ אין אחראי משויך לאתר</div>'}
       </div>
       ${phone ? `<a class="btn-wa" href="https://wa.me/${phone}?text=${msg}" target="_blank" style="font-size:12px;padding:7px 12px">
