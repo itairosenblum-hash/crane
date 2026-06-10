@@ -1107,7 +1107,7 @@ async function analyzeImage(dataUrl) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey, 'HTTP-Referer': 'https://itairosenblum-hash.github.io/crane/', 'X-Title': 'Safety Inspector' },
       body: JSON.stringify({
-        model: 'qwen/qwen2.5-vl-7b-instruct:free',
+        model: 'google/gemini-2.0-flash-lite-001',
         messages: [
           { role: 'system', content: 'You are a safety document parser. Always respond with valid JSON only, no markdown, no explanation.' },
           { role: 'user', content: [
