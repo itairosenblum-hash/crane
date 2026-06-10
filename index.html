@@ -663,8 +663,13 @@ function getApiKey() { return localStorage.getItem(GEMINI_KEY_STORE) || ''; }
 // ===== API =====
 async function apiGet(params) {
   const qs = new URLSearchParams(params).toString();
-  const resp = await fetch(getScriptUrl() + '?' + qs);
-  return resp.json();
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 15000);
+  try {
+    const resp = await fetch(getScriptUrl() + '?' + qs, { signal: ctrl.signal });
+    clearTimeout(t);
+    return resp.json();
+  } catch(e) { clearTimeout(t); throw e.name === 'AbortError' ? new Error('timeout') : e; }
 }
 async function apiPost(body) {
   // Apps Script requires no-cors or form data for cross-origin POST
@@ -677,29 +682,49 @@ async function apiPost(body) {
 }
 
 // ===== DATA =====
-async function loadData() {
-  setSyncStatus('ing', '● מתחבר...');
+async function loadData(silent = false) {
+  if (!silent) setSyncStatus('ing', '● טוען...');
   try {
     const data = await apiGet({ action: 'getAll' });
     appData.sites = (data.sites || []).map(s => ({ ...s, id: parseInt(s.id), phone: String(s.phone||''), manager: String(s.manager||''), name: String(s.name||''), location: String(s.location||'') }));
-    appData.equipment = (data.equipment || []).map(e => {
-      const eq = { ...e, 
-        id: parseInt(e.id), 
-        siteId: parseInt(e.siteId), 
-        eqId: String(e.eqId||''), 
-        name: String(e.name||''), 
-        type: String(e.type||''), 
-        notes: String(e.notes||''), 
-        lastCheck: String(e.lastCheck||''), 
-        nextCheck: String(e.nextCheck||''),
-        imageUrl: (e.imageUrl && e.imageUrl !== 'null' && e.imageUrl !== 'undefined') ? String(e.imageUrl) : ''
-      };
-      return eq;
-    });
+    appData.equipment = (data.equipment || []).map(e => ({
+      ...e,
+      id: parseInt(e.id),
+      siteId: parseInt(e.siteId),
+      eqId: String(e.eqId||''),
+      name: String(e.name||''),
+      type: String(e.type||''),
+      notes: String(e.notes||''),
+      lastCheck: String(e.lastCheck||''),
+      nextCheck: String(e.nextCheck||''),
+      imageUrl: (e.imageUrl && e.imageUrl !== 'null' && e.imageUrl !== 'undefined') ? String(e.imageUrl) : ''
+    }));
     appData.users = data.users || [];
     setSyncStatus('ok', '● מחובר');
     refreshCurrentTab();
   } catch(e) { setSyncStatus('err', '● שגיאה'); }
+}
+
+// Update local data without re-fetching from Sheets
+function updateLocalEquipment(eq) {
+  const idx = appData.equipment.findIndex(e => e.id === eq.id);
+  if (idx >= 0) appData.equipment[idx] = eq;
+  else appData.equipment.push(eq);
+  refreshCurrentTab();
+}
+function removeLocalEquipment(id) {
+  appData.equipment = appData.equipment.filter(e => e.id !== id);
+  refreshCurrentTab();
+}
+function updateLocalSite(site) {
+  const idx = appData.sites.findIndex(s => s.id === site.id);
+  if (idx >= 0) appData.sites[idx] = site;
+  else appData.sites.push(site);
+  refreshCurrentTab();
+}
+function removeLocalSite(id) {
+  appData.sites = appData.sites.filter(s => s.id !== id);
+  refreshCurrentTab();
 }
 function setSyncStatus(t, txt) { const el = document.getElementById('sync-status'); el.className = 'sync-status sync-' + t; el.textContent = txt; }
 
@@ -913,7 +938,11 @@ function viewEquipment(id) {
 }
 async function deleteEquipment(id) {
   if (!confirm('האם למחוק אמצעי זה?')) return;
-  try { await apiPost({ action: 'deleteEquipment', data: { id } }); showToast('אמצעי נמחק'); await loadData(); } catch(e) { alert('שגיאה: '+e.message); }
+  // Optimistic update
+  removeLocalEquipment(id);
+  showToast('אמצעי נמחק');
+  try { await apiPost({ action: 'deleteEquipment', data: { id } }); } 
+  catch(e) { alert('שגיאה: '+e.message); await loadData(); }
 }
 function editEquipment(id) {
   editingEqId = id;
@@ -1106,7 +1135,8 @@ async function saveEquipment() {
     }
     
     closeModal('modal-add-eq');
-    await loadData();
+    // Reload in background silently
+    loadData(true);
   } catch(e) { console.error('Save error:', e); alert('שגיאה כללית: ' + e.message); }
 }
 
@@ -1298,12 +1328,16 @@ async function saveSite() {
     await apiPost({ action: editingSiteId ? 'updateSite' : 'addSite', data });
     showToast(editingSiteId ? 'אתר עודכן ✓' : 'אתר נוסף ✓');
     editingSiteId = null;
-    closeModal('modal-add-site'); await loadData();
+    closeModal('modal-add-site');
+    loadData(true);
   } catch(e) { alert('שגיאה: '+e.message); }
 }
 async function deleteSite(id) {
   if (!confirm('למחוק אתר זה?')) return;
-  try { await apiPost({ action: 'deleteSite', data: { id } }); showToast('אתר נמחק'); await loadData(); } catch(e) { alert('שגיאה: '+e.message); }
+  removeLocalSite(id);
+  showToast('אתר נמחק');
+  try { await apiPost({ action: 'deleteSite', data: { id } }); }
+  catch(e) { alert('שגיאה: '+e.message); await loadData(); }
 }
 
 // ===== SETTINGS =====
@@ -1369,12 +1403,12 @@ async function saveUser() {
     editingUsername = null;
     document.getElementById('new-username').disabled = false;
     document.querySelector('#modal-add-user .modal-header h3').textContent = 'הוספת משתמש';
-    closeModal('modal-add-user'); await loadData(); renderUsersTable();
+    closeModal('modal-add-user'); loadData(true).then(() => renderUsersTable());
   } catch(e) { alert('שגיאה: '+e.message); }
 }
 async function deleteUser(username) {
   if (!confirm(`למחוק משתמש ${username}?`)) return;
-  try { await apiPost({ action:'deleteUser', data:{username} }); showToast('משתמש הוסר'); await loadData(); renderUsersTable(); } catch(e) { alert('שגיאה: '+e.message); }
+  try { await apiPost({ action:'deleteUser', data:{username} }); showToast('משתמש הוסר'); loadData(true).then(() => renderUsersTable()); } catch(e) { alert('שגיאה: '+e.message); }
 }
 
 // ===== MODALS =====
