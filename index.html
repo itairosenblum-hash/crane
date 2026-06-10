@@ -1323,8 +1323,14 @@ Rules: dates as DD/MM/YYYY, null for missing, JSON only.`;
 
     // Build content based on file type
     const userContent = isPDF ? [
-      { type: 'text', text: PROMPT + '\n\nThe following is the PDF document as base64:' },
-      { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } }
+      {
+        type: 'text',
+        text: PROMPT
+      },
+      {
+        type: 'image_url',
+        image_url: { url: 'data:application/pdf;base64,' + base64 }
+      }
     ] : [
       { type: 'image_url', image_url: { url: 'data:' + mediaType + ';base64,' + base64 } },
       { type: 'text', text: PROMPT }
@@ -1334,7 +1340,7 @@ Rules: dates as DD/MM/YYYY, null for missing, JSON only.`;
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey, 'HTTP-Referer': 'https://itairosenblum-hash.github.io/crane/', 'X-Title': 'Safety Inspector' },
       body: JSON.stringify({
-        model: 'anthropic/claude-opus-4-5',
+        model: 'anthropic/claude-sonnet-4-5',
         messages: [
           { role: 'system', content: 'You are a safety document parser. Respond with valid JSON only.' },
           { role: 'user', content: userContent }
