@@ -1122,6 +1122,14 @@ function getUserEquipment() {
   if (!userSites.length) return appData.equipment;
   return appData.equipment.filter(e => userSites.includes(String(e.siteId)));
 }
+// Returns non-admin users responsible for a given siteId (for WA alerts)
+function getSiteResponsibleUsers(siteId) {
+  return appData.users.filter(u => {
+    if (!u || u.role === 'admin') return false;
+    const sites = String(u.siteId||'').split(',').map(s => s.trim()).filter(Boolean);
+    return sites.includes(String(siteId));
+  });
+}
 function waLink(phone, name, siteId, nextCheck) {
   const rawPhone = String(phone == null ? '' : phone).replace(/\D/g,'');
   const p = rawPhone.startsWith('972') ? rawPhone : rawPhone.replace(/^0/,'972');
