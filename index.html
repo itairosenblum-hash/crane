@@ -682,7 +682,20 @@ async function loadData() {
   try {
     const data = await apiGet({ action: 'getAll' });
     appData.sites = (data.sites || []).map(s => ({ ...s, id: parseInt(s.id), phone: String(s.phone||''), manager: String(s.manager||''), name: String(s.name||''), location: String(s.location||'') }));
-    appData.equipment = (data.equipment || []).map(e => ({ ...e, id: parseInt(e.id), siteId: parseInt(e.siteId), eqId: String(e.eqId||''), name: String(e.name||''), type: String(e.type||''), notes: String(e.notes||''), lastCheck: String(e.lastCheck||''), nextCheck: String(e.nextCheck||''), imageUrl: String(e.imageUrl||'') }));
+    appData.equipment = (data.equipment || []).map(e => {
+      const eq = { ...e, 
+        id: parseInt(e.id), 
+        siteId: parseInt(e.siteId), 
+        eqId: String(e.eqId||''), 
+        name: String(e.name||''), 
+        type: String(e.type||''), 
+        notes: String(e.notes||''), 
+        lastCheck: String(e.lastCheck||''), 
+        nextCheck: String(e.nextCheck||''),
+        imageUrl: (e.imageUrl && e.imageUrl !== 'null' && e.imageUrl !== 'undefined') ? String(e.imageUrl) : ''
+      };
+      return eq;
+    });
     appData.users = data.users || [];
     setSyncStatus('ok', '● מחובר');
     refreshCurrentTab();
@@ -862,16 +875,16 @@ function viewEquipment(id) {
   if (!e) return;
   const days = daysUntil(e.nextCheck); const st = getStatus(e.nextCheck);
   document.getElementById('view-eq-body').innerHTML = `
-    ${(e.imageUrl && e.imageUrl !== 'null' && e.imageUrl.startsWith('http')) ? `
+    ${(e.imageUrl && String(e.imageUrl) !== 'null' && String(e.imageUrl).startsWith('http')) ? `
   <div style="margin-bottom:1.5rem">
-    <a href="${e.imageUrl.replace('uc?id=','file/d/').replace(/\/uc\?.*$/,'').replace('file/d/','file/d/') + (e.imageUrl.includes('uc?id=') ? '/view' : '')}" 
-       target="_blank" 
-       style="display:flex;align-items:center;justify-content:center;gap:10px;background:var(--blue);color:white;padding:14px;border-radius:8px;text-decoration:none;font-size:15px;font-weight:600">
+    <a href="${e.imageUrl}" target="_blank" 
+       style="display:flex;align-items:center;justify-content:center;gap:10px;background:var(--blue);color:white;padding:14px;border-radius:8px;text-decoration:none;font-size:15px;font-weight:600;margin-bottom:8px">
       📄 פתח תסקיר ב-Google Drive
     </a>
-    <iframe src="${e.imageUrl.replace('uc?id=','file/d/').replace(/\?.*$/,'')}/preview" 
-      style="width:100%;height:300px;border-radius:8px;border:1px solid var(--border);margin-top:8px;display:block"
-      allowfullscreen>
+    <iframe src="${'https://drive.google.com/file/d/' + e.imageUrl.split('id=')[1] + '/preview'}" 
+      width="100%" height="300" 
+      style="border-radius:8px;border:1px solid var(--border);display:block"
+      allow="autoplay">
     </iframe>
   </div>` : ''}
     <table style="width:100%;font-size:14px;border-collapse:collapse">
