@@ -1233,13 +1233,16 @@ function editEquipment(id) {
   editingEqId = id;
   const e = appData.equipment.find(x => x.id === id);
   if (!e) return;
+  // Rebuild modal first (creates all fields)
+  rebuildModalBody();
   document.getElementById('modal-eq-title').textContent = 'עריכת אמצעי';
-  populateEqSites();
-  const sv = (id, val) => { const el = document.getElementById(id); if(el) el.value = val||''; };
+  // Fill fields after rebuild
+  const sv = (fid, val) => { const el = document.getElementById(fid); if(el) el.value = val||''; };
   sv('eq-id', e.eqId); sv('eq-serial', e.serialNumber);
   sv('eq-type', e.type); sv('eq-manufacturer', e.manufacturer);
   sv('eq-name', e.name); sv('eq-year', e.manufacturingYear);
-  document.getElementById('eq-site').value = e.siteId;
+  const siteEl = document.getElementById('eq-site');
+  if (siteEl) siteEl.value = e.siteId;
   sv('eq-last', e.lastCheck); sv('eq-next', e.nextCheck);
   sv('eq-swl', e.safeWorkLoad); sv('eq-max-load', e.maxLoad);
   sv('eq-test-load', e.testLoad); sv('eq-height', e.height);
