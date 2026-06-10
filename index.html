@@ -1122,14 +1122,6 @@ function getUserEquipment() {
   if (!userSites.length) return appData.equipment;
   return appData.equipment.filter(e => userSites.includes(String(e.siteId)));
 }
-// Returns non-admin users responsible for a given siteId (for WA alerts)
-function getSiteResponsibleUsers(siteId) {
-  return appData.users.filter(u => {
-    if (u.role === 'admin') return false;
-    const sites = String(u.siteId||'').split(',').map(s => s.trim()).filter(Boolean);
-    return sites.includes(String(siteId));
-  });
-}
 function waLink(phone, name, siteId, nextCheck) {
   const rawPhone = String(phone == null ? '' : phone).replace(/\D/g,'');
   const p = rawPhone.startsWith('972') ? rawPhone : rawPhone.replace(/^0/,'972');
@@ -1164,10 +1156,10 @@ function renderDashboard() {
       <div class="alert-dot ${cls}"></div>
       <div class="alert-info">
         <div class="alert-name">${e.name} <span style="color:var(--text-muted);font-size:12px;font-weight:400">(${e.eqId})</span></div>
-        <div class="alert-meta">📍 ${getSiteName(e.siteId)} · 📅 בדיקה הבאה: ${formatDate(e.nextCheck)}${(() => { const r = getSiteResponsibleUsers(e.siteId); return r.length ? ` · 👤 ${r[0].fullname||r[0].username}` : ''; })()}</div>
+        <div class="alert-meta">📍 ${getSiteName(e.siteId)} · 📅 בדיקה הבאה: ${formatDate(e.nextCheck)}</div>
       </div>
       <span class="alert-days ${cls}">${daysTxt}</span>
-      ${(() => { const resp = getSiteResponsibleUsers(e.siteId); return resp.length ? waLink(resp[0].phone, e.name, e.siteId, e.nextCheck) : ''; })()}
+      ${waLink(e.phone, e.name, e.siteId, e.nextCheck)}
     </div>`;
   }).join('');
 }
@@ -1906,7 +1898,7 @@ function sendWaNewUser() {
 function loadExpiryReminders() {
   const eqs = appData.equipment.filter(e => {
     const d = daysUntil(e.nextCheck);
-    return d <= 30; // Include expired (d < 0) AND expiring within 30 days
+    return d <= 30;
   }).sort((a,b) => daysUntil(a.nextCheck) - daysUntil(b.nextCheck));
 
   if (!eqs.length) {
@@ -1915,41 +1907,83 @@ function loadExpiryReminders() {
     return;
   }
 
-  document.getElementById('wa-expiry-list').innerHTML = eqs.map(e => {
+  // --- Group by responsible user ---
+  const byUser = {}; // key: username or '__none__'
+  eqs.forEach(e => {
+    const resp = getSiteResponsibleUsers(e.siteId);
+    const key = resp.length ? resp[0].username : '__none__';
+    if (!byUser[key]) byUser[key] = { user: resp[0] || null, items: [] };
+    byUser[key].items.push(e);
+  });
+
+  const WA_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.523 5.847L0 24l6.356-1.492A11.934 11.934 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.894a9.866 9.866 0 01-5.031-1.381l-.361-.214-3.741.878.936-3.619-.235-.372A9.855 9.855 0 012.106 12C2.106 6.58 6.58 2.106 12 2.106S21.894 6.58 21.894 12 17.42 21.894 12 21.894z"/></svg>';
+
+  // Helper: build summary message for all items of a user
+  function buildSummaryMsg(user, items) {
+    const name = user ? (user.fullname || user.username) : '';
+    const greeting = name ? `שלום ${name},\n\n` : 'שלום,\n\n';
+    const lines = items.map((e, i) => {
+      const days = daysUntil(e.nextCheck);
+      const daysLabel = days < 0 ? `פג לפני ${Math.abs(days)} ימים` : days === 0 ? 'היום!' : `בעוד ${days} ימים`;
+      return `${i+1}. 🔧 ${e.name} (${e.type||''})\n   📋 תסקיר: ${e.eqId}  |  ס/נ: ${e.serialNumber||'—'}\n   📍 אתר: ${getSiteName(e.siteId)}\n   📅 בדיקה הבאה: ${formatDate(e.nextCheck)} — ${daysLabel}`;
+    }).join('\n\n');
+    return greeting + `תזכורת — האמצעים הבאים דורשים תיאום בדיקה בדחיפות:\n\n${lines}\n\nנא לתאם בדיקות בהקדם האפשרי.\n\nמערכת תסקירי הבטיחות — מדור צהר"מ זרוע הים`;
+  }
+
+  // Helper: build single-item message
+  function buildSingleMsg(e) {
     const days = daysUntil(e.nextCheck);
     const daysLabel = days < 0 ? `פג לפני ${Math.abs(days)} ימים` : days === 0 ? 'היום!' : `בעוד ${days} ימים`;
-    const site = appData.sites.find(s => s.id == e.siteId);
-    // Find responsible non-admin user for this site
-    const responsibleUsers = getSiteResponsibleUsers(e.siteId);
-    const user = responsibleUsers[0] || null;
+    return `שלום,\n\nתזכורת: תסקיר הבטיחות של האמצעי הבא עומד לפוג בקרוב:\n\n🔧 אמצעי: ${e.name} (${e.type||''})\n📋 מספר תסקיר: ${e.eqId}\n🔢 מספר סידורי: ${e.serialNumber||'—'}\n📍 אתר: ${getSiteName(e.siteId)}\n📅 בדיקה הבאה: ${formatDate(e.nextCheck)} (${daysLabel})\n\nנא לתאם בדיקה חדשה בהקדם האפשרי.\n\nמערכת תסקירי הבטיחות — מדור צהר"מ זרוע הים`;
+  }
+
+  let html = '';
+
+  Object.values(byUser).forEach(({ user, items }) => {
     const phone = (user && user.phone) ? String(user.phone).replace(/\D/g,'').replace(/^0/,'972') : '';
-    const msg = encodeURIComponent(`שלום,
+    const hasSummary = items.length > 1 && phone;
 
-תזכורת: תסקיר הבטיחות של האמצעי הבא עומד לפוג בקרוב:
+    // Summary button for this user (if >1 items)
+    if (hasSummary) {
+      const summaryMsg = encodeURIComponent(buildSummaryMsg(user, items));
+      html += `<div style="background:rgba(30,77,183,0.06);border:1.5px solid rgba(30,77,183,0.2);border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:var(--blue)">👤 ${user ? (user.fullname||user.username) : 'ללא אחראי'}</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${items.length} אמצעים דורשים טיפול · ${formatPhone(user.phone)}</div>
+        </div>
+        <a class="btn-wa" href="https://wa.me/${phone}?text=${summaryMsg}" target="_blank"
+           style="font-size:13px;padding:9px 18px;background:#0f6e3a">
+          ${WA_ICON} שלח סיכום (${items.length} אמצעים)
+        </a>
+      </div>`;
+    }
 
-🔧 אמצעי: ${e.name} (${e.type||''})
-📋 מספר תסקיר: ${e.eqId}
-🔢 מספר סידורי: ${e.serialNumber||'—'}
-📍 אתר: ${getSiteName(e.siteId)}
-📅 בדיקה הבאה: ${formatDate(e.nextCheck)} (בעוד ${days} ימים)
+    // Individual items
+    items.forEach(e => {
+      const days = daysUntil(e.nextCheck);
+      const daysLabel = days < 0 ? `פג לפני ${Math.abs(days)} ימים` : days === 0 ? 'היום!' : `בעוד ${days} ימים`;
+      const cls = days <= 7 ? 'red' : 'amber';
+      const singleMsg = encodeURIComponent(buildSingleMsg(e));
+      const responsibleUsers = getSiteResponsibleUsers(e.siteId);
+      const userForItem = responsibleUsers[0] || null;
 
-נא לתאם בדיקה חדשה בהקדם האפשרי.
+      html += `<div class="alert-item ${cls}" style="margin-bottom:8px">
+        <div class="alert-dot ${cls}"></div>
+        <div class="alert-info">
+          <div class="alert-name">${e.name} <span style="font-size:12px;color:var(--text-muted)">(${e.eqId})</span></div>
+          <div class="alert-meta">📍 ${getSiteName(e.siteId)} · 📅 ${formatDate(e.nextCheck)} · ${daysLabel}</div>
+          ${userForItem ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">אחראי: ${userForItem.fullname||userForItem.username} ${formatPhone(userForItem.phone)}</div>` : '<div style="font-size:11px;color:var(--danger);margin-top:2px">⚠️ אין אחראי משויך לאתר</div>'}
+        </div>
+        ${phone ? `<a class="btn-wa" href="https://wa.me/${phone}?text=${singleMsg}" target="_blank" style="font-size:12px;padding:7px 12px">
+          ${WA_ICON} שלח תזכורת
+        </a>` : '<span style="font-size:11px;color:var(--danger)">אין טלפון</span>'}
+      </div>`;
+    });
 
-מערכת תסקירי הבטיחות — מדור צהר"מ זרוע הים — מדור צהר"מ זרוע הים`);
+    if (hasSummary) html += '<div style="margin-bottom:16px"></div>';
+  });
 
-    return `<div class="alert-item ${days <= 0 ? 'red' : days <= 7 ? 'red' : 'amber'}" style="margin-bottom:8px">
-      <div class="alert-dot ${days <= 0 ? 'red' : days <= 7 ? 'red' : 'amber'}"></div>
-      <div class="alert-info">
-        <div class="alert-name">${e.name} <span style="font-size:12px;color:var(--text-muted)">(${e.eqId})</span></div>
-        <div class="alert-meta">📍 ${getSiteName(e.siteId)} · 📅 ${formatDate(e.nextCheck)} · ${daysLabel}</div>
-        ${user ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">אחראי: ${user.fullname||user.username} ${formatPhone(user.phone)}</div>` : '<div style="font-size:11px;color:var(--danger);margin-top:2px">⚠️ אין אחראי משויך לאתר</div>'}
-      </div>
-      ${phone ? `<a class="btn-wa" href="https://wa.me/${phone}?text=${msg}" target="_blank" style="font-size:12px;padding:7px 12px">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.523 5.847L0 24l6.356-1.492A11.934 11.934 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.894a9.866 9.866 0 01-5.031-1.381l-.361-.214-3.741.878.936-3.619-.235-.372A9.855 9.855 0 012.106 12C2.106 6.58 6.58 2.106 12 2.106S21.894 6.58 21.894 12 17.42 21.894 12 21.894z"/></svg>
-        שלח תזכורת
-      </a>` : '<span style="font-size:11px;color:var(--danger)">אין טלפון</span>'}
-    </div>`;
-  }).join('');
+  document.getElementById('wa-expiry-list').innerHTML = html;
 }
 
 function generateGeneralLinks() {
