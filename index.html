@@ -1002,13 +1002,32 @@ function populateEqSites() {
   document.getElementById('eq-site').innerHTML = appData.sites.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
   if (currentUser.siteId) document.getElementById('eq-site').value = currentUser.siteId;
 }
+async function compressImage(dataUrl, maxWidth=1200, quality=0.75) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ratio = Math.min(maxWidth / img.width, maxWidth / img.height, 1);
+      canvas.width = Math.round(img.width * ratio);
+      canvas.height = Math.round(img.height * ratio);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.src = dataUrl;
+  });
+}
+
 async function saveEquipment() {
   const eqId = document.getElementById('eq-id').value.trim();
   const name = document.getElementById('eq-name').value.trim();
   if (!eqId || !name) { alert('נא למלא מספר מזהה ושם'); return; }
   const imgEl = document.getElementById('img-preview');
   const hasNewImage = imgEl.style.display !== 'none' && imgEl.src.startsWith('data:');
-  const imageData = hasNewImage ? imgEl.src : '';
+  let imageData = '';
+  if (hasNewImage) {
+    imageData = await compressImage(imgEl.src);
+    console.log('Image size:', Math.round(imageData.length/1024), 'KB');
+  }
   const imageUrl = !hasNewImage && editingEqId ? (appData.equipment.find(e=>e.id===editingEqId)||{}).imageUrl||'' : '';
   const gv = id => { const el = document.getElementById(id); return el ? el.value : ''; };
   const data = {
@@ -1030,7 +1049,17 @@ async function saveEquipment() {
     imageData: imageData||'',
     imageUrl: imageUrl||''
   };
-  try { await apiPost({ action: editingEqId ? 'updateEquipment' : 'addEquipment', data }); showToast(editingEqId ? 'אמצעי עודכן ✓' : 'אמצעי נוסף ✓'); closeModal('modal-add-eq'); await loadData(); } catch(e) { alert('שגיאה: '+e.message); }
+  try {
+    showToast('שומר...');
+    const res = await apiPost({ action: editingEqId ? 'updateEquipment' : 'addEquipment', data });
+    console.log('Save response:', res);
+    if (res && res.ok === false) { alert('שגיאה משרת: ' + (res.msg||'לא ידוע')); return; }
+    const savedUrl = res && res.imageUrl ? res.imageUrl : '';
+    if (savedUrl) showToast('אמצעי נשמר + תמונה הועלתה ל-Drive ✓');
+    else showToast(editingEqId ? 'אמצעי עודכן ✓' : 'אמצעי נוסף ✓');
+    closeModal('modal-add-eq');
+    await loadData();
+  } catch(e) { console.error('Save error:', e); alert('שגיאה: '+e.message); }
 }
 
 // ===== IMAGE / AI =====
