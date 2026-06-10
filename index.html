@@ -473,9 +473,32 @@ tr:hover td { background: rgba(30,77,183,0.02); }
   <div class="nav-right">
     <span class="sync-status sync-ok" id="sync-status">● מחובר</span>
     <span class="nav-user" id="nav-user-name"></span>
+    <button id="nav-settings-btn" onclick="toggleSettingsPanel()" title="הגדרות" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:var(--radius-sm);padding:7px 10px;cursor:pointer;color:#cbd5e1;font-size:16px">⚙️</button>
     <button class="btn-logout" onclick="logout()">יציאה</button>
   </div>
 </nav>
+
+<!-- SETTINGS PANEL -->
+<div id="settings-panel" style="display:none;position:fixed;top:64px;left:1rem;right:1rem;z-index:150;background:var(--card);border-radius:var(--radius);border:1px solid var(--border);box-shadow:0 8px 30px rgba(0,0,0,0.15);padding:1.25rem;max-width:420px;margin:0 auto">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+    <h3 style="font-size:15px;font-weight:700">⚙️ הגדרות מערכת</h3>
+    <button onclick="toggleSettingsPanel()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted)">×</button>
+  </div>
+  <div class="form-group">
+    <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase">Google Apps Script URL</label>
+    <input type="text" id="script-url-settings" placeholder="https://script.google.com/..." style="font-size:12px">
+  </div>
+  <div style="display:flex;gap:8px;margin-bottom:1rem">
+    <button class="btn-primary-sm" onclick="saveScriptUrlFromSettings();toggleSettingsPanel()" style="font-size:13px">שמור URL</button>
+    <button class="btn-secondary" onclick="testConnection()" style="font-size:13px">בדוק חיבור</button>
+  </div>
+  <div class="form-group">
+    <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase">OpenRouter API Key (AI)</label>
+    <input type="password" id="api-key-input" placeholder="sk-or-...">
+  </div>
+  <button class="btn-primary-sm" onclick="saveApiKey();showToast('נשמר ✓')" style="font-size:13px">שמור מפתח AI</button>
+</div>
+<div id="settings-overlay" onclick="toggleSettingsPanel()" style="display:none;position:fixed;inset:0;z-index:149"></div>
 
 <!-- ===== LOGIN ===== -->
 <div id="page-login" class="page active">
@@ -586,7 +609,6 @@ tr:hover td { background: rgba(30,77,183,0.02); }
       <button class="tab-btn" id="tab-sites-btn" onclick="showTab('sites',this)"><span class="tab-icon">📍</span> אתרים</button>
       <button class="tab-btn" id="tab-users-btn" onclick="showTab('users',this)"><span class="tab-icon">👥</span> משתמשים</button>
       <button class="tab-btn" id="tab-wa-btn" onclick="showTab('whatsapp',this)"><span class="tab-icon">💬</span> WhatsApp</button>
-      <button class="tab-btn" id="tab-settings-btn" onclick="showTab('settings',this)"><span class="tab-icon">⚙️</span> הגדרות</button>
     </div>
 
     <!-- DASHBOARD -->
@@ -782,11 +804,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
       </div>
     </div>
 
-    <!-- SETTINGS -->
-    <div id="tab-settings-content" style="display:none">
-      <div class="page-header">
-        <div><h2>הגדרות מערכת</h2><p>ניהול משתמשים וחיבורים</p></div>
-      </div>
+
       <div class="settings-card">
         <h3>🔗 חיבור Google Sheets</h3>
         <div class="form-group"><label>Web App URL</label><input type="text" id="script-url-settings" placeholder="https://script.google.com/macros/s/.../exec"></div>
@@ -969,7 +987,6 @@ async function doLogin() {
       document.getElementById('tab-sites-btn').style.display = 'none';
       document.getElementById('tab-users-btn').style.display = 'none';
       document.getElementById('tab-wa-btn').style.display = 'none';
-      document.getElementById('tab-settings-btn').style.display = 'none';
     } else {
       document.getElementById('btn-add-eq').style.display = '';
     }
@@ -977,6 +994,17 @@ async function doLogin() {
     await loadData();
     showTab('dashboard', document.querySelector('.tab-btn'));
   } catch(e) { alert('שגיאת חיבור: ' + e.message); setSyncStatus('err', '● שגיאה'); }
+}
+function toggleSettingsPanel() {
+  const panel = document.getElementById('settings-panel');
+  const overlay = document.getElementById('settings-overlay');
+  const isOpen = panel.style.display !== 'none';
+  panel.style.display = isOpen ? 'none' : 'block';
+  overlay.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) {
+    document.getElementById('script-url-settings').value = getScriptUrl();
+    document.getElementById('api-key-input').value = getApiKey() ? '••••••••••••••••' : '';
+  }
 }
 function logout() { currentUser = null; document.getElementById('main-nav').style.display = 'none'; showPage('page-login'); }
 function togglePass() {
@@ -998,13 +1026,12 @@ function showTab(tab, btn) {
   currentTab = tab;
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  ['tab-dashboard','tab-equipment','tab-sites-content','tab-users-content','tab-wa-content','tab-settings-content'].forEach(id => document.getElementById(id).style.display = 'none');
+  ['tab-dashboard','tab-equipment','tab-sites-content','tab-users-content','tab-wa-content'].forEach(id => document.getElementById(id).style.display = 'none');
   if (tab === 'dashboard') { document.getElementById('tab-dashboard').style.display = ''; renderDashboard(); }
   if (tab === 'equipment') { document.getElementById('tab-equipment').style.display = ''; renderEquipmentTable(); populateSiteFilter(); }
   if (tab === 'sites') { document.getElementById('tab-sites-content').style.display = ''; renderSitesNew(); }
   if (tab === 'users') { document.getElementById('tab-users-content').style.display = ''; renderUsersTable(); }
   if (tab === 'whatsapp') { document.getElementById('tab-wa-content').style.display = ''; renderWaTab(); }
-  if (tab === 'settings') { document.getElementById('tab-settings-content').style.display = ''; document.getElementById('script-url-settings').value = getScriptUrl(); renderSettings(); }
 }
 function refreshCurrentTab() { showTab(currentTab, document.querySelector('.tab-btn.active')); }
 
@@ -1120,13 +1147,18 @@ function renderDashboard() {
 function populateSiteFilter() {
   const sites = currentUser.role === 'admin' ? appData.sites : appData.sites.filter(s => s.id == currentUser.siteId);
   document.getElementById('filter-site').innerHTML = '<option value="">כל האתרים</option>' + sites.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+  // Populate type filter
+  const types = [...new Set(getUserEquipment().map(e => e.type).filter(Boolean))].sort();
+  document.getElementById('filter-type').innerHTML = '<option value="">כל הסוגים</option>' + types.map(t => `<option value="${t}">${t}</option>`).join('');
 }
 function renderEquipmentTable() {
   let eqs = getUserEquipment();
   const sf = document.getElementById('filter-site').value;
+  const tf = document.getElementById('filter-type').value;
   const stf = document.getElementById('filter-status').value;
   const q = document.getElementById('filter-search').value.toLowerCase();
   if (sf) eqs = eqs.filter(e => e.siteId == sf);
+  if (tf) eqs = eqs.filter(e => e.type === tf);
   if (stf) eqs = eqs.filter(e => getStatus(e.nextCheck) === stf);
   if (q) eqs = eqs.filter(e => (e.name||'').toLowerCase().includes(q) || (e.eqId||'').toLowerCase().includes(q));
   const isAdmin = currentUser.role === 'admin';
