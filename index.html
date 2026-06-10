@@ -1412,7 +1412,8 @@ function closeModal(id) {
 document.querySelectorAll('.modal-overlay').forEach(m => { m.addEventListener('click', function(e) { if (e.target === this) closeModal(this.id); }); });
 
 // ===== INIT =====
-if (!localStorage.getItem(SCRIPT_URL_STORE)) localStorage.setItem(SCRIPT_URL_STORE, DEFAULT_SCRIPT_URL);
+// Always use latest URL
+localStorage.setItem(SCRIPT_URL_STORE, DEFAULT_SCRIPT_URL);
 if (!getScriptUrl()) document.getElementById('no-script-warning').style.display = 'block';
 </script>
 <script>
