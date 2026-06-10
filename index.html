@@ -1122,6 +1122,14 @@ function getUserEquipment() {
   if (!userSites.length) return appData.equipment;
   return appData.equipment.filter(e => userSites.includes(String(e.siteId)));
 }
+// Returns non-admin users responsible for a given siteId (for WA alerts)
+function getSiteResponsibleUsers(siteId) {
+  return appData.users.filter(u => {
+    if (u.role === 'admin') return false;
+    const sites = String(u.siteId||'').split(',').map(s => s.trim()).filter(Boolean);
+    return sites.includes(String(siteId));
+  });
+}
 function waLink(phone, name, siteId, nextCheck) {
   const rawPhone = String(phone == null ? '' : phone).replace(/\D/g,'');
   const p = rawPhone.startsWith('972') ? rawPhone : rawPhone.replace(/^0/,'972');
@@ -1156,10 +1164,10 @@ function renderDashboard() {
       <div class="alert-dot ${cls}"></div>
       <div class="alert-info">
         <div class="alert-name">${e.name} <span style="color:var(--text-muted);font-size:12px;font-weight:400">(${e.eqId})</span></div>
-        <div class="alert-meta">📍 ${getSiteName(e.siteId)} · 📅 בדיקה הבאה: ${formatDate(e.nextCheck)}</div>
+        <div class="alert-meta">📍 ${getSiteName(e.siteId)} · 📅 בדיקה הבאה: ${formatDate(e.nextCheck)}${(() => { const r = getSiteResponsibleUsers(e.siteId); return r.length ? ` · 👤 ${r[0].fullname||r[0].username}` : ''; })()}</div>
       </div>
       <span class="alert-days ${cls}">${daysTxt}</span>
-      ${waLink(e.phone, e.name, e.siteId, e.nextCheck)}
+      ${(() => { const resp = getSiteResponsibleUsers(e.siteId); return resp.length ? waLink(resp[0].phone, e.name, e.siteId, e.nextCheck) : ''; })()}
     </div>`;
   }).join('');
 }
@@ -1911,8 +1919,9 @@ function loadExpiryReminders() {
     const days = daysUntil(e.nextCheck);
     const daysLabel = days < 0 ? `פג לפני ${Math.abs(days)} ימים` : days === 0 ? 'היום!' : `בעוד ${days} ימים`;
     const site = appData.sites.find(s => s.id == e.siteId);
-    // Find responsible user for this site
-    const user = appData.users.find(u => u.siteId && String(u.siteId).split(',').includes(String(e.siteId)));
+    // Find responsible non-admin user for this site
+    const responsibleUsers = getSiteResponsibleUsers(e.siteId);
+    const user = responsibleUsers[0] || null;
     const phone = (user && user.phone) ? String(user.phone).replace(/\D/g,'').replace(/^0/,'972') : '';
     const msg = encodeURIComponent(`שלום,
 
