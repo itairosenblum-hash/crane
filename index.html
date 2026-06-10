@@ -1053,30 +1053,35 @@ async function saveEquipment() {
     showToast('שומר...');
     // Step 1: Save equipment data (without image)
     const saveData = {...data, imageData: '', imageUrl: imageUrl};
+    console.log('DEBUG - Script URL:', getScriptUrl());
+    console.log('DEBUG - Action:', editingEqId ? 'updateEquipment' : 'addEquipment');
+    console.log('DEBUG - imageData size:', imageData ? Math.round(imageData.length/1024)+'KB' : 'none');
     const res = await apiPost({ action: editingEqId ? 'updateEquipment' : 'addEquipment', data: saveData });
-    console.log('Save response:', res);
-    if (res && res.ok === false) { alert('שגיאה משרת: ' + (res.msg||'לא ידוע')); return; }
+    console.log('DEBUG - Save response:', JSON.stringify(res));
+    if (!res) { alert('שגיאה: אין תגובה מהשרת'); return; }
+    if (res.ok === false) { alert('שגיאה משרת: ' + (res.msg||'לא ידוע')); return; }
     
     const savedId = editingEqId || (res && res.id);
+    console.log('DEBUG - savedId:', savedId, 'hasImage:', !!imageData);
     
     // Step 2: Upload image separately if we have one
     if (imageData && savedId) {
       showToast('מעלה תמונה ל-Drive...');
+      console.log('DEBUG - Starting image upload, size:', Math.round(imageData.length/1024), 'KB');
       try {
         const imgRes = await apiPost({ 
           action: 'uploadImage', 
           data: { id: savedId, eqId: data.eqId, imageData: imageData }
         });
-        console.log('Image upload response:', imgRes);
+        console.log('DEBUG - Image upload response:', JSON.stringify(imgRes));
         if (imgRes && imgRes.ok && imgRes.imageUrl) {
           showToast('אמצעי נשמר + תמונה הועלתה ל-Drive ✓');
         } else {
-          showToast('אמצעי נשמר ✓ (שגיאה בהעלאת תמונה)');
-          console.error('Image upload failed:', imgRes);
+          alert('שגיאה בהעלאת תמונה: ' + (imgRes ? JSON.stringify(imgRes) : 'אין תגובה'));
         }
       } catch(imgErr) {
         console.error('Image upload error:', imgErr);
-        showToast('אמצעי נשמר ✓ (שגיאה בהעלאת תמונה)');
+        alert('שגיאת רשת בהעלאת תמונה: ' + imgErr.message);
       }
     } else {
       showToast(editingEqId ? 'אמצעי עודכן ✓' : 'אמצעי נוסף ✓');
@@ -1084,7 +1089,7 @@ async function saveEquipment() {
     
     closeModal('modal-add-eq');
     await loadData();
-  } catch(e) { console.error('Save error:', e); alert('שגיאה: '+e.message); }
+  } catch(e) { console.error('Save error:', e); alert('שגיאה כללית: ' + e.message); }
 }
 
 // ===== IMAGE / AI =====
