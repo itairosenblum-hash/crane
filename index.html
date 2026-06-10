@@ -697,8 +697,9 @@ async function loadData(silent = false) {
       notes: String(e.notes||''),
       lastCheck: String(e.lastCheck||''),
       nextCheck: String(e.nextCheck||''),
-      imageUrl: (e.imageUrl && e.imageUrl !== 'null' && e.imageUrl !== 'undefined') ? String(e.imageUrl) : ''
+      imageUrl: (e.imageUrl && String(e.imageUrl) !== 'null' && String(e.imageUrl) !== 'undefined' && String(e.imageUrl).startsWith('http')) ? String(e.imageUrl) : ''
     }));
+    console.log('Equipment with images:', appData.equipment.filter(e=>e.imageUrl).map(e=>({id:e.id,url:e.imageUrl})));
     appData.users = data.users || [];
     setSyncStatus('ok', '● מחובר');
     refreshCurrentTab();
@@ -888,7 +889,7 @@ function renderEquipmentTable() {
       <td>${statusBadge(st,days)}</td>
       <td><div class="actions-cell">
         <button class="btn-icon" onclick="viewEquipment(${e.id})" title="פרטים">👁</button>
-        ${e.imageUrl ? `<a class="btn-icon" href="${e.imageUrl}" target="_blank" title="פתח תסקיר" style="text-decoration:none">📄</a>` : ''}
+        ${e.imageUrl && e.imageUrl.startsWith('http') ? `<a class="btn-icon" href="${e.imageUrl}" target="_blank" title="פתח תסקיר ב-Drive" style="text-decoration:none;color:var(--blue)">📄</a>` : ''}
         ${isAdmin ? `<button class="btn-icon" onclick="editEquipment(${e.id})" title="עריכה">✏️</button>` : ''}
         ${isAdmin ? `<button class="btn-icon del" onclick="deleteEquipment(${e.id})" title="מחיקה">🗑</button>` : ''}
       </div></td>
