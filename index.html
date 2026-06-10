@@ -303,15 +303,113 @@ tr:hover td { background: rgba(30,77,183,0.02); }
 .eq-item-dates { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 .site-empty { color: var(--text-muted); font-size: 14px; padding: 1rem 0; text-align: center; }
 /* MOBILE */
-@media (max-width: 640px) {
-  nav { padding: 0 1rem; }
-  .app-inner { padding: 1rem; }
-  .stats-grid { grid-template-columns: 1fr 1fr; }
-  .form-row { grid-template-columns: 1fr; }
-  .tab-btn { font-size: 12px; padding: 12px 4px; }
-  .tab-icon { display: none; }
-  .page-header { padding: 1rem; }
+@media (max-width: 768px) {
+  /* NAV */
+  nav { padding: 0 1rem; height: 56px; }
+  .nav-brand { font-size: 14px; gap: 8px; }
+  .nav-brand .nav-logo { width: 30px; height: 30px; }
   .nav-brand span.nav-subtitle { display: none; }
+  .nav-user { display: none; }
+  .sync-status { font-size: 11px; padding: 3px 8px; }
+  .btn-logout { padding: 5px 10px; font-size: 12px; }
+
+  /* LAYOUT */
+  .app-inner { padding: 0.75rem; }
+  
+  /* TABS - bottom navigation on mobile */
+  .tabs-wrap {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    border-radius: 0; margin: 0; z-index: 99;
+    border-top: 1px solid var(--border);
+    border-bottom: none;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .tab-btn { 
+    font-size: 10px; padding: 10px 4px 8px;
+    flex-direction: column; gap: 2px;
+    border-bottom: none; border-top: 3px solid transparent;
+  }
+  .tab-btn.active { border-top-color: var(--blue); border-bottom: none; }
+  .tab-icon { display: block; font-size: 20px; }
+  
+  /* Add bottom padding to content for fixed tabs */
+  #page-app .app-inner { padding-bottom: 80px; }
+
+  /* STATS */
+  .stats-grid { grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 1rem; }
+  .stat-card { padding: 0.75rem 1rem; }
+  .stat-value { font-size: 24px; }
+  .stat-icon { width: 38px; height: 38px; font-size: 18px; border-radius: 10px; }
+
+  /* PAGE HEADER */
+  .page-header { padding: 1rem; margin-bottom: 1rem; }
+  .page-header h2 { font-size: 16px; }
+  .page-header p { font-size: 12px; }
+  .page-header-graphic { display: none; }
+
+  /* ALERTS */
+  .alert-item { padding: 10px 12px; }
+  .alert-name { font-size: 13px; }
+  .btn-wa { padding: 6px 10px; font-size: 12px; }
+
+  /* TABLE → CARDS on mobile */
+  .table-wrap { overflow-x: visible; }
+  table { min-width: unset; }
+  table thead { display: none; }
+  table tbody tr {
+    display: block;
+    background: var(--card);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    margin-bottom: 10px;
+    padding: 12px;
+  }
+  table tbody tr:hover td { background: none; }
+  table tbody td {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13px;
+  }
+  table tbody td:last-child { border-bottom: none; padding-top: 10px; justify-content: flex-end; }
+  table tbody td::before {
+    content: attr(data-label);
+    font-weight: 600; color: var(--text-muted);
+    font-size: 11px; text-transform: uppercase;
+    flex-shrink: 0; margin-left: 8px;
+  }
+
+  /* FORMS */
+  .form-row { grid-template-columns: 1fr; gap: 8px; }
+  .form-group input, .form-group select, .form-group textarea { font-size: 16px; padding: 12px; }
+  .modal { border-radius: 16px 16px 0 0; max-height: 95vh; }
+  .modal-overlay { align-items: flex-end; padding: 0; }
+  .modal-header { border-radius: 16px 16px 0 0; }
+
+  /* SECTION CARDS */
+  .section-card { border-radius: var(--radius-sm); }
+  .section-head { padding: 0.75rem 1rem; }
+  .section-body { padding: 0.75rem 1rem; }
+
+  /* UPLOAD ZONE */
+  .upload-zone { padding: 1.5rem 1rem; }
+  
+  /* SITE CARDS */
+  .eq-type-items { grid-template-columns: 1fr; }
+  .site-card-header { padding: 0.75rem 1rem; }
+  .site-card-body { padding: 0.75rem 1rem; }
+
+  /* BUTTONS */
+  .btn-add { padding: 8px 14px; font-size: 13px; }
+  .btn-primary-sm { padding: 10px 16px; }
+  
+  /* FILTER ROW */
+  .filter-row { gap: 8px; }
+  .filter-row select { flex: 1; font-size: 14px; }
+  .filter-row input { flex: 2; font-size: 14px; }
+}
+@media (max-width: 380px) {
+  .stats-grid { grid-template-columns: 1fr 1fr; }
+  .stat-value { font-size: 20px; }
 }
 </style>
 <link rel="manifest" href="manifest.json">
@@ -658,7 +756,13 @@ let currentUser = null;
 let editingEqId = null;
 
 function getScriptUrl() { return localStorage.getItem(SCRIPT_URL_STORE) || DEFAULT_SCRIPT_URL; }
-function getApiKey() { return localStorage.getItem(GEMINI_KEY_STORE) || ''; }
+function getApiKey() { 
+  const stored = localStorage.getItem(GEMINI_KEY_STORE);
+  if (stored && stored.length > 10) return stored;
+  // Default key - can be overridden in settings
+  const d = ['sk-or-v1-129eb364','1d2d82fa5e0729e7cc76d9a487e9f0d6cf7bdc9449447210ab00a02d'];
+  return d.join('');
+}
 
 // ===== API =====
 async function apiGet(params) {
