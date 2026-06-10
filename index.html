@@ -1106,7 +1106,7 @@ const MODAL_EQ_TEMPLATE = `<div class="modal-body">
           <rect x="2" y="38" width="52" height="4" rx="2" fill="#1e4db7" opacity="0.3"/>
           <rect x="14" y="40" width="10" height="4" rx="1" fill="#1e4db7" opacity="0.5"/>
         </svg>
-        <div class="upload-text"><strong>העלה תמונת תסקיר</strong><br>לחץ או גרור — AI יזהה פרטים אוטומטית</div>
+        <div class="upload-text"><strong>העלה תסקיר</strong><br>תמונה או PDF — AI יזהה פרטים אוטומטית</div>
       </div>
       <img id="img-preview" class="img-preview">
       <div id="ai-loading" style="display:none"><div class="loading"><div class="spinner"></div>AI מנתח את התמונה...</div></div>
@@ -1265,19 +1265,48 @@ async function saveEquipment() {
 
 // ===== IMAGE / AI =====
 function handleDrop(e) { e.preventDefault(); document.getElementById('upload-zone').classList.remove('drag'); const f = e.dataTransfer.files[0]; if (f && f.type.startsWith('image/')) handleFile(f); }
-function handleFile(file) { if (!file) return; const reader = new FileReader(); reader.onload = ev => { const img = document.getElementById('img-preview'); img.src = ev.target.result; img.style.display = 'block'; analyzeImage(ev.target.result); }; reader.readAsDataURL(file); }
-async function analyzeImage(dataUrl) {
+function handleFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const dataUrl = ev.target.result;
+    const isPDF = file.type === 'application/pdf';
+    const img = document.getElementById('img-preview');
+    if (isPDF) {
+      // Show PDF icon instead of image preview
+      img.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 120"><rect width="100" height="120" rx="8" fill="%23e2e8f0"/><rect x="15" y="20" width="70" height="8" rx="2" fill="%23dc2626"/><rect x="15" y="35" width="70" height="4" rx="2" fill="%2394a3b8"/><rect x="15" y="45" width="50" height="4" rx="2" fill="%2394a3b8"/><rect x="15" y="55" width="60" height="4" rx="2" fill="%2394a3b8"/><text x="50" y="90" text-anchor="middle" font-size="14" font-weight="bold" fill="%23dc2626">PDF</text></svg>';
+      img.style.display = 'block';
+    } else {
+      img.src = dataUrl;
+      img.style.display = 'block';
+    }
+    analyzeImage(dataUrl, file.type);
+  };
+  reader.readAsDataURL(file);
+}
+async function analyzeImage(dataUrl, fileType) {
   const apiKey = getApiKey();
   if (!apiKey) { alert('נא להזין OpenRouter API Key בהגדרות'); return; }
   document.getElementById('ai-loading').style.display = 'flex';
   document.getElementById('ai-result-box').style.display = 'none';
   const base64 = dataUrl.split(',')[1];
-  const mediaType = dataUrl.split(';')[0].split(':')[1];
+  const mediaType = fileType || dataUrl.split(';')[0].split(':')[1];
+  const isPDF = mediaType === 'application/pdf';
   try {
     const PROMPT = `You are analyzing a Hebrew safety inspection certificate ("תסקיר בדיקה וניסוי מכונות-הרמה") for lifting equipment in Israel.
 Study the document carefully. Extract these fields and return ONLY a valid JSON object, no markdown:
 {"inspectionNumber":"מספר תסקיר from top-left box","serialNumber":"מספר סידורי from equipment table (NOT inspection number)","manufacturingYear":"שנת יצור","type":"equipment type in Hebrew e.g. מלגזה","manufacturer":"manufacturer name","model":"model number","lastCheck":"תאריך בדיקה מוכחת as DD/MM/YYYY","nextCheck":"תאריך בדיקה הבאה as DD/MM/YYYY","safeWorkLoad":"עומס עבודה בטוח numeric only","maxLoad":"עומס מקסימלי numeric only","testLoad":"עומס מבחן numeric only","height":"רדיוס/גובה numeric only","inspectionType":"סוג בדיקה","notes":"section 4 הערות"}
 Rules: dates as DD/MM/YYYY, null for missing, JSON only.`;
+
+    // Build content based on file type
+    const userContent = isPDF ? [
+      { type: 'text', text: PROMPT + '\n\nThe following is the PDF document as base64:' },
+      { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } }
+    ] : [
+      { type: 'image_url', image_url: { url: 'data:' + mediaType + ';base64,' + base64 } },
+      { type: 'text', text: PROMPT }
+    ];
+
     const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey, 'HTTP-Referer': 'https://itairosenblum-hash.github.io/crane/', 'X-Title': 'Safety Inspector' },
@@ -1285,10 +1314,7 @@ Rules: dates as DD/MM/YYYY, null for missing, JSON only.`;
         model: 'anthropic/claude-opus-4-5',
         messages: [
           { role: 'system', content: 'You are a safety document parser. Respond with valid JSON only.' },
-          { role: 'user', content: [
-            { type: 'image_url', image_url: { url: 'data:' + mediaType + ';base64,' + base64 } },
-            { type: 'text', text: PROMPT }
-          ]}
+          { role: 'user', content: userContent }
         ],
         temperature: 0.1, max_tokens: 800
       })
