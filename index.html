@@ -1051,12 +1051,37 @@ async function saveEquipment() {
   };
   try {
     showToast('שומר...');
-    const res = await apiPost({ action: editingEqId ? 'updateEquipment' : 'addEquipment', data });
+    // Step 1: Save equipment data (without image)
+    const saveData = {...data, imageData: '', imageUrl: imageUrl};
+    const res = await apiPost({ action: editingEqId ? 'updateEquipment' : 'addEquipment', data: saveData });
     console.log('Save response:', res);
     if (res && res.ok === false) { alert('שגיאה משרת: ' + (res.msg||'לא ידוע')); return; }
-    const savedUrl = res && res.imageUrl ? res.imageUrl : '';
-    if (savedUrl) showToast('אמצעי נשמר + תמונה הועלתה ל-Drive ✓');
-    else showToast(editingEqId ? 'אמצעי עודכן ✓' : 'אמצעי נוסף ✓');
+    
+    const savedId = editingEqId || (res && res.id);
+    
+    // Step 2: Upload image separately if we have one
+    if (imageData && savedId) {
+      showToast('מעלה תמונה ל-Drive...');
+      try {
+        const imgRes = await apiPost({ 
+          action: 'uploadImage', 
+          data: { id: savedId, eqId: data.eqId, imageData: imageData }
+        });
+        console.log('Image upload response:', imgRes);
+        if (imgRes && imgRes.ok && imgRes.imageUrl) {
+          showToast('אמצעי נשמר + תמונה הועלתה ל-Drive ✓');
+        } else {
+          showToast('אמצעי נשמר ✓ (שגיאה בהעלאת תמונה)');
+          console.error('Image upload failed:', imgRes);
+        }
+      } catch(imgErr) {
+        console.error('Image upload error:', imgErr);
+        showToast('אמצעי נשמר ✓ (שגיאה בהעלאת תמונה)');
+      }
+    } else {
+      showToast(editingEqId ? 'אמצעי עודכן ✓' : 'אמצעי נוסף ✓');
+    }
+    
     closeModal('modal-add-eq');
     await loadData();
   } catch(e) { console.error('Save error:', e); alert('שגיאה: '+e.message); }
