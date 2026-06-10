@@ -1160,7 +1160,7 @@ Rules: dates as DD/MM/YYYY, null for missing, JSON only.`;
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey, 'HTTP-Referer': 'https://itairosenblum-hash.github.io/crane/', 'X-Title': 'Safety Inspector' },
       body: JSON.stringify({
-        model: 'claude-opus-4-5',
+        model: 'anthropic/claude-opus-4-5',
         messages: [
           { role: 'system', content: 'You are a safety document parser. Respond with valid JSON only.' },
           { role: 'user', content: [
