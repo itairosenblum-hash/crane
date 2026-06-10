@@ -301,6 +301,8 @@ tr:hover td { background: rgba(30,77,183,0.02); }
 }
 </style>
 <link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="icon.svg">
 <meta name="theme-color" content="#0a1628">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -312,14 +314,26 @@ tr:hover td { background: rgba(30,77,183,0.02); }
 <nav id="main-nav" style="display:none">
   <div class="nav-brand">
     <svg class="nav-logo" viewBox="0 0 36 36" fill="none">
-      <!-- Crane icon -->
       <rect width="36" height="36" rx="8" fill="#1e4db7"/>
-      <rect x="6" y="28" width="24" height="3" rx="1" fill="#f59e0b"/>
-      <rect x="9" y="10" width="3" height="18" rx="1" fill="white"/>
-      <rect x="9" y="10" width="18" height="3" rx="1" fill="white"/>
-      <rect x="24" y="13" width="2" height="10" rx="1" fill="#f59e0b"/>
-      <circle cx="26" cy="24" r="2" fill="#f59e0b"/>
-      <rect x="6" y="10" width="5" height="3" rx="1" fill="#f59e0b"/>
+      <!-- Tower -->
+      <rect x="8" y="10" width="4" height="22" rx="1" fill="white"/>
+      <!-- Boom -->
+      <rect x="8" y="10" width="22" height="3" rx="1" fill="white"/>
+      <!-- Counter jib -->
+      <rect x="4" y="10" width="6" height="2.5" rx="1" fill="#f59e0b"/>
+      <!-- Counter weight -->
+      <rect x="3" y="12.5" width="5" height="3" rx="1" fill="#f59e0b"/>
+      <!-- Trolley -->
+      <rect x="22" y="13" width="4" height="2.5" rx="1" fill="#f59e0b"/>
+      <!-- Rope -->
+      <line x1="24" y1="15.5" x2="24" y2="25" stroke="#f59e0b" stroke-width="1.2"/>
+      <!-- Hook -->
+      <path d="M21 25 Q21 29 24 29 Q27 29 27 26 Q27 25 25.5 25" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-linecap="round"/>
+      <!-- Ground -->
+      <rect x="4" y="30" width="28" height="2.5" rx="1" fill="#f59e0b"/>
+      <!-- Wheels -->
+      <circle cx="9" cy="32.5" r="2" fill="none" stroke="white" stroke-width="1.2"/>
+      <circle cx="26" cy="32.5" r="2" fill="none" stroke="white" stroke-width="1.2"/>
     </svg>
     <div>
       <div>מערכת תסקירי הבטיחות</div>
@@ -363,12 +377,28 @@ tr:hover td { background: rgba(30,77,183,0.02); }
       <!-- Crane logo big -->
       <svg class="login-icon" viewBox="0 0 72 72" fill="none">
         <rect width="72" height="72" rx="16" fill="#0a1628"/>
-        <rect x="12" y="56" width="48" height="6" rx="2" fill="#f59e0b"/>
-        <rect x="18" y="20" width="6" height="36" rx="2" fill="white"/>
-        <rect x="18" y="20" width="36" height="6" rx="2" fill="white"/>
-        <rect x="48" y="26" width="4" height="20" rx="1" fill="#f59e0b"/>
-        <circle cx="52" cy="48" r="5" fill="none" stroke="#f59e0b" stroke-width="3"/>
-        <rect x="10" y="20" width="12" height="6" rx="2" fill="#f59e0b"/>
+        <!-- Tower -->
+        <rect x="16" y="14" width="8" height="46" rx="2" fill="white"/>
+        <!-- Boom -->
+        <rect x="16" y="14" width="44" height="7" rx="2" fill="white"/>
+        <!-- Counter jib -->
+        <rect x="6" y="14" width="14" height="5" rx="2" fill="#f59e0b"/>
+        <!-- Counter weight -->
+        <rect x="5" y="19" width="10" height="7" rx="2" fill="#f59e0b"/>
+        <!-- Trolley -->
+        <rect x="46" y="21" width="8" height="5" rx="2" fill="#f59e0b"/>
+        <!-- Rope -->
+        <line x1="50" y1="26" x2="50" y2="46" stroke="#f59e0b" stroke-width="2.5"/>
+        <!-- Hook -->
+        <path d="M44 46 Q44 56 50 56 Q56 56 56 50 Q56 46 53 46" fill="none" stroke="#f59e0b" stroke-width="3" stroke-linecap="round"/>
+        <!-- Support lines -->
+        <line x1="16" y1="14" x2="24" y2="36" stroke="#94a3b8" stroke-width="1.5" opacity="0.4"/>
+        <line x1="24" y1="14" x2="16" y2="36" stroke="#94a3b8" stroke-width="1.5" opacity="0.4"/>
+        <!-- Ground beam -->
+        <rect x="6" y="58" width="60" height="5" rx="2" fill="#f59e0b"/>
+        <!-- Wheels -->
+        <circle cx="18" cy="63" r="4" fill="none" stroke="white" stroke-width="2.5"/>
+        <circle cx="54" cy="63" r="4" fill="none" stroke="white" stroke-width="2.5"/>
       </svg>
       <h1>מערכת תסקירי הבטיחות</h1>
       <p>מדור צהר"מ זרוע הים</p>
