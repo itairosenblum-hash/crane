@@ -621,8 +621,13 @@ tr:hover td { background: rgba(30,77,183,0.02); }
     <div class="modal-body">
       <div class="form-group"><label>שם משתמש *</label><input type="text" id="new-username" placeholder="user3"></div>
       <div class="form-group"><label>שם מלא</label><input type="text" id="new-fullname" placeholder="ישראל ישראלי"></div>
-      <div class="form-group"><label>סיסמה *</label><input type="password" id="new-password" placeholder="••••••"></div>
-      <div class="form-group"><label>אתר משויך</label><select id="new-user-site"><option value="">כל האתרים</option></select></div>
+      <div class="form-group"><label>סיסמה *</label><input type="password" id="new-password" placeholder="ברירת מחדל: Aa123456"></div>
+      <div class="form-group">
+        <label>אתרים משויכים (ניתן לבחור מספר)</label>
+        <select id="new-user-sites" multiple style="height:120px;padding:6px">
+        </select>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Ctrl+לחיצה לבחירת מספר אתרים</div>
+      </div>
       <div class="form-group"><label>טלפון WhatsApp</label><input type="tel" id="new-user-phone" placeholder="0501234567"></div>
     </div>
     <div class="modal-footer">
@@ -773,7 +778,13 @@ function statusBadge(st, days) {
   return `<span class="badge ${C[st]}">${L[st]}</span>`;
 }
 function getSiteName(id) { const s = appData.sites.find(x => x.id == id); return s ? s.name : '—'; }
-function getUserEquipment() { if (!currentUser || currentUser.role === 'admin') return appData.equipment; return appData.equipment.filter(e => e.siteId == currentUser.siteId); }
+function getUserEquipment() {
+  if (!currentUser || currentUser.role === 'admin') return appData.equipment;
+  // Support comma-separated site IDs
+  const userSites = String(currentUser.siteId||'').split(',').map(s => s.trim()).filter(Boolean);
+  if (!userSites.length) return appData.equipment;
+  return appData.equipment.filter(e => userSites.includes(String(e.siteId)));
+}
 function waLink(phone, name, siteId, nextCheck) {
   const p = String(phone == null ? '' : phone).replace(/^0/,'972').replace(/\D/g,'');
   if (!p) return '';
@@ -1185,12 +1196,13 @@ function renderUsersTable() {
   const tbody = document.getElementById('users-tbody');
   if (!tbody) return;
   tbody.innerHTML = appData.users.map(u => {
-    const siteName = u.siteId ? getSiteName(u.siteId) : 'כל האתרים';
+    const siteIds = u.siteId ? String(u.siteId).split(',').map(s=>s.trim()).filter(Boolean) : [];
+    const siteName = siteIds.length ? siteIds.map(id => getSiteName(id)).join(', ') : 'כל האתרים';
     return `<tr>
       <td><strong>${u.fullname||u.username}</strong></td>
       <td style="color:var(--text-muted)">${u.username}</td>
       <td>${u.role === 'admin' ? '<span class="badge badge-ok">👑 מנהל</span>' : '<span class="badge" style="background:var(--bg);border:1px solid var(--border)">👤 משתמש</span>'}</td>
-      <td>📍 ${siteName}</td>
+      <td>${siteName === 'כל האתרים' ? '🌐 כל האתרים' : '📍 '+siteName}</td>
       <td>${u.phone||'—'}</td>
       <td><div class="actions-cell">
         <button class="btn-icon" onclick="editUser('${u.username}')" title="עריכה">✏️</button>
@@ -1267,8 +1279,18 @@ function openUserModal() {
   document.getElementById('new-username').disabled = false;
   document.querySelector('#modal-add-user .modal-header h3').textContent = 'הוספת משתמש';
   ['new-username','new-fullname','new-password','new-user-phone'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('new-user-site').innerHTML = '<option value="">כל האתרים</option>' + appData.sites.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+  populateUserSites([]);
   openModal('modal-add-user');
+}
+function populateUserSites(selectedIds) {
+  const sel = document.getElementById('new-user-sites');
+  sel.innerHTML = appData.sites.map(s =>
+    `<option value="${s.id}" ${selectedIds.includes(String(s.id)) || selectedIds.includes(s.id) ? 'selected' : ''}>${s.name}</option>`
+  ).join('');
+}
+function getSelectedSites() {
+  const sel = document.getElementById('new-user-sites');
+  return Array.from(sel.selectedOptions).map(o => o.value).join(',');
 }
 let editingUsername = null;
 function editUser(username) {
@@ -1280,8 +1302,9 @@ function editUser(username) {
   document.getElementById('new-fullname').value = u.fullname || '';
   document.getElementById('new-password').value = '';
   document.getElementById('new-user-phone').value = u.phone || '';
-  document.getElementById('new-user-site').innerHTML = '<option value="">כל האתרים</option>' + appData.sites.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-  if (u.siteId) document.getElementById('new-user-site').value = u.siteId;
+  // siteIds can be comma-separated string
+  const siteIds = u.siteId ? String(u.siteId).split(',').map(s => s.trim()) : [];
+  populateUserSites(siteIds);
   document.querySelector('#modal-add-user .modal-header h3').textContent = 'עריכת משתמש';
   openModal('modal-add-user');
 }
@@ -1289,9 +1312,11 @@ async function saveUser() {
   const username = document.getElementById('new-username').value.trim();
   const password = document.getElementById('new-password').value;
   if (!username) { alert('נא למלא שם משתמש'); return; }
-  if (!editingUsername && !password) { alert('נא למלא סיסמה'); return; }
-  const data = { username, fullname: document.getElementById('new-fullname').value||username, role:'user', phone: document.getElementById('new-user-phone').value, siteId: document.getElementById('new-user-site').value||'' };
-  if (password) data.password = password;
+  // Password is optional - defaults to Aa123456 for new users
+  const siteIds = getSelectedSites();
+  const data = { username, fullname: document.getElementById('new-fullname').value||username, role:'user', phone: document.getElementById('new-user-phone').value, siteId: siteIds };
+  data.password = password || (editingUsername ? undefined : 'Aa123456');
+  if (!data.password) delete data.password;
   try {
     const res = await apiPost({ action: editingUsername ? 'updateUser' : 'addUser', data });
     if (!res.ok) { alert(res.msg); return; }
