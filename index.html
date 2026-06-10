@@ -288,6 +288,20 @@ tr:hover td { background: rgba(30,77,183,0.02); }
 .eye-btn { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 4px; display: flex; align-items: center; }
 .eye-btn:hover { color: var(--blue); }
 
+.site-card { background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 1.5rem; overflow: hidden; }
+.site-card-header { background: linear-gradient(135deg, var(--blue-mid), var(--blue-dark)); padding: 1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; }
+.site-card-header h3 { color: white; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.site-card-body { padding: 1rem 1.5rem; }
+.eq-type-group { margin-bottom: 1rem; }
+.eq-type-label { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+.eq-type-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px; }
+.eq-item { background: var(--bg); border-radius: var(--radius-sm); border: 1px solid var(--border); padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: all 0.15s; }
+.eq-item:hover { border-color: var(--blue); background: rgba(30,77,183,0.03); }
+.eq-item-info { flex: 1; }
+.eq-item-name { font-size: 13px; font-weight: 600; }
+.eq-item-id { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.eq-item-dates { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.site-empty { color: var(--text-muted); font-size: 14px; padding: 1rem 0; text-align: center; }
 /* MOBILE */
 @media (max-width: 640px) {
   nav { padding: 0 1rem; }
@@ -454,6 +468,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
       <button class="tab-btn active" onclick="showTab('dashboard',this)"><span class="tab-icon">📊</span> לוח בקרה</button>
       <button class="tab-btn" onclick="showTab('equipment',this)"><span class="tab-icon">🏗️</span> אמצעים</button>
       <button class="tab-btn" id="tab-sites-btn" onclick="showTab('sites',this)"><span class="tab-icon">📍</span> אתרים</button>
+      <button class="tab-btn" id="tab-users-btn" onclick="showTab('users',this)"><span class="tab-icon">👥</span> משתמשים</button>
       <button class="tab-btn" id="tab-settings-btn" onclick="showTab('settings',this)"><span class="tab-icon">⚙️</span> הגדרות</button>
     </div>
 
@@ -525,14 +540,23 @@ tr:hover td { background: rgba(30,77,183,0.02); }
     <!-- SITES -->
     <div id="tab-sites-content" style="display:none">
       <div class="page-header">
-        <div><h2>ניהול אתרים</h2><p>רשימת אתרים ומשתמשים אחראים</p></div>
+        <div><h2>ניהול אתרים</h2><p>אמצעים לפי אתר וסוג</p></div>
         <button class="btn-add" onclick="openSiteModal()">+ הוסף אתר</button>
+      </div>
+      <div id="sites-content"></div>
+    </div>
+
+    <!-- USERS -->
+    <div id="tab-users-content" style="display:none">
+      <div class="page-header">
+        <div><h2>ניהול משתמשים</h2><p>הוספה, עריכה וצוות לאתרים</p></div>
+        <button class="btn-add" onclick="openUserModal()">+ הוסף משתמש</button>
       </div>
       <div class="section-card">
         <div class="table-wrap">
           <table>
-            <thead><tr><th>שם האתר</th><th>אחראי</th><th>טלפון</th><th>אמצעים</th><th>פעולות</th></tr></thead>
-            <tbody id="sites-tbody"></tbody>
+            <thead><tr><th>שם מלא</th><th>שם משתמש</th><th>תפקיד</th><th>אתר משויך</th><th>טלפון</th><th>פעולות</th></tr></thead>
+            <tbody id="users-tbody"></tbody>
           </table>
         </div>
       </div>
@@ -554,11 +578,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
         <div class="form-group"><input type="password" id="api-key-input" placeholder="sk-or-..."></div>
         <button class="btn-primary-sm" onclick="saveApiKey()">שמור מפתח</button>
       </div>
-      <div class="settings-card">
-        <h3>👥 ניהול משתמשים</h3>
-        <div id="users-list"></div>
-        <button class="btn-add" style="margin-top:1rem" onclick="openUserModal()">+ הוסף משתמש</button>
-      </div>
+
     </div>
 
   </div>
@@ -585,9 +605,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
   <div class="modal" style="max-width:420px">
     <div class="modal-header"><h3>הוספת אתר</h3><button class="btn-close" onclick="closeModal('modal-add-site')">×</button></div>
     <div class="modal-body">
-      <div class="form-group"><label>שם האתר *</label><input type="text" id="site-name" placeholder="שם האתר"></div>
-      <div class="form-group"><label>שם אחראי</label><input type="text" id="site-manager" placeholder="ישראל ישראלי"></div>
-      <div class="form-group"><label>טלפון</label><input type="tel" id="site-phone" placeholder="0501234567"></div>
+      <div class="form-group"><label>שם האתר *</label><input type="text" id="site-name" placeholder="שם האתר" autocomplete="off"></div>
     </div>
     <div class="modal-footer">
       <button class="btn-secondary" onclick="closeModal('modal-add-site')">ביטול</button>
@@ -681,6 +699,7 @@ async function doLogin() {
     document.getElementById('main-nav').style.display = 'flex';
     if (currentUser.role !== 'admin') {
       document.getElementById('tab-sites-btn').style.display = 'none';
+      document.getElementById('tab-users-btn').style.display = 'none';
       document.getElementById('tab-settings-btn').style.display = 'none';
     } else {
       document.getElementById('btn-add-eq').style.display = '';
@@ -710,10 +729,11 @@ function showTab(tab, btn) {
   currentTab = tab;
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  ['tab-dashboard','tab-equipment','tab-sites-content','tab-settings-content'].forEach(id => document.getElementById(id).style.display = 'none');
+  ['tab-dashboard','tab-equipment','tab-sites-content','tab-users-content','tab-settings-content'].forEach(id => document.getElementById(id).style.display = 'none');
   if (tab === 'dashboard') { document.getElementById('tab-dashboard').style.display = ''; renderDashboard(); }
   if (tab === 'equipment') { document.getElementById('tab-equipment').style.display = ''; renderEquipmentTable(); populateSiteFilter(); }
-  if (tab === 'sites') { document.getElementById('tab-sites-content').style.display = ''; renderSites(); }
+  if (tab === 'sites') { document.getElementById('tab-sites-content').style.display = ''; renderSitesNew(); }
+  if (tab === 'users') { document.getElementById('tab-users-content').style.display = ''; renderUsersTable(); }
   if (tab === 'settings') { document.getElementById('tab-settings-content').style.display = ''; document.getElementById('script-url-settings').value = getScriptUrl(); renderSettings(); }
 }
 function refreshCurrentTab() { showTab(currentTab, document.querySelector('.tab-btn.active')); }
@@ -1110,6 +1130,76 @@ CRITICAL RULES:
 }
 
 // ===== SITES =====
+function renderSitesNew() {
+  const container = document.getElementById('sites-content');
+  if (!container) return;
+  if (!appData.sites.length) {
+    container.innerHTML = '<div class="section-card"><div class="section-body site-empty">לא נמצאו אתרים — לחץ "+ הוסף אתר"</div></div>';
+    return;
+  }
+  container.innerHTML = appData.sites.map(site => {
+    const siteEqs = appData.equipment.filter(e => e.siteId == site.id);
+    // Group by type
+    const byType = {};
+    siteEqs.forEach(e => {
+      const t = e.type || 'אחר';
+      if (!byType[t]) byType[t] = [];
+      byType[t].push(e);
+    });
+    const typesHtml = Object.keys(byType).length === 0
+      ? '<div class="site-empty">אין אמצעים רשומים באתר זה</div>'
+      : Object.entries(byType).map(([type, eqs]) => `
+        <div class="eq-type-group">
+          <div class="eq-type-label">🔧 ${type} (${eqs.length})</div>
+          <div class="eq-type-items">
+            ${eqs.map(e => {
+              const days = daysUntil(e.nextCheck);
+              const st = getStatus(e.nextCheck);
+              const dot = st === 'danger' ? '🔴' : st === 'warn' ? '🟡' : '🟢';
+              return `<div class="eq-item" onclick="viewEquipment(${e.id})">
+                <div class="eq-item-info">
+                  <div class="eq-item-name">${dot} ${e.name||'—'}</div>
+                  <div class="eq-item-id">תסקיר: ${e.eqId||'—'} | ס/נ: ${e.serialNumber||'—'}</div>
+                  <div class="eq-item-dates">בדיקה הבאה: ${formatDate(e.nextCheck)}</div>
+                </div>
+                ${statusBadge(st, days)}
+              </div>`;
+            }).join('')}
+          </div>
+        </div>`).join('');
+    return `<div class="site-card">
+      <div class="site-card-header">
+        <h3>📍 ${site.name}</h3>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="color:#94a3b8;font-size:13px">${siteEqs.length} אמצעים</span>
+          <button class="btn-icon" onclick="editSite(${site.id})" style="border-color:rgba(255,255,255,0.2);color:white;background:rgba(255,255,255,0.1)" title="עריכה">✏️</button>
+          <button class="btn-icon del" onclick="deleteSite(${site.id})" style="border-color:rgba(255,255,255,0.2);color:#f87171;background:rgba(220,38,38,0.15)" title="מחיקה">🗑</button>
+        </div>
+      </div>
+      <div class="site-card-body">${typesHtml}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderUsersTable() {
+  const tbody = document.getElementById('users-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = appData.users.map(u => {
+    const siteName = u.siteId ? getSiteName(u.siteId) : 'כל האתרים';
+    return `<tr>
+      <td><strong>${u.fullname||u.username}</strong></td>
+      <td style="color:var(--text-muted)">${u.username}</td>
+      <td>${u.role === 'admin' ? '<span class="badge badge-ok">👑 מנהל</span>' : '<span class="badge" style="background:var(--bg);border:1px solid var(--border)">👤 משתמש</span>'}</td>
+      <td>📍 ${siteName}</td>
+      <td>${u.phone||'—'}</td>
+      <td><div class="actions-cell">
+        <button class="btn-icon" onclick="editUser('${u.username}')" title="עריכה">✏️</button>
+        ${u.username !== 'admin' ? `<button class="btn-icon del" onclick="deleteUser('${u.username}')" title="מחיקה">🗑</button>` : ''}
+      </div></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:2rem">אין משתמשים</td></tr>';
+}
+
 function renderSites() {
   document.getElementById('sites-tbody').innerHTML = appData.sites.map(s => {
     const cnt = appData.equipment.filter(e => e.siteId == s.id).length;
@@ -1139,14 +1229,14 @@ function editSite(id) {
 }
 function openSiteModal() {
   editingSiteId = null;
-  ['site-name','site-manager','site-phone'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('site-name').value = '';
   document.querySelector('#modal-add-site .modal-header h3').textContent = 'הוספת אתר';
   openModal('modal-add-site');
 }
 async function saveSite() {
   const name = document.getElementById('site-name').value.trim();
   if (!name) { alert('נא להזין שם אתר'); return; }
-  const data = { id: editingSiteId, name, location: name, manager: document.getElementById('site-manager').value, phone: document.getElementById('site-phone').value };
+  const data = { id: editingSiteId, name, location: name, manager: '', phone: '' };
   try {
     await apiPost({ action: editingSiteId ? 'updateSite' : 'addSite', data });
     showToast(editingSiteId ? 'אתר עודכן ✓' : 'אתר נוסף ✓');
@@ -1162,17 +1252,6 @@ async function deleteSite(id) {
 // ===== SETTINGS =====
 function renderSettings() {
   document.getElementById('api-key-input').value = getApiKey() ? '••••••••••••••••' : '';
-  document.getElementById('users-list').innerHTML = appData.users.map(u => `
-    <div class="user-row">
-      <div>
-        <div style="font-size:14px;font-weight:600">${u.fullname||u.username} <span style="font-size:12px;color:var(--text-muted);font-weight:400">(${u.username})</span></div>
-        <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${u.role==='admin'?'👑 מנהל':'👤 משתמש'} · ${u.siteId ? getSiteName(u.siteId) : 'כל האתרים'}</div>
-      </div>
-      ${u.username !== 'admin' ? `<div style="display:flex;gap:6px">
-        <button class="btn-icon" onclick="editUser('${u.username}')" title="עריכה">✏️</button>
-        <button class="btn-danger-sm" onclick="deleteUser('${u.username}')">הסר</button>
-      </div>` : ''}
-    </div>`).join('');
 }
 function saveScriptUrl() { const val = document.getElementById('script-url-input').value.trim(); if (!val) { alert('נא להזין URL'); return; } localStorage.setItem(SCRIPT_URL_STORE, val); showToast('URL נשמר'); showPage('page-login'); }
 function saveScriptUrlFromSettings() { const val = document.getElementById('script-url-settings').value.trim(); if (!val) return; localStorage.setItem(SCRIPT_URL_STORE, val); showToast('URL עודכן'); }
@@ -1220,12 +1299,12 @@ async function saveUser() {
     editingUsername = null;
     document.getElementById('new-username').disabled = false;
     document.querySelector('#modal-add-user .modal-header h3').textContent = 'הוספת משתמש';
-    closeModal('modal-add-user'); await loadData(); renderSettings();
+    closeModal('modal-add-user'); await loadData(); renderUsersTable();
   } catch(e) { alert('שגיאה: '+e.message); }
 }
 async function deleteUser(username) {
   if (!confirm(`למחוק משתמש ${username}?`)) return;
-  try { await apiPost({ action:'deleteUser', data:{username} }); showToast('משתמש הוסר'); await loadData(); renderSettings(); } catch(e) { alert('שגיאה: '+e.message); }
+  try { await apiPost({ action:'deleteUser', data:{username} }); showToast('משתמש הוסר'); await loadData(); renderUsersTable(); } catch(e) { alert('שגיאה: '+e.message); }
 }
 
 // ===== MODALS =====
