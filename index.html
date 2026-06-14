@@ -288,6 +288,13 @@ tr:hover td { background: rgba(30,77,183,0.02); }
 .eye-btn { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 4px; display: flex; align-items: center; }
 .eye-btn:hover { color: var(--blue); }
 
+/* DATE PICKER */
+.date-input-wrap { position: relative; }
+.date-input-wrap input[type="text"] { padding-left: 40px; }
+.date-pick-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 16px; color: var(--text-muted); pointer-events: none; z-index: 1; line-height: 1; }
+.date-picker-overlay { position: absolute; left: 4px; top: 50%; transform: translateY(-50%); width: 30px; height: 30px; opacity: 0; cursor: pointer; border: none; padding: 0; margin: 0; background: transparent; z-index: 2; -webkit-appearance: none; }
+.date-picker-overlay::-webkit-calendar-picker-indicator { cursor: pointer; width: 30px; height: 30px; }
+
 .site-card { background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 1.5rem; overflow: hidden; }
 .site-card-header { background: linear-gradient(135deg, var(--blue-mid), var(--blue-dark)); padding: 1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; }
 .site-card-header h3 { color: white; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
@@ -1068,6 +1075,36 @@ function daysUntil(d) {
   const today = new Date(); today.setHours(0,0,0,0);
   return Math.round((parsed - today) / 86400000);
 }
+// ===== DATE PICKER (calendar) for DD/MM/YYYY text fields =====
+function ddmmyyyyToIso(s) {
+  if (!s) return '';
+  const m = String(s).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!m) return '';
+  return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+}
+function syncDatePickerFromText(id) {
+  const picker = document.getElementById(id + '-picker');
+  const text = document.getElementById(id);
+  if (!picker || !text) return;
+  picker.value = ddmmyyyyToIso(text.value) || '';
+}
+function onDatePicked(id, pickerEl) {
+  const iso = pickerEl.value;
+  if (!iso) return;
+  const [y,m,d] = iso.split('-');
+  const text = document.getElementById(id);
+  if (text) text.value = `${d}/${m}/${y}`;
+}
+// Builds a DD/MM/YYYY text field with a 📅 calendar-picker button overlaid on it
+function dateFieldHtml(id, labelHtml) {
+  return `<div class="form-group"><label>${labelHtml}</label>
+    <div class="date-input-wrap">
+      <input type="text" id="${id}" placeholder="DD/MM/YYYY" autocomplete="off">
+      <span class="date-pick-icon">📅</span>
+      <input type="date" id="${id}-picker" class="date-picker-overlay" tabindex="-1" aria-label="בחר תאריך מלוח שנה" onfocus="syncDatePickerFromText('${id}')" onchange="onDatePicked('${id}', this)">
+    </div>
+  </div>`;
+}
 function maskPhone(input) {
   // Remove all non-digits
   let digits = input.value.replace(/\D/g, '');
@@ -1387,12 +1424,12 @@ const MODAL_EQ_TEMPLATE = `<div class="modal-body">
       </div>
       <div class="form-group"><label>אתר *</label><select id="eq-site"></select></div>
       <div class="form-row">
-        <div class="form-group"><label>בדיקה אחרונה (DD/MM/YYYY)</label><input type="text" id="eq-last" placeholder="DD/MM/YYYY" autocomplete="off"></div>
-        <div class="form-group"><label>בדיקה הבאה (DD/MM/YYYY)</label><input type="text" id="eq-next" placeholder="DD/MM/YYYY" autocomplete="off"></div>
+        ${dateFieldHtml('eq-last', 'בדיקה אחרונה (DD/MM/YYYY)')}
+        ${dateFieldHtml('eq-next', 'בדיקה הבאה (DD/MM/YYYY)')}
       </div>
       <div class="form-row">
-        <div class="form-group"><label>ב.ת הבא (DD/MM/YYYY) <span style="font-size:11px;color:var(--text-muted);text-transform:none;letter-spacing:normal">— בדיקה תקופתית</span></label><input type="text" id="eq-bt-next" placeholder="DD/MM/YYYY" autocomplete="off"></div>
-        <div class="form-group"><label>רישוי שנתי הבא (DD/MM/YYYY)</label><input type="text" id="eq-license-next" placeholder="DD/MM/YYYY" autocomplete="off"></div>
+        ${dateFieldHtml('eq-bt-next', 'ב.ת הבא (DD/MM/YYYY) <span style="font-size:11px;color:var(--text-muted);text-transform:none;letter-spacing:normal">— בדיקה תקופתית</span>')}
+        ${dateFieldHtml('eq-license-next', 'רישוי שנתי הבא (DD/MM/YYYY)')}
       </div>
       <div class="form-row">
         <div class="form-group"><label>עומס עבודה בטוח (טון)</label><input type="text" id="eq-swl" placeholder="טון" autocomplete="off"></div>
