@@ -628,7 +628,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
       <div class="stats-grid" id="stats-grid"></div>
       <div class="section-card">
         <div class="section-head">
-          <h3>⚠️ התרעות קרובות</h3>
+          <h3>⚠️ התראות קרובות</h3>
         </div>
         <div class="section-body" id="alerts-list"></div>
       </div>
@@ -1154,7 +1154,7 @@ function renderDashboard() {
     <div class="stat-card"><div class="stat-icon amber">⏰</div><div class="stat-info"><div class="stat-label">קרוב לבדיקה</div><div class="stat-value amber">${warn}</div></div></div>
     <div class="stat-card"><div class="stat-icon green">✅</div><div class="stat-info"><div class="stat-label">תקין</div><div class="stat-value green">${ok}</div></div></div>`;
   const alerts = eqs.filter(e => e.nextCheck && String(e.nextCheck).trim() !== '' && daysUntil(e.nextCheck) <= 30).sort((a,b) => daysUntil(a.nextCheck) - daysUntil(b.nextCheck));
-  if (!alerts.length) { document.getElementById('alerts-list').innerHTML = '<div style="color:var(--text-muted);font-size:14px;padding:0.5rem 0;display:flex;align-items:center;gap:8px"><span style="font-size:20px">✅</span> אין התרעות פעילות — כל האמצעים תקינים</div>'; return; }
+  if (!alerts.length) { document.getElementById('alerts-list').innerHTML = '<div style="color:var(--text-muted);font-size:14px;padding:0.5rem 0;display:flex;align-items:center;gap:8px"><span style="font-size:20px">✅</span> אין התראות פעילות — כל האמצעים תקינים</div>'; return; }
   document.getElementById('alerts-list').innerHTML = alerts.map(e => {
     const days = daysUntil(e.nextCheck);
     const st = getStatus(e.nextCheck);
