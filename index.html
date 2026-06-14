@@ -928,6 +928,7 @@ async function loadData(silent = false) {
       notes: String(e.notes||''),
       lastCheck: normalizeDate(e.lastCheck),
       nextCheck: normalizeDate(e.nextCheck),
+      btNext: normalizeDate(e.btNext),
       imageUrl: (e.imageUrl && String(e.imageUrl) !== 'null' && String(e.imageUrl) !== 'undefined' && String(e.imageUrl).startsWith('http')) ? String(e.imageUrl) : ''
     }));
     console.log('Equipment with images:', appData.equipment.filter(e=>e.imageUrl).map(e=>({id:e.id,url:e.imageUrl})));
@@ -1109,6 +1110,32 @@ function formatDate(s) {
   return str;
 }
 function getStatus(next) { const d = daysUntil(next); if (d <= 14) return 'danger'; if (d <= 30) return 'warn'; return 'ok'; }
+// Overall status considers both "בדיקה הבאה" and "ב.ת הבא" — whichever is more urgent wins
+function getOverallStatus(e) {
+  const s1 = getStatus(e.nextCheck), s2 = getStatus(e.btNext);
+  const order = { danger: 2, warn: 1, ok: 0 };
+  return order[s1] >= order[s2] ? s1 : s2;
+}
+// Days-until value matching the more urgent of the two dates (for badge text)
+function getRelevantDays(e) {
+  const d1 = e.nextCheck ? daysUntil(e.nextCheck) : 9999;
+  const d2 = e.btNext ? daysUntil(e.btNext) : 9999;
+  return Math.min(d1, d2);
+}
+// Returns a flat list of due items (one per expiring date) across equipment,
+// each tagged with its kind ('check' = תסקיר / 'bt' = ב.ת) for alerts & reminders
+function getDueChecks(eqs, maxDays = 30) {
+  const due = [];
+  eqs.forEach(e => {
+    if (e.nextCheck && String(e.nextCheck).trim() !== '' && daysUntil(e.nextCheck) <= maxDays) {
+      due.push({ eq: e, kind: 'check', label: 'תסקיר', date: e.nextCheck, days: daysUntil(e.nextCheck) });
+    }
+    if (e.btNext && String(e.btNext).trim() !== '' && daysUntil(e.btNext) <= maxDays) {
+      due.push({ eq: e, kind: 'bt', label: 'ב.ת', date: e.btNext, days: daysUntil(e.btNext) });
+    }
+  });
+  return due.sort((a,b) => a.days - b.days);
+}
 function statusBadge(st, days) {
   const L = { ok:'תקין', warn:'קרוב לבדיקה', danger: days < 0 ? 'פג תוקף!' : 'דחוף' };
   const C = { ok:'badge-ok', warn:'badge-warn', danger:'badge-danger' };
@@ -1130,11 +1157,12 @@ function getSiteResponsibleUsers(siteId) {
     return sites.includes(String(siteId));
   });
 }
-function waLink(phone, name, siteId, nextCheck) {
+function waLink(phone, name, siteId, date, kind) {
   const rawPhone = String(phone == null ? '' : phone).replace(/\D/g,'');
   const p = rawPhone.startsWith('972') ? rawPhone : rawPhone.replace(/^0/,'972');
   if (!p) return '';
-  const msg = encodeURIComponent(`שלום, תזכורת: האמצעי "${name}" באתר "${getSiteName(siteId)}" מיועד לבדיקה בתאריך ${formatDate(nextCheck)}. נא לתאם בדיקה.`);
+  const action = kind === 'bt' ? 'לבדיקה התקופתית (ב.ת)' : 'לבדיקה';
+  const msg = encodeURIComponent(`שלום, תזכורת: האמצעי "${name}" באתר "${getSiteName(siteId)}" מיועד ${action} בתאריך ${formatDate(date)}. נא לתאם בדיקה.`);
   return `<a class="btn-wa" href="https://wa.me/${p}?text=${msg}" target="_blank">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.523 5.847L0 24l6.356-1.492A11.934 11.934 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.894a9.866 9.866 0 01-5.031-1.381l-.361-.214-3.741.878.936-3.619-.235-.372A9.855 9.855 0 012.106 12C2.106 6.58 6.58 2.106 12 2.106S21.894 6.58 21.894 12 17.42 21.894 12 21.894z"/></svg>
     WhatsApp
@@ -1145,29 +1173,30 @@ function showToast(msg) { const t = document.getElementById('toast'); t.textCont
 // ===== DASHBOARD =====
 function renderDashboard() {
   const eqs = getUserEquipment();
-  const danger = eqs.filter(e => getStatus(e.nextCheck) === 'danger').length;
-  const warn = eqs.filter(e => getStatus(e.nextCheck) === 'warn').length;
+  const danger = eqs.filter(e => getOverallStatus(e) === 'danger').length;
+  const warn = eqs.filter(e => getOverallStatus(e) === 'warn').length;
   const ok = eqs.length - danger - warn;
   document.getElementById('stats-grid').innerHTML = `
     <div class="stat-card"><div class="stat-icon blue">🏗️</div><div class="stat-info"><div class="stat-label">סה"כ אמצעים</div><div class="stat-value blue">${eqs.length}</div></div></div>
     <div class="stat-card"><div class="stat-icon red">🚨</div><div class="stat-info"><div class="stat-label">דחוף / פג תוקף</div><div class="stat-value red">${danger}</div></div></div>
     <div class="stat-card"><div class="stat-icon amber">⏰</div><div class="stat-info"><div class="stat-label">קרוב לבדיקה</div><div class="stat-value amber">${warn}</div></div></div>
     <div class="stat-card"><div class="stat-icon green">✅</div><div class="stat-info"><div class="stat-label">תקין</div><div class="stat-value green">${ok}</div></div></div>`;
-  const alerts = eqs.filter(e => e.nextCheck && String(e.nextCheck).trim() !== '' && daysUntil(e.nextCheck) <= 30).sort((a,b) => daysUntil(a.nextCheck) - daysUntil(b.nextCheck));
-  if (!alerts.length) { document.getElementById('alerts-list').innerHTML = '<div style="color:var(--text-muted);font-size:14px;padding:0.5rem 0;display:flex;align-items:center;gap:8px"><span style="font-size:20px">✅</span> אין התראות פעילות — כל האמצעים תקינים</div>'; return; }
-  document.getElementById('alerts-list').innerHTML = alerts.map(e => {
-    const days = daysUntil(e.nextCheck);
-    const st = getStatus(e.nextCheck);
-    const cls = st === 'danger' ? 'red' : 'amber';
+  const due = getDueChecks(eqs, 30);
+  if (!due.length) { document.getElementById('alerts-list').innerHTML = '<div style="color:var(--text-muted);font-size:14px;padding:0.5rem 0;display:flex;align-items:center;gap:8px"><span style="font-size:20px">✅</span> אין התראות פעילות — כל האמצעים תקינים</div>'; return; }
+  document.getElementById('alerts-list').innerHTML = due.map(d => {
+    const e = d.eq;
+    const days = d.days;
+    const cls = days <= 14 ? 'red' : 'amber';
     const daysTxt = days < 0 ? `פג לפני ${Math.abs(days)} ימים` : days === 0 ? 'היום!' : `${days} ימים`;
+    const kindTag = d.kind === 'bt' ? '<span class="badge badge-warn" style="font-size:10px;margin-right:6px">ב.ת</span>' : '';
     return `<div class="alert-item ${cls}">
       <div class="alert-dot ${cls}"></div>
       <div class="alert-info">
-        <div class="alert-name">${e.name} <span style="color:var(--text-muted);font-size:12px;font-weight:400">(${e.eqId})</span></div>
-        <div class="alert-meta">📍 ${getSiteName(e.siteId)} · 📅 בדיקה הבאה: ${formatDate(e.nextCheck)}</div>
+        <div class="alert-name">${kindTag}${e.name} <span style="color:var(--text-muted);font-size:12px;font-weight:400">(${e.eqId})</span></div>
+        <div class="alert-meta">📍 ${getSiteName(e.siteId)} · 📅 ${d.label}: ${formatDate(d.date)}</div>
       </div>
       <span class="alert-days ${cls}">${daysTxt}</span>
-      ${waLink(e.phone, e.name, e.siteId, e.nextCheck)}
+      ${waLink(e.phone, e.name, e.siteId, d.date, d.kind)}
     </div>`;
   }).join('');
 }
@@ -1188,16 +1217,16 @@ function renderEquipmentTable() {
   const q = document.getElementById('filter-search').value.toLowerCase();
   if (sf) eqs = eqs.filter(e => e.siteId == sf);
   if (tf) eqs = eqs.filter(e => e.type === tf);
-  if (stf) eqs = eqs.filter(e => getStatus(e.nextCheck) === stf);
+  if (stf) eqs = eqs.filter(e => getOverallStatus(e) === stf);
   if (q) eqs = eqs.filter(e => (e.name||'').toLowerCase().includes(q) || (e.eqId||'').toLowerCase().includes(q));
   const isAdmin = currentUser.role === 'admin';
   document.getElementById('eq-tbody').innerHTML = eqs.map(e => {
-    const days = daysUntil(e.nextCheck); const st = getStatus(e.nextCheck);
+    const days = getRelevantDays(e); const st = getOverallStatus(e);
     return `<tr>
       <td><strong style="color:var(--blue)">${e.eqId||'—'}</strong><br><span style='font-size:11px;color:var(--text-muted)'>${e.serialNumber||''}</span></td>
       <td>${e.name}</td><td><span style="color:var(--text-muted)">${e.type||'—'}</span></td>
       <td>📍 ${getSiteName(e.siteId)}</td>
-      <td>${formatDate(e.lastCheck)}</td><td>${formatDate(e.nextCheck)}</td>
+      <td>${formatDate(e.lastCheck)}</td><td>${formatDate(e.nextCheck)}${e.btNext ? `<br><span style="font-size:11px;color:var(--text-muted)">ב.ת: ${formatDate(e.btNext)}</span>` : ''}</td>
       <td>${statusBadge(st,days)}</td>
       <td><div class="actions-cell">
         <button class="btn-icon" onclick="viewEquipment(${e.id})" title="פרטים">👁</button>
@@ -1211,7 +1240,7 @@ function renderEquipmentTable() {
 function viewEquipment(id) {
   const e = appData.equipment.find(x => x.id === id);
   if (!e) return;
-  const days = daysUntil(e.nextCheck); const st = getStatus(e.nextCheck);
+  const days = getRelevantDays(e); const st = getOverallStatus(e);
   document.getElementById('view-eq-body').innerHTML = `
     ${(e.imageUrl && String(e.imageUrl) !== 'null' && String(e.imageUrl).startsWith('http')) ? `
   <div style="margin-bottom:1.5rem">
@@ -1236,6 +1265,7 @@ function viewEquipment(id) {
       ['אתר','📍 '+getSiteName(e.siteId)],
       ['בדיקה אחרונה',formatDate(e.lastCheck)],
       ['בדיקה הבאה',formatDate(e.nextCheck)],
+      ['ב.ת הבא',formatDate(e.btNext)],
       ['סטטוס',statusBadge(st,days)],
       ['עומס עבודה בטוח', e.safeWorkLoad ? e.safeWorkLoad+' טון' : '—'],
       ['עומס מקסימלי', e.maxLoad ? e.maxLoad+' טון' : '—'],
@@ -1272,7 +1302,7 @@ function editEquipment(id) {
   sv('eq-name', e.name); sv('eq-year', e.manufacturingYear);
   const siteEl = document.getElementById('eq-site');
   if (siteEl) siteEl.value = e.siteId;
-  sv('eq-last', e.lastCheck); sv('eq-next', e.nextCheck);
+  sv('eq-last', e.lastCheck); sv('eq-next', e.nextCheck); sv('eq-bt-next', e.btNext);
   sv('eq-swl', e.safeWorkLoad); sv('eq-max-load', e.maxLoad);
   sv('eq-test-load', e.testLoad); sv('eq-height', e.height);
   sv('eq-inspection-type', e.inspectionType); sv('eq-inspector', e.inspectorName);
@@ -1349,6 +1379,7 @@ const MODAL_EQ_TEMPLATE = `<div class="modal-body">
         <div class="form-group"><label>בדיקה אחרונה (DD/MM/YYYY)</label><input type="text" id="eq-last" placeholder="DD/MM/YYYY" autocomplete="off"></div>
         <div class="form-group"><label>בדיקה הבאה (DD/MM/YYYY)</label><input type="text" id="eq-next" placeholder="DD/MM/YYYY" autocomplete="off"></div>
       </div>
+      <div class="form-group"><label>ב.ת הבא (DD/MM/YYYY) <span style="font-size:11px;color:var(--text-muted);text-transform:none;letter-spacing:normal">— תוקף בדיקה תקופתית, מנוהל ומתריע בנפרד</span></label><input type="text" id="eq-bt-next" placeholder="DD/MM/YYYY" autocomplete="off"></div>
       <div class="form-row">
         <div class="form-group"><label>עומס עבודה בטוח (טון)</label><input type="text" id="eq-swl" placeholder="טון" autocomplete="off"></div>
         <div class="form-group"><label>עומס מקסימלי (טון)</label><input type="text" id="eq-max-load" placeholder="טון" autocomplete="off"></div>
@@ -1435,6 +1466,7 @@ async function saveEquipment() {
     siteId: parseInt(document.getElementById('eq-site').value),
     lastCheck: gv('eq-last'),
     nextCheck: gv('eq-next'),
+    btNext: gv('eq-bt-next'),
     safeWorkLoad: gv('eq-swl'),
     maxLoad: gv('eq-max-load'),
     testLoad: gv('eq-test-load'),
@@ -1635,14 +1667,14 @@ function renderSitesNew() {
           <div class="eq-type-label">🔧 ${type} (${eqs.length})</div>
           <div class="eq-type-items">
             ${eqs.map(e => {
-              const days = daysUntil(e.nextCheck);
-              const st = getStatus(e.nextCheck);
+              const days = getRelevantDays(e);
+              const st = getOverallStatus(e);
               const dot = st === 'danger' ? '🔴' : st === 'warn' ? '🟡' : '🟢';
               return `<div class="eq-item" onclick="viewEquipment(${e.id})">
                 <div class="eq-item-info">
                   <div class="eq-item-name">${dot} ${e.name||'—'}</div>
                   <div class="eq-item-id">תסקיר: ${e.eqId||'—'} | ס/נ: ${e.serialNumber||'—'}</div>
-                  <div class="eq-item-dates">בדיקה הבאה: ${formatDate(e.nextCheck)}</div>
+                  <div class="eq-item-dates">בדיקה הבאה: ${formatDate(e.nextCheck)}${e.btNext ? ` · ב.ת: ${formatDate(e.btNext)}` : ''}</div>
                 </div>
                 ${statusBadge(st, days)}
               </div>`;
@@ -1907,10 +1939,9 @@ function loadExpiryReminders() {
   const container = document.getElementById('wa-expiry-list');
   if (!container) return;
 
-  const eqs = appData.equipment.filter(e => daysUntil(e.nextCheck) <= 30)
-    .sort((a,b) => daysUntil(a.nextCheck) - daysUntil(b.nextCheck));
+  const due = getDueChecks(appData.equipment, 30);
 
-  if (!eqs.length) {
+  if (!due.length) {
     container.innerHTML = '<div style="color:var(--success);font-size:13px;padding:0.5rem 0">✅ אין תסקירים הדורשים תזכורת בחודש הקרוב</div>';
     return;
   }
@@ -1919,28 +1950,31 @@ function loadExpiryReminders() {
 
   // Group by responsible user (non-admin)
   const byUser = {};
-  eqs.forEach(e => {
-    const resp = getSiteResponsibleUsers(e.siteId);
+  due.forEach(d => {
+    const resp = getSiteResponsibleUsers(d.eq.siteId);
     const key = resp.length ? resp[0].username : '__none__';
     if (!byUser[key]) byUser[key] = { user: resp[0] || null, items: [] };
-    byUser[key].items.push(e);
+    byUser[key].items.push(d);
   });
+
+  function dLabelFor(days) {
+    return days < 0 ? `פג לפני ${Math.abs(days)} ימים` : days === 0 ? 'היום!' : `בעוד ${days} ימים`;
+  }
 
   function buildSummaryMsg(user, items) {
     const name = user ? (user.fullname || user.username) : '';
     const greeting = name ? `שלום ${name},\n\n` : 'שלום,\n\n';
-    const lines = items.map((e, i) => {
-      const days = daysUntil(e.nextCheck);
-      const dLabel = days < 0 ? `פג לפני ${Math.abs(days)} ימים` : days === 0 ? 'היום!' : `בעוד ${days} ימים`;
-      return `${i+1}. 🔧 ${e.name} (${e.type||''})\n   📋 תסקיר: ${e.eqId}  |  ס/נ: ${e.serialNumber||'—'}\n   📍 ${getSiteName(e.siteId)}\n   📅 ${formatDate(e.nextCheck)} — ${dLabel}`;
+    const lines = items.map((d, i) => {
+      const e = d.eq;
+      return `${i+1}. 🔧 ${e.name} (${e.type||''})\n   📋 תסקיר: ${e.eqId}  |  ס/נ: ${e.serialNumber||'—'}\n   📍 ${getSiteName(e.siteId)}\n   📅 ${d.label}: ${formatDate(d.date)} — ${dLabelFor(d.days)}`;
     }).join('\n\n');
     return greeting + `תזכורת — האמצעים הבאים דורשים תיאום בדיקה:\n\n${lines}\n\nנא לתאם בהקדם האפשרי.\n\nמערכת תסקירי הבטיחות — מדור צהר"מ זרוע הים`;
   }
 
-  function buildSingleMsg(e) {
-    const days = daysUntil(e.nextCheck);
-    const dLabel = days < 0 ? `פג לפני ${Math.abs(days)} ימים` : days === 0 ? 'היום!' : `בעוד ${days} ימים`;
-    return `שלום,\n\nתזכורת: תסקיר הבטיחות של האמצעי הבא עומד לפוג:\n\n🔧 ${e.name} (${e.type||''})\n📋 תסקיר: ${e.eqId}\n🔢 ס/נ: ${e.serialNumber||'—'}\n📍 אתר: ${getSiteName(e.siteId)}\n📅 בדיקה הבאה: ${formatDate(e.nextCheck)} (${dLabel})\n\nנא לתאם בדיקה חדשה בהקדם.\n\nמערכת תסקירי הבטיחות — מדור צהר"מ זרוע הים`;
+  function buildSingleMsg(d) {
+    const e = d.eq;
+    const what = d.kind === 'bt' ? 'הבדיקה התקופתית (ב.ת)' : 'תסקיר הבטיחות';
+    return `שלום,\n\nתזכורת: ${what} של האמצעי הבא עומד לפוג:\n\n🔧 ${e.name} (${e.type||''})\n📋 תסקיר: ${e.eqId}\n🔢 ס/נ: ${e.serialNumber||'—'}\n📍 אתר: ${getSiteName(e.siteId)}\n📅 ${d.label}: ${formatDate(d.date)} (${dLabelFor(d.days)})\n\nנא לתאם בדיקה חדשה בהקדם.\n\nמערכת תסקירי הבטיחות — מדור צהר"מ זרוע הים`;
   }
 
   let html = '';
@@ -1954,28 +1988,30 @@ function loadExpiryReminders() {
       html += `<div style="background:rgba(30,77,183,0.06);border:1.5px solid rgba(30,77,183,0.2);border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
         <div>
           <div style="font-size:14px;font-weight:700;color:var(--blue)">👤 ${user.fullname||user.username}</div>
-          <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${items.length} אמצעים דורשים טיפול · ${formatPhone(user.phone)}</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${items.length} פריטים דורשים טיפול · ${formatPhone(user.phone)}</div>
         </div>
         <a class="btn-wa" href="https://wa.me/${phone}?text=${summaryMsg}" target="_blank" style="font-size:13px;padding:9px 18px;background:#0f6e3a">
-          ${WA_ICON} שלח סיכום (${items.length} אמצעים)
+          ${WA_ICON} שלח סיכום (${items.length} פריטים)
         </a>
       </div>`;
     }
 
     // Individual items
-    items.forEach(e => {
-      const days = daysUntil(e.nextCheck);
-      const dLabel = days < 0 ? `פג לפני ${Math.abs(days)} ימים` : days === 0 ? 'היום!' : `בעוד ${days} ימים`;
+    items.forEach(d => {
+      const e = d.eq;
+      const days = d.days;
+      const dLabel = dLabelFor(days);
       const cls = days <= 7 ? 'red' : 'amber';
-      const singleMsg = encodeURIComponent(buildSingleMsg(e));
+      const singleMsg = encodeURIComponent(buildSingleMsg(d));
       const resp = getSiteResponsibleUsers(e.siteId);
       const responsible = resp[0] || null;
       const rPhone = (responsible && responsible.phone) ? String(responsible.phone).replace(/\D/g,'').replace(/^0/,'972') : '';
+      const kindTag = d.kind === 'bt' ? '<span class="badge badge-warn" style="font-size:10px;margin-right:6px">ב.ת</span>' : '';
       html += `<div class="alert-item ${cls}" style="margin-bottom:8px">
         <div class="alert-dot ${cls}"></div>
         <div class="alert-info">
-          <div class="alert-name">${e.name} <span style="font-size:12px;color:var(--text-muted)">(${e.eqId})</span></div>
-          <div class="alert-meta">📍 ${getSiteName(e.siteId)} · 📅 ${formatDate(e.nextCheck)} · ${dLabel}</div>
+          <div class="alert-name">${kindTag}${e.name} <span style="font-size:12px;color:var(--text-muted)">(${e.eqId})</span></div>
+          <div class="alert-meta">📍 ${getSiteName(e.siteId)} · 📅 ${d.label}: ${formatDate(d.date)} · ${dLabel}</div>
           ${responsible
             ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">אחראי: ${responsible.fullname||responsible.username} ${formatPhone(responsible.phone)}</div>`
             : '<div style="font-size:11px;color:var(--danger);margin-top:2px">⚠️ אין אחראי משויך</div>'}
