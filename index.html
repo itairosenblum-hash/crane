@@ -662,7 +662,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
         <div class="section-head">
           <div class="filter-row" style="margin:0">
             <select id="filter-site" onchange="renderEquipmentTable()"><option value="">כל האתרים</option></select>
-            <select id="filter-type" onchange="renderEquipmentTable()"><option value="">כל מספרי השילדה</option></select>
+            <select id="filter-type" onchange="renderEquipmentTable()"><option value="">כל הסוגים</option></select>
             <select id="filter-status" onchange="renderEquipmentTable()">
               <option value="">כל הסטטוסים</option>
               <option value="ok">תקין</option>
@@ -675,7 +675,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
         <div class="table-wrap">
           <table>
             <thead><tr>
-              <th>מ. מזהה</th><th>שם האמצעי</th><th>מס' שילדה</th><th>אתר</th>
+              <th>מ. מזהה</th><th>מס' שילדה</th><th>סוג</th><th>אתר</th>
               <th>בדיקה אחרונה</th><th>בדיקה הבאה</th><th>סטטוס</th><th>פעולות</th>
             </tr></thead>
             <tbody id="eq-tbody"></tbody>
@@ -687,7 +687,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
     <!-- SITES -->
     <div id="tab-sites-content" style="display:none">
       <div class="page-header">
-        <div><h2>ניהול אתרים</h2><p>אמצעים לפי אתר ומספר שילדה</p></div>
+        <div><h2>ניהול אתרים</h2><p>אמצעים לפי אתר וסוג</p></div>
         <button class="btn-add" onclick="openSiteModal()">+ הוסף אתר</button>
       </div>
       <div id="sites-content"></div>
@@ -1252,7 +1252,7 @@ function populateSiteFilter() {
   document.getElementById('filter-site').innerHTML = '<option value="">כל האתרים</option>' + sites.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
   // Populate type filter
   const types = [...new Set(getUserEquipment().map(e => e.type).filter(Boolean))].sort();
-  document.getElementById('filter-type').innerHTML = '<option value="">כל מספרי השילדה</option>' + types.map(t => `<option value="${t}">${t}</option>`).join('');
+  document.getElementById('filter-type').innerHTML = '<option value="">כל הסוגים</option>' + types.map(t => `<option value="${t}">${t}</option>`).join('');
 }
 function renderEquipmentTable() {
   let eqs = getUserEquipment();
@@ -1304,8 +1304,9 @@ function viewEquipment(id) {
       ['מספר תסקיר',`<strong style="color:var(--blue)">${e.eqId||'—'}</strong>`],
       ['מספר רישוי / צ\' (רישוי צבאי)', e.serialNumber||'—'],
       ['שנת יצור', e.manufacturingYear||'—'],
-      ['מס\' שילדה', e.type||'—'],
-      ['יצרן / דגם', [e.manufacturer,e.name].filter(Boolean).join(' ')||'—'],
+      ['סוג', e.type||'—'],
+      ['יצרן', e.manufacturer||'—'],
+      ['מס\' שילדה', e.name||'—'],
       ['מיקום', e.location||'—'],
       ['אתר','📍 '+getSiteName(e.siteId)],
       ['בדיקה אחרונה',formatDate(e.lastCheck)],
@@ -1412,11 +1413,11 @@ const MODAL_EQ_TEMPLATE = `<div class="modal-body">
         <div class="form-group"><label>מספר רישוי / צ' (רישוי צבאי)</label><input type="text" id="eq-serial" placeholder="הזן מספר רישוי / צ'" autocomplete="off"></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>מס' שילדה</label><input type="text" id="eq-type" placeholder="הזן מספר שילדה" autocomplete="off"></div>
+        <div class="form-group"><label>סוג האמצעי</label><input type="text" id="eq-type" placeholder="סוג האמצעי" autocomplete="off"></div>
         <div class="form-group"><label>יצרן</label><input type="text" id="eq-manufacturer" placeholder="שם היצרן" autocomplete="off"></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>דגם *</label><input type="text" id="eq-name" placeholder="דגם האמצעי" autocomplete="off"></div>
+        <div class="form-group"><label>מס' שילדה *</label><input type="text" id="eq-name" placeholder="הזן מספר שילדה" autocomplete="off"></div>
         <div class="form-group"><label>שנת יצור</label><input type="text" id="eq-year" placeholder="שנת יצור" autocomplete="off"></div>
       </div>
       <div class="form-group"><label>אתר *</label><select id="eq-site"></select></div>
@@ -1492,7 +1493,7 @@ async function compressImage(dataUrl, maxWidth=1200, quality=0.75) {
 async function saveEquipment() {
   const eqId = document.getElementById('eq-id').value.trim();
   const name = document.getElementById('eq-name').value.trim();
-  if (!eqId || !name) { alert('נא למלא מספר מזהה ושם'); return; }
+  if (!eqId || !name) { alert('נא למלא מספר תסקיר ומספר שילדה'); return; }
   // Duplicate detection: warn if this מספר תסקיר or מספר רישוי/צ' already exists on another equipment record
   const serialNumberVal = document.getElementById('eq-serial').value.trim();
   const dupEqId = appData.equipment.find(e => e.id !== editingEqId && String(e.eqId||'').trim() === eqId);
@@ -1647,13 +1648,11 @@ async function analyzeImage(dataUrl, fileType) {
   const isPDF = mediaType === 'application/pdf';
   try {
     const PROMPT = `You are analyzing a Hebrew safety inspection certificate ("תסקיר בדיקה וניסוי מכונות-הרמה") for lifting equipment in Israel.
-Study section 2 ("תיאור המתקן") carefully - it contains SEVERAL different id-like values that look similar but must NOT be confused with each other:
+Study section 2 ("תיאור המתקן") carefully - it contains TWO different id-like values that look similar but must NOT be confused with each other:
 - "מספר רישוי" (sometimes written as "צ'" or with a צ' prefix like צ'10242) = the LICENSE/REGISTRATION number - this goes into serialNumber ONLY.
-- "מס' שילדה" = the CHASSIS number (e.g. 8FBCU25-88599) - this goes into type ONLY. Do NOT put this value into model or serialNumber.
-- the "יצרן, דגם, מספר סידורי" row lists the manufacturer, then the MODEL code (e.g. 8FBU25MV), then possibly a serial number after it. Only the MODEL portion of this row goes into model. Do NOT put the מס' שילדה chassis number into model, and do NOT put this row's model code into type.
-In short: type and model are two DIFFERENT values from two DIFFERENT rows - never copy the same value into both, and never swap them.
+- "מס' שילדה" = the CHASSIS number (e.g. 8FBCU25-88599) - this goes into chassisNumber ONLY. Do NOT put this value into serialNumber, and do NOT confuse it with any model code that may appear in the "יצרן, דגם, מספר סידורי" row.
 Extract these fields and return ONLY a valid JSON object, no markdown:
-{"inspectionNumber":"מספר תסקיר from top-left box","serialNumber":"ONLY the value explicitly labeled מספר רישוי (license/registration number, possibly prefixed with צ'). If no field is explicitly labeled מספר רישוי anywhere in the document, return null - never substitute מס' שילדה or the model's serial number","manufacturingYear":"שנת יצור","type":"ONLY the value explicitly labeled מס' שילדה (chassis number). If no field is explicitly labeled מס' שילדה anywhere in the document, return null - never substitute מספר רישוי or the model code","manufacturer":"manufacturer name, from the 'יצרן, דגם, מספר סידורי' row","model":"ONLY the model code from the 'יצרן, דגם, מספר סידורי' row (e.g. 8FBU25MV) - never substitute the מס' שילדה chassis number here","lastCheck":"תאריך בדיקה מוכחת as DD/MM/YYYY","nextCheck":"תאריך בדיקה הבאה as DD/MM/YYYY","safeWorkLoad":"עומס עבודה בטוח numeric only","maxLoad":"עומס מקסימלי numeric only","testLoad":"עומס מבחן numeric only","height":"רדיוס/גובה numeric only","inspectionType":"סוג בדיקה","notes":"section 4 הערות"}
+{"inspectionNumber":"מספר תסקיר from top-left box","serialNumber":"ONLY the value explicitly labeled מספר רישוי (license/registration number, possibly prefixed with צ'). If no field is explicitly labeled מספר רישוי anywhere in the document, return null - never substitute מס' שילדה","chassisNumber":"ONLY the value explicitly labeled מס' שילדה (chassis number). If no field is explicitly labeled מס' שילדה anywhere in the document, return null - never substitute מספר רישוי","manufacturingYear":"שנת יצור","type":"equipment type in Hebrew e.g. מלגזה","manufacturer":"manufacturer name, from the 'יצרן, דגם, מספר סידורי' row","lastCheck":"תאריך בדיקה מוכחת as DD/MM/YYYY","nextCheck":"תאריך בדיקה הבאה as DD/MM/YYYY","safeWorkLoad":"עומס עבודה בטוח numeric only","maxLoad":"עומס מקסימלי numeric only","testLoad":"עומס מבחן numeric only","height":"רדיוס/גובה numeric only","inspectionType":"סוג בדיקה","notes":"section 4 הערות"}
 Rules: dates as DD/MM/YYYY, null for missing, JSON only.`;
 
     // Always send as image (PDF converted to image in handleFile)
@@ -1686,7 +1685,7 @@ Rules: dates as DD/MM/YYYY, null for missing, JSON only.`;
     setF('eq-serial', parsed.serialNumber);
     setF('eq-type', parsed.type);
     setF('eq-manufacturer', parsed.manufacturer);
-    setF('eq-name', parsed.model || parsed.name);
+    setF('eq-name', parsed.chassisNumber);
     setF('eq-year', parsed.manufacturingYear);
     setF('eq-last', parsed.lastCheck);
     setF('eq-next', parsed.nextCheck);
