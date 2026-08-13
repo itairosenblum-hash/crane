@@ -734,6 +734,9 @@ tr:hover td { background: rgba(30,77,183,0.02); }
       <div class="page-header">
         <div><h2>📍 אתרים</h2><p>אמצעים לפי אתר וסוג</p></div>
       </div>
+      <div class="filter-row">
+        <select id="sites-filter-site" onchange="renderSitesNew()"><option value="">כל האתרים</option></select>
+      </div>
       <div id="sites-content"></div>
     </div>
 
@@ -1795,11 +1798,24 @@ Rules: dates as DD/MM/YYYY, null for missing, JSON only.`;
 function renderSitesNew() {
   const container = document.getElementById('sites-content');
   if (!container) return;
+  // Populate/preserve the site filter dropdown
+  const filterEl = document.getElementById('sites-filter-site');
+  let filterVal = '';
+  if (filterEl) {
+    filterVal = filterEl.value;
+    filterEl.innerHTML = '<option value="">כל האתרים</option>' + appData.sites.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+    filterEl.value = filterVal;
+  }
   if (!appData.sites.length) {
     container.innerHTML = '<div class="section-card"><div class="section-body site-empty">לא נמצאו אתרים — לחץ "+ הוסף אתר"</div></div>';
     return;
   }
-  container.innerHTML = appData.sites.map(site => {
+  const sitesToShow = filterVal ? appData.sites.filter(s => String(s.id) === String(filterVal)) : appData.sites;
+  if (!sitesToShow.length) {
+    container.innerHTML = '<div class="section-card"><div class="section-body site-empty">האתר שנבחר לא נמצא</div></div>';
+    return;
+  }
+  container.innerHTML = sitesToShow.map(site => {
     const siteEqs = appData.equipment.filter(e => e.siteId == site.id);
     // Group by type
     const byType = {};
