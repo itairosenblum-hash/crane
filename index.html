@@ -1304,7 +1304,7 @@ function viewEquipment(id) {
     <table style="width:100%;font-size:14px;border-collapse:collapse">
       ${[
       ['מספר תסקיר',`<strong style="color:var(--blue)">${e.eqId||'—'}</strong>`],
-      ['מספר סידורי', e.serialNumber||'—'],
+      ['מספר רישוי / צ\' (רישוי צבאי)', e.serialNumber||'—'],
       ['שנת יצור', e.manufacturingYear||'—'],
       ['סוג', e.type||'—'],
       ['יצרן / דגם', [e.manufacturer,e.name].filter(Boolean).join(' ')||'—'],
@@ -1412,7 +1412,7 @@ const MODAL_EQ_TEMPLATE = `<div class="modal-body">
       </div>
       <div class="form-row">
         <div class="form-group"><label>מספר תסקיר *</label><input type="text" id="eq-id" placeholder="הזן מספר תסקיר" autocomplete="off"></div>
-        <div class="form-group"><label>מספר סידורי אמצעי</label><input type="text" id="eq-serial" placeholder="הזן מספר סידורי" autocomplete="off"></div>
+        <div class="form-group"><label>מספר רישוי / צ' (רישוי צבאי)</label><input type="text" id="eq-serial" placeholder="הזן מספר רישוי / צ'" autocomplete="off"></div>
       </div>
       <div class="form-row">
         <div class="form-group"><label>סוג האמצעי</label><input type="text" id="eq-type" placeholder="סוג האמצעי" autocomplete="off"></div>
@@ -1644,7 +1644,7 @@ async function analyzeImage(dataUrl, fileType) {
   try {
     const PROMPT = `You are analyzing a Hebrew safety inspection certificate ("תסקיר בדיקה וניסוי מכונות-הרמה") for lifting equipment in Israel.
 Study the document carefully. Extract these fields and return ONLY a valid JSON object, no markdown:
-{"inspectionNumber":"מספר תסקיר from top-left box","serialNumber":"מספר סידורי from equipment table (NOT inspection number)","manufacturingYear":"שנת יצור","type":"equipment type in Hebrew e.g. מלגזה","manufacturer":"manufacturer name","model":"model number","lastCheck":"תאריך בדיקה מוכחת as DD/MM/YYYY","nextCheck":"תאריך בדיקה הבאה as DD/MM/YYYY","safeWorkLoad":"עומס עבודה בטוח numeric only","maxLoad":"עומס מקסימלי numeric only","testLoad":"עומס מבחן numeric only","height":"רדיוס/גובה numeric only","inspectionType":"סוג בדיקה","notes":"section 4 הערות"}
+{"inspectionNumber":"מספר תסקיר from top-left box","serialNumber":"מספר רישוי או מספר צ' (רישוי צבאי) of the equipment (NOT inspection number)","manufacturingYear":"שנת יצור","type":"equipment type in Hebrew e.g. מלגזה","manufacturer":"manufacturer name","model":"model number","lastCheck":"תאריך בדיקה מוכחת as DD/MM/YYYY","nextCheck":"תאריך בדיקה הבאה as DD/MM/YYYY","safeWorkLoad":"עומס עבודה בטוח numeric only","maxLoad":"עומס מקסימלי numeric only","testLoad":"עומס מבחן numeric only","height":"רדיוס/גובה numeric only","inspectionType":"סוג בדיקה","notes":"section 4 הערות"}
 Rules: dates as DD/MM/YYYY, null for missing, JSON only.`;
 
     // Always send as image (PDF converted to image in handleFile)
