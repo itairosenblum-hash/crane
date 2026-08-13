@@ -2077,7 +2077,7 @@ function loadExpiryReminders() {
       html += `<div class="alert-item ${cls}" style="margin-bottom:8px">
         <div class="alert-dot ${cls}"></div>
         <div class="alert-info">
-          <div class="alert-name">${kindTag}${e.name} <span style="font-size:12px;color:var(--text-muted)">(${e.eqId})</span></div>
+          <div class="alert-name">${kindTag}${e.name} <span style="font-size:12px;color:var(--text-muted)">(${e.serialNumber||'—'})</span></div>
           <div class="alert-meta">📍 ${getSiteName(e.siteId)} · 📅 ${d.label}: ${formatDate(d.date)} · ${dLabel}</div>
           ${responsible
             ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">אחראי: ${responsible.fullname||responsible.username} ${formatPhone(responsible.phone)}</div>`
