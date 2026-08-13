@@ -936,7 +936,6 @@ async function loadData(silent = false) {
       lastCheck: normalizeDate(e.lastCheck),
       nextCheck: normalizeDate(e.nextCheck),
       btNext: normalizeDate(e.btNext),
-      licenseNext: normalizeDate(e.licenseNext),
       imageUrl: (e.imageUrl && String(e.imageUrl) !== 'null' && String(e.imageUrl) !== 'undefined' && String(e.imageUrl).startsWith('http')) ? String(e.imageUrl) : ''
     }));
     console.log('Equipment with images:', appData.equipment.filter(e=>e.imageUrl).map(e=>({id:e.id,url:e.imageUrl})));
@@ -1152,8 +1151,7 @@ function getStatus(next) { const d = daysUntil(next); if (d <= 14) return 'dange
 // status badges, dashboard alerts and WhatsApp reminders all pick them up automatically.
 const CHECK_FIELDS = [
   { field: 'nextCheck',    label: 'תסקיר', kind: 'check',   waAction: 'לבדיקה',                 waWhat: 'תסקיר הבטיחות' },
-  { field: 'btNext',       label: 'ב.ת',   kind: 'bt',      waAction: 'לבדיקה התקופתית (ב.ת)',   waWhat: 'הבדיקה התקופתית (ב.ת)' },
-  { field: 'licenseNext',  label: 'רישוי', kind: 'license', waAction: 'לרישוי השנתי',            waWhat: 'הרישוי השנתי' }
+  { field: 'btNext',       label: 'ב.ת',   kind: 'bt',      waAction: 'לבדיקה התקופתית (ב.ת)',   waWhat: 'הבדיקה התקופתית (ב.ת)' }
 ];
 // Overall status considers all tracked dates — whichever is most urgent wins
 function getOverallStatus(e) {
@@ -1273,7 +1271,7 @@ function renderEquipmentTable() {
       <td><strong style="color:var(--blue)">${e.eqId||'—'}</strong><br><span style='font-size:11px;color:var(--text-muted)'>${e.serialNumber||''}</span></td>
       <td>${e.name}</td><td><span style="color:var(--text-muted)">${e.type||'—'}</span></td>
       <td>📍 ${getSiteName(e.siteId)}</td>
-      <td>${formatDate(e.lastCheck)}</td><td>${formatDate(e.nextCheck)}${e.btNext ? `<br><span style="font-size:11px;color:var(--text-muted)">ב.ת: ${formatDate(e.btNext)}</span>` : ''}${e.licenseNext ? `<br><span style="font-size:11px;color:var(--text-muted)">רישוי: ${formatDate(e.licenseNext)}</span>` : ''}</td>
+      <td>${formatDate(e.lastCheck)}</td><td>${formatDate(e.nextCheck)}${e.btNext ? `<br><span style="font-size:11px;color:var(--text-muted)">ב.ת: ${formatDate(e.btNext)}</span>` : ''}</td>
       <td>${statusBadge(st,days)}</td>
       <td><div class="actions-cell">
         <button class="btn-icon" onclick="viewEquipment(${e.id})" title="פרטים">👁</button>
@@ -1313,7 +1311,6 @@ function viewEquipment(id) {
       ['בדיקה אחרונה',formatDate(e.lastCheck)],
       ['בדיקה הבאה',formatDate(e.nextCheck)],
       ['ב.ת הבא',formatDate(e.btNext)],
-      ['רישוי שנתי הבא',formatDate(e.licenseNext)],
       ['סטטוס',statusBadge(st,days)],
       ['עומס עבודה בטוח', e.safeWorkLoad ? e.safeWorkLoad+' טון' : '—'],
       ['עומס מקסימלי', e.maxLoad ? e.maxLoad+' טון' : '—'],
@@ -1350,7 +1347,7 @@ function editEquipment(id) {
   sv('eq-name', e.name); sv('eq-year', e.manufacturingYear);
   const siteEl = document.getElementById('eq-site');
   if (siteEl) siteEl.value = e.siteId;
-  sv('eq-last', e.lastCheck); sv('eq-next', e.nextCheck); sv('eq-bt-next', e.btNext); sv('eq-license-next', e.licenseNext);
+  sv('eq-last', e.lastCheck); sv('eq-next', e.nextCheck); sv('eq-bt-next', e.btNext);
   sv('eq-swl', e.safeWorkLoad); sv('eq-max-load', e.maxLoad);
   sv('eq-test-load', e.testLoad); sv('eq-height', e.height);
   sv('eq-inspection-type', e.inspectionType); sv('eq-inspector', e.inspectorName);
@@ -1427,10 +1424,7 @@ const MODAL_EQ_TEMPLATE = `<div class="modal-body">
         ${dateFieldHtml('eq-last', 'בדיקה אחרונה (DD/MM/YYYY)')}
         ${dateFieldHtml('eq-next', 'בדיקה הבאה (DD/MM/YYYY)')}
       </div>
-      <div class="form-row">
-        ${dateFieldHtml('eq-bt-next', 'ב.ת הבא (DD/MM/YYYY) <span style="font-size:11px;color:var(--text-muted);text-transform:none;letter-spacing:normal">— בדיקה תקופתית</span>')}
-        ${dateFieldHtml('eq-license-next', 'רישוי שנתי הבא (DD/MM/YYYY)')}
-      </div>
+      ${dateFieldHtml('eq-bt-next', 'ב.ת הבא (DD/MM/YYYY) <span style="font-size:11px;color:var(--text-muted);text-transform:none;letter-spacing:normal">— בדיקה תקופתית</span>')}
       <div class="form-row">
         <div class="form-group"><label>עומס עבודה בטוח (טון)</label><input type="text" id="eq-swl" placeholder="טון" autocomplete="off"></div>
         <div class="form-group"><label>עומס מקסימלי (טון)</label><input type="text" id="eq-max-load" placeholder="טון" autocomplete="off"></div>
@@ -1529,7 +1523,6 @@ async function saveEquipment() {
     lastCheck: gv('eq-last'),
     nextCheck: gv('eq-next'),
     btNext: gv('eq-bt-next'),
-    licenseNext: gv('eq-license-next'),
     safeWorkLoad: gv('eq-swl'),
     maxLoad: gv('eq-max-load'),
     testLoad: gv('eq-test-load'),
@@ -1741,7 +1734,7 @@ function renderSitesNew() {
                 <div class="eq-item-info">
                   <div class="eq-item-name">${dot} ${e.name||'—'}</div>
                   <div class="eq-item-id">תסקיר: ${e.eqId||'—'} | ס/נ: ${e.serialNumber||'—'}</div>
-                  <div class="eq-item-dates">בדיקה הבאה: ${formatDate(e.nextCheck)}${e.btNext ? ` · ב.ת: ${formatDate(e.btNext)}` : ''}${e.licenseNext ? ` · רישוי: ${formatDate(e.licenseNext)}` : ''}</div>
+                  <div class="eq-item-dates">בדיקה הבאה: ${formatDate(e.nextCheck)}${e.btNext ? ` · ב.ת: ${formatDate(e.btNext)}` : ''}</div>
                 </div>
                 ${statusBadge(st, days)}
               </div>`;
