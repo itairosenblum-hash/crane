@@ -1643,8 +1643,12 @@ async function analyzeImage(dataUrl, fileType) {
   const isPDF = mediaType === 'application/pdf';
   try {
     const PROMPT = `You are analyzing a Hebrew safety inspection certificate ("תסקיר בדיקה וניסוי מכונות-הרמה") for lifting equipment in Israel.
-Study the document carefully. Extract these fields and return ONLY a valid JSON object, no markdown:
-{"inspectionNumber":"מספר תסקיר from top-left box","serialNumber":"מספר רישוי או מספר צ' (רישוי צבאי) of the equipment (NOT inspection number)","manufacturingYear":"שנת יצור","type":"equipment type in Hebrew e.g. מלגזה","manufacturer":"manufacturer name","model":"model number","lastCheck":"תאריך בדיקה מוכחת as DD/MM/YYYY","nextCheck":"תאריך בדיקה הבאה as DD/MM/YYYY","safeWorkLoad":"עומס עבודה בטוח numeric only","maxLoad":"עומס מקסימלי numeric only","testLoad":"עומס מבחן numeric only","height":"רדיוס/גובה numeric only","inspectionType":"סוג בדיקה","notes":"section 4 הערות"}
+Study section 2 ("תיאור המתקן") carefully - it contains SEVERAL different id numbers that look similar but must NOT be confused with each other:
+- "מספר רישוי" (sometimes written as "צ'" or with a צ' prefix like צ'10242) = the LICENSE/REGISTRATION number - THIS is what you must extract as serialNumber.
+- "מס' שילדה" = chassis number - this is a DIFFERENT field, do NOT use it for serialNumber.
+- the serial number embedded inside the "יצרן, דגם, מספר סידורי" manufacturer/model row (e.g. after a model code like 8FBU25MV) - this is also a DIFFERENT field, do NOT use it for serialNumber.
+Extract these fields and return ONLY a valid JSON object, no markdown:
+{"inspectionNumber":"מספר תסקיר from top-left box","serialNumber":"ONLY the value explicitly labeled מספר רישוי (license/registration number, possibly prefixed with צ'). If no field is explicitly labeled מספר רישוי anywhere in the document, return null - never substitute מס' שילדה or the model's serial number","manufacturingYear":"שנת יצור","type":"equipment type in Hebrew e.g. מלגזה","manufacturer":"manufacturer name","model":"model number","lastCheck":"תאריך בדיקה מוכחת as DD/MM/YYYY","nextCheck":"תאריך בדיקה הבאה as DD/MM/YYYY","safeWorkLoad":"עומס עבודה בטוח numeric only","maxLoad":"עומס מקסימלי numeric only","testLoad":"עומס מבחן numeric only","height":"רדיוס/גובה numeric only","inspectionType":"סוג בדיקה","notes":"section 4 הערות"}
 Rules: dates as DD/MM/YYYY, null for missing, JSON only.`;
 
     // Always send as image (PDF converted to image in handleFile)
