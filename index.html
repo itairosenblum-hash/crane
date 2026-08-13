@@ -1413,7 +1413,7 @@ const MODAL_EQ_TEMPLATE = `<div class="modal-body">
         <div class="form-group"><label>מספר רישוי / צ' (רישוי צבאי)</label><input type="text" id="eq-serial" placeholder="הזן מספר רישוי / צ'" autocomplete="off"></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>סוג האמצעי</label><input type="text" id="eq-type" placeholder="סוג האמצעי" autocomplete="off"></div>
+        <div class="form-group"><label>סוג האמצעי</label><select id="eq-type" onchange="handleTypeSelectChange(this)"></select></div>
         <div class="form-group"><label>יצרן</label><input type="text" id="eq-manufacturer" placeholder="שם היצרן" autocomplete="off"></div>
       </div>
       <div class="form-row">
@@ -1463,6 +1463,7 @@ function rebuildModalBody() {
     el.value = '';
   });
   populateEqSites();
+  populateEqTypes();
 }
 
 function openAddModal() {
@@ -1474,6 +1475,39 @@ function openAddModal() {
 function populateEqSites() {
   document.getElementById('eq-site').innerHTML = appData.sites.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
   if (currentUser.siteId) document.getElementById('eq-site').value = currentUser.siteId;
+}
+// Populates the equipment-type dropdown from all distinct types already used in the data,
+// plus an option to add a brand new type on the fly.
+function populateEqTypes(selected) {
+  const sel = document.getElementById('eq-type');
+  if (!sel) return;
+  const types = [...new Set(appData.equipment.map(e => e.type).filter(Boolean))].sort((a,b) => a.localeCompare(b, 'he'));
+  const current = selected || '';
+  let optionsHtml = '<option value="">-- בחר סוג --</option>' + types.map(t => `<option value="${t}">${t}</option>`).join('');
+  if (current && !types.includes(current)) optionsHtml += `<option value="${current}">${current}</option>`;
+  optionsHtml += '<option value="__custom__">➕ הוסף סוג חדש...</option>';
+  sel.innerHTML = optionsHtml;
+  sel.value = current;
+}
+// When the user picks "add new type", prompt for free text and add it as a real option
+function handleTypeSelectChange(selectEl) {
+  if (selectEl.value !== '__custom__') return;
+  const newType = prompt('הזן סוג אמצעי חדש:');
+  if (newType && newType.trim()) {
+    const val = newType.trim();
+    const customOpt = selectEl.querySelector('option[value="__custom__"]');
+    const existing = Array.from(selectEl.options).find(o => o.value === val);
+    if (existing) {
+      selectEl.value = val;
+    } else {
+      const opt = document.createElement('option');
+      opt.value = val; opt.textContent = val;
+      selectEl.insertBefore(opt, customOpt);
+      selectEl.value = val;
+    }
+  } else {
+    selectEl.value = '';
+  }
 }
 async function compressImage(dataUrl, maxWidth=1200, quality=0.75) {
   return new Promise(resolve => {
@@ -1680,7 +1714,17 @@ Rules: dates as DD/MM/YYYY, null for missing, JSON only.`;
     try { parsed = JSON.parse(rawText); } catch { try { const m = rawText.match(/\{[\s\S]*\}/); if (m) parsed = JSON.parse(m[0]); } catch(e2) { console.error('Parse failed:', rawText); } }
     document.getElementById('ai-loading').style.display = 'none';
     document.getElementById('ai-result-box').style.display = 'block';
-    const setF = (id, val) => { const el = document.getElementById(id); if(el && val && String(val) !== 'null' && String(val).trim() !== '') el.value = val; };
+    const setF = (id, val) => {
+      const el = document.getElementById(id);
+      if (!el || !val || String(val) === 'null' || String(val).trim() === '') return;
+      if (el.tagName === 'SELECT' && !Array.from(el.options).some(o => o.value === val)) {
+        const customOpt = el.querySelector('option[value="__custom__"]');
+        const opt = document.createElement('option');
+        opt.value = val; opt.textContent = val;
+        if (customOpt) el.insertBefore(opt, customOpt); else el.appendChild(opt);
+      }
+      el.value = val;
+    };
     setF('eq-id', parsed.inspectionNumber);
     setF('eq-serial', parsed.serialNumber);
     setF('eq-type', parsed.type);
