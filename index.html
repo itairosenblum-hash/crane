@@ -1239,7 +1239,7 @@ function renderDashboard() {
     return `<div class="alert-item ${cls}">
       <div class="alert-dot ${cls}"></div>
       <div class="alert-info">
-        <div class="alert-name">${kindTag}${e.name} <span style="color:var(--text-muted);font-size:12px;font-weight:400">(${e.eqId})</span></div>
+        <div class="alert-name">${kindTag}${e.name} <span style="color:var(--text-muted);font-size:12px;font-weight:400">(${e.serialNumber||'—'})</span></div>
         <div class="alert-meta">📍 ${getSiteName(e.siteId)} · 📅 ${d.label}: ${formatDate(d.date)}</div>
       </div>
       <span class="alert-days ${cls}">${daysTxt}</span>
