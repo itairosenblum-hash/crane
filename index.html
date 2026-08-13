@@ -885,7 +885,7 @@ const GEMINI_KEY_STORE = 'safety_or_key';
 const SCRIPT_URL_STORE = 'safety_script_url';
 const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw3kpsA7h1e_5Rg-vs1ndNULRTH-Vjkz7thKquEE-LDhvVbsaflrmwrsXMHYiJ5Lv1PKw/exec';
 
-let appData = { sites: [], equipment: [], users: [] };
+let appData = { sites: [], equipment: [], users: [], equipmentTypes: [] };
 let currentUser = null;
 let editingEqId = null;
 
@@ -940,6 +940,7 @@ async function loadData(silent = false) {
     }));
     console.log('Equipment with images:', appData.equipment.filter(e=>e.imageUrl).map(e=>({id:e.id,url:e.imageUrl})));
     appData.users = data.users || [];
+    appData.equipmentTypes = (data.equipmentTypes || []).map(t => String(t||'').trim()).filter(Boolean);
     setSyncStatus('ok', '● מחובר');
     refreshCurrentTab();
   } catch(e) { setSyncStatus('err', '● שגיאה'); }
@@ -1476,12 +1477,16 @@ function populateEqSites() {
   document.getElementById('eq-site').innerHTML = appData.sites.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
   if (currentUser.siteId) document.getElementById('eq-site').value = currentUser.siteId;
 }
-// Populates the equipment-type dropdown from all distinct types already used in the data,
-// plus an option to add a brand new type on the fly.
+// Populates the equipment-type dropdown from the managed "EquipmentTypes" list on the sheet.
+// Falls back to aggregating distinct types already used on equipment records if that list
+// is empty (e.g. the Apps Script hasn't been updated/redeployed with the new sheet yet).
 function populateEqTypes(selected) {
   const sel = document.getElementById('eq-type');
   if (!sel) return;
-  const types = [...new Set(appData.equipment.map(e => e.type).filter(Boolean))].sort((a,b) => a.localeCompare(b, 'he'));
+  const source = (appData.equipmentTypes && appData.equipmentTypes.length)
+    ? appData.equipmentTypes
+    : [...new Set(appData.equipment.map(e => e.type).filter(Boolean))];
+  const types = [...new Set(source)].sort((a,b) => a.localeCompare(b, 'he'));
   const current = selected || '';
   let optionsHtml = '<option value="">-- בחר סוג --</option>' + types.map(t => `<option value="${t}">${t}</option>`).join('');
   if (current && !types.includes(current)) optionsHtml += `<option value="${current}">${current}</option>`;
@@ -1489,8 +1494,9 @@ function populateEqTypes(selected) {
   sel.innerHTML = optionsHtml;
   sel.value = current;
 }
-// When the user picks "add new type", prompt for free text and add it as a real option
-function handleTypeSelectChange(selectEl) {
+// When the user picks "add new type", prompt for free text, add it as a real option locally,
+// and persist it to the EquipmentTypes sheet so it's available everywhere going forward.
+async function handleTypeSelectChange(selectEl) {
   if (selectEl.value !== '__custom__') return;
   const newType = prompt('הזן סוג אמצעי חדש:');
   if (newType && newType.trim()) {
@@ -1504,6 +1510,11 @@ function handleTypeSelectChange(selectEl) {
       opt.value = val; opt.textContent = val;
       selectEl.insertBefore(opt, customOpt);
       selectEl.value = val;
+    }
+    if (!appData.equipmentTypes.includes(val)) {
+      appData.equipmentTypes.push(val);
+      try { await apiPost({ action: 'addEquipmentType', data: { type: val } }); }
+      catch(e) { console.error('Failed to persist new equipment type:', e); }
     }
   } else {
     selectEl.value = '';
