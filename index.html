@@ -613,8 +613,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
     <div class="tabs-wrap">
       <button class="tab-btn active" onclick="showTab('dashboard',this)"><span class="tab-icon">📊</span> לוח בקרה</button>
       <button class="tab-btn" onclick="showTab('equipment',this)"><span class="tab-icon">🏗️</span> אמצעים</button>
-      <button class="tab-btn" id="tab-sites-btn" onclick="showTab('sites',this)"><span class="tab-icon">📍</span> אתרים</button>
-      <button class="tab-btn" id="tab-users-btn" onclick="showTab('users',this)"><span class="tab-icon">👥</span> משתמשים</button>
+      <button class="tab-btn" id="tab-settings-btn" onclick="showTab('settings',this)"><span class="tab-icon">⚙️</span> הגדרות</button>
       <button class="tab-btn" id="tab-wa-btn" onclick="showTab('whatsapp',this)"><span class="tab-icon">💬</span> WhatsApp</button>
     </div>
 
@@ -684,22 +683,37 @@ tr:hover td { background: rgba(30,77,183,0.02); }
       </div>
     </div>
 
-    <!-- SITES -->
-    <div id="tab-sites-content" style="display:none">
+    <!-- SETTINGS (Users, Sites, Equipment Types) -->
+    <div id="tab-settings-content" style="display:none">
       <div class="page-header">
-        <div><h2>ניהול אתרים</h2><p>אמצעים לפי אתר וסוג</p></div>
-        <button class="btn-add" onclick="openSiteModal()">+ הוסף אתר</button>
+        <div><h2>⚙️ הגדרות</h2><p>ניהול משתמשים, אתרים וסוגי אמצעים</p></div>
       </div>
-      <div id="sites-content"></div>
-    </div>
 
-    <!-- USERS -->
-    <div id="tab-users-content" style="display:none">
-      <div class="page-header">
-        <div><h2>ניהול משתמשים</h2><p>הוספה, עריכה וצוות לאתרים</p></div>
-        <button class="btn-add" onclick="openUserModal()">+ הוסף משתמש</button>
+      <!-- Equipment Types -->
+      <div class="settings-card">
+        <h3>🔧 סוגי אמצעים</h3>
+        <div id="settings-types-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:1rem"></div>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="new-type-input" placeholder="סוג אמצעי חדש" autocomplete="off" style="flex:1;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit;background:var(--card);color:var(--text)" onkeydown="if(event.key==='Enter'){event.preventDefault();addNewEquipmentType();}">
+          <button class="btn-primary-sm" onclick="addNewEquipmentType()">+ הוסף</button>
+        </div>
       </div>
-      <div class="section-card">
+
+      <!-- Sites -->
+      <div class="settings-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+          <h3 style="margin:0">📍 אתרים</h3>
+          <button class="btn-add" onclick="openSiteModal()">+ הוסף אתר</button>
+        </div>
+        <div id="sites-content"></div>
+      </div>
+
+      <!-- Users -->
+      <div class="settings-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+          <h3 style="margin:0">👥 משתמשים</h3>
+          <button class="btn-add" onclick="openUserModal()">+ הוסף משתמש</button>
+        </div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>שם מלא</th><th>שם משתמש</th><th>תפקיד</th><th>אתר משויך</th><th>טלפון</th><th>פעולות</th></tr></thead>
@@ -982,8 +996,7 @@ async function doLogin() {
     document.getElementById('nav-user-name').textContent = currentUser.fullname + (currentUser.role === 'admin' ? ' 👑' : '');
     document.getElementById('main-nav').style.display = 'flex';
     if (currentUser.role !== 'admin') {
-      document.getElementById('tab-sites-btn').style.display = 'none';
-      document.getElementById('tab-users-btn').style.display = 'none';
+      document.getElementById('tab-settings-btn').style.display = 'none';
       document.getElementById('tab-wa-btn').style.display = 'none';
     } else {
       document.getElementById('btn-add-eq').style.display = '';
@@ -1024,15 +1037,19 @@ function showTab(tab, btn) {
   currentTab = tab;
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  ['tab-dashboard','tab-equipment','tab-sites-content','tab-users-content','tab-wa-content'].forEach(id => document.getElementById(id).style.display = 'none');
+  ['tab-dashboard','tab-equipment','tab-settings-content','tab-wa-content'].forEach(id => document.getElementById(id).style.display = 'none');
   if (tab === 'dashboard') { document.getElementById('tab-dashboard').style.display = ''; renderDashboard(); }
   if (tab === 'equipment') { 
     document.getElementById('tab-equipment').style.display = ''; 
     populateSiteFilter(); 
     renderEquipmentTable(); 
   }
-  if (tab === 'sites') { document.getElementById('tab-sites-content').style.display = ''; renderSitesNew(); }
-  if (tab === 'users') { document.getElementById('tab-users-content').style.display = ''; renderUsersTable(); }
+  if (tab === 'settings') {
+    document.getElementById('tab-settings-content').style.display = '';
+    renderSitesNew();
+    renderUsersTable();
+    renderEquipmentTypesSettings();
+  }
   if (tab === 'whatsapp') { document.getElementById('tab-wa-content').style.display = ''; renderWaTab(); }
 }
 function refreshCurrentTab() { 
@@ -1828,6 +1845,46 @@ function renderUsersTable() {
       </div></td>
     </tr>`;
   }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:2rem">אין משתמשים</td></tr>';
+}
+
+// ===== SETTINGS: EQUIPMENT TYPES =====
+function renderEquipmentTypesSettings() {
+  const container = document.getElementById('settings-types-list');
+  if (!container) return;
+  const types = [...(appData.equipmentTypes||[])].sort((a,b) => a.localeCompare(b, 'he'));
+  if (!types.length) {
+    container.innerHTML = '<div style="color:var(--text-muted);font-size:13px">אין עדיין סוגי אמצעים ברשימה — הוסף למטה</div>';
+    return;
+  }
+  container.innerHTML = types.map(t => `
+    <span style="display:inline-flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:6px 8px 6px 14px;font-size:13px">
+      ${t}
+      <button onclick="deleteEquipmentTypeUI('${t.replace(/'/g,"\\'")}')" title="מחק סוג" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:14px;padding:0;line-height:1;display:flex;align-items:center">✕</button>
+    </span>`).join('');
+}
+async function addNewEquipmentType() {
+  const input = document.getElementById('new-type-input');
+  const val = (input.value||'').trim();
+  if (!val) { alert('נא להזין סוג אמצעי'); return; }
+  if (appData.equipmentTypes.includes(val)) { alert('הסוג הזה כבר קיים ברשימה'); return; }
+  appData.equipmentTypes.push(val);
+  renderEquipmentTypesSettings();
+  input.value = '';
+  try {
+    const res = await apiPost({ action: 'addEquipmentType', data: { type: val } });
+    if (!res || res.ok === false) { alert('שגיאה בשמירת הסוג בשרת: ' + (res && res.msg || '')); return; }
+    showToast('סוג אמצעי נוסף ✓');
+  } catch(e) { alert('שגיאת רשת בשמירת הסוג: ' + e.message); }
+}
+async function deleteEquipmentTypeUI(type) {
+  if (!confirm(`למחוק את הסוג "${type}" מהרשימה? (אמצעים קיימים מהסוג הזה לא יושפעו)`)) return;
+  appData.equipmentTypes = appData.equipmentTypes.filter(t => t !== type);
+  renderEquipmentTypesSettings();
+  try {
+    const res = await apiPost({ action: 'deleteEquipmentType', data: { type } });
+    if (!res || res.ok === false) { alert('שגיאה במחיקת הסוג בשרת: ' + (res && res.msg || '')); await loadData(true); return; }
+    showToast('סוג אמצעי הוסר');
+  } catch(e) { alert('שגיאת רשת במחיקת הסוג: ' + e.message); await loadData(true); }
 }
 
 function renderSites() {
