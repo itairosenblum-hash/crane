@@ -1499,6 +1499,17 @@ async function saveEquipment() {
   const eqId = document.getElementById('eq-id').value.trim();
   const name = document.getElementById('eq-name').value.trim();
   if (!eqId || !name) { alert('נא למלא מספר מזהה ושם'); return; }
+  // Duplicate detection: warn if this מספר תסקיר or מספר רישוי/צ' already exists on another equipment record
+  const serialNumberVal = document.getElementById('eq-serial').value.trim();
+  const dupEqId = appData.equipment.find(e => e.id !== editingEqId && String(e.eqId||'').trim() === eqId);
+  const dupSerial = serialNumberVal ? appData.equipment.find(e => e.id !== editingEqId && String(e.serialNumber||'').trim() === serialNumberVal) : null;
+  if (dupEqId || dupSerial) {
+    const msgs = [];
+    if (dupEqId) msgs.push(`⚠️ מספר תסקיר "${eqId}" כבר קיים במערכת עבור: ${dupEqId.name} (${getSiteName(dupEqId.siteId)})`);
+    if (dupSerial) msgs.push(`⚠️ מספר רישוי / צ' "${serialNumberVal}" כבר קיים במערכת עבור: ${dupSerial.name} (${getSiteName(dupSerial.siteId)})`);
+    const proceed = confirm(msgs.join('\n') + '\n\nהאם להמשיך בכל זאת ולשמור?');
+    if (!proceed) return;
+  }
   const imgEl = document.getElementById('img-preview');
   const hasNewImage = imgEl.style.display !== 'none' && imgEl.src.startsWith('data:');
   let imageData = '';
