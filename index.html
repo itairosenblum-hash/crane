@@ -613,6 +613,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
     <div class="tabs-wrap">
       <button class="tab-btn active" onclick="showTab('dashboard',this)"><span class="tab-icon">📊</span> לוח בקרה</button>
       <button class="tab-btn" onclick="showTab('equipment',this)"><span class="tab-icon">🏗️</span> אמצעים</button>
+      <button class="tab-btn" id="tab-sites-btn" onclick="showTab('sites',this)"><span class="tab-icon">📍</span> אתרים</button>
       <button class="tab-btn" id="tab-settings-btn" onclick="showTab('settings',this)"><span class="tab-icon">⚙️</span> הגדרות</button>
       <button class="tab-btn" id="tab-wa-btn" onclick="showTab('whatsapp',this)"><span class="tab-icon">💬</span> WhatsApp</button>
     </div>
@@ -705,7 +706,12 @@ tr:hover td { background: rgba(30,77,183,0.02); }
           <h3 style="margin:0">📍 אתרים</h3>
           <button class="btn-add" onclick="openSiteModal()">+ הוסף אתר</button>
         </div>
-        <div id="sites-content"></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>שם האתר</th><th>אמצעים</th><th>פעולות</th></tr></thead>
+            <tbody id="settings-sites-tbody"></tbody>
+          </table>
+        </div>
       </div>
 
       <!-- Users -->
@@ -721,6 +727,14 @@ tr:hover td { background: rgba(30,77,183,0.02); }
           </table>
         </div>
       </div>
+    </div>
+
+    <!-- SITES (equipment grouped by site, view-only) -->
+    <div id="tab-sites-content" style="display:none">
+      <div class="page-header">
+        <div><h2>📍 אתרים</h2><p>אמצעים לפי אתר וסוג</p></div>
+      </div>
+      <div id="sites-content"></div>
     </div>
 
     <!-- WHATSAPP -->
@@ -996,6 +1010,7 @@ async function doLogin() {
     document.getElementById('nav-user-name').textContent = currentUser.fullname + (currentUser.role === 'admin' ? ' 👑' : '');
     document.getElementById('main-nav').style.display = 'flex';
     if (currentUser.role !== 'admin') {
+      document.getElementById('tab-sites-btn').style.display = 'none';
       document.getElementById('tab-settings-btn').style.display = 'none';
       document.getElementById('tab-wa-btn').style.display = 'none';
     } else {
@@ -1037,16 +1052,17 @@ function showTab(tab, btn) {
   currentTab = tab;
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  ['tab-dashboard','tab-equipment','tab-settings-content','tab-wa-content'].forEach(id => document.getElementById(id).style.display = 'none');
+  ['tab-dashboard','tab-equipment','tab-sites-content','tab-settings-content','tab-wa-content'].forEach(id => document.getElementById(id).style.display = 'none');
   if (tab === 'dashboard') { document.getElementById('tab-dashboard').style.display = ''; renderDashboard(); }
   if (tab === 'equipment') { 
     document.getElementById('tab-equipment').style.display = ''; 
     populateSiteFilter(); 
     renderEquipmentTable(); 
   }
+  if (tab === 'sites') { document.getElementById('tab-sites-content').style.display = ''; renderSitesNew(); }
   if (tab === 'settings') {
     document.getElementById('tab-settings-content').style.display = '';
-    renderSitesNew();
+    renderSettingsSitesList();
     renderUsersTable();
     renderEquipmentTypesSettings();
   }
@@ -1816,15 +1832,28 @@ function renderSitesNew() {
     return `<div class="site-card">
       <div class="site-card-header">
         <h3>📍 ${site.name}</h3>
-        <div style="display:flex;gap:8px;align-items:center">
-          <span style="color:#94a3b8;font-size:13px">${siteEqs.length} אמצעים</span>
-          <button class="btn-icon" onclick="editSite(${site.id})" style="border-color:rgba(255,255,255,0.2);color:white;background:rgba(255,255,255,0.1)" title="עריכה">✏️</button>
-          <button class="btn-icon del" onclick="deleteSite(${site.id})" style="border-color:rgba(255,255,255,0.2);color:#f87171;background:rgba(220,38,38,0.15)" title="מחיקה">🗑</button>
-        </div>
+        <span style="color:#94a3b8;font-size:13px">${siteEqs.length} אמצעים</span>
       </div>
       <div class="site-card-body">${typesHtml}</div>
     </div>`;
   }).join('');
+}
+
+// Simple management list for Settings — just names + edit/delete, no equipment breakdown
+function renderSettingsSitesList() {
+  const tbody = document.getElementById('settings-sites-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = appData.sites.map(site => {
+    const cnt = appData.equipment.filter(e => e.siteId == site.id).length;
+    return `<tr>
+      <td><strong>📍 ${site.name}</strong></td>
+      <td><span class="badge badge-ok">${cnt} אמצעים</span></td>
+      <td><div class="actions-cell">
+        <button class="btn-icon" onclick="editSite(${site.id})" title="עריכה">✏️</button>
+        <button class="btn-icon del" onclick="deleteSite(${site.id})" title="מחיקה">🗑</button>
+      </div></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:2rem">לא נמצאו אתרים</td></tr>';
 }
 
 function renderUsersTable() {
