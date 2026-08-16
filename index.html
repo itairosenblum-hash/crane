@@ -694,6 +694,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
           <button class="btn-add" id="btn-add-eq" onclick="openAddModal()" style="display:none">+ הוסף אמצעי</button>
         </div>
       </div>
+      <div class="stats-grid" id="eq-stats-grid"></div>
       <div class="section-card">
         <div class="section-head">
           <div class="filter-row" style="margin:0">
@@ -726,7 +727,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
         <div><h2>👷 מנופאים</h2><p>מעקב אחר מנופאים, רישיונות ותוקפים</p></div>
         <button class="btn-add" id="btn-add-op" onclick="openAddOperatorModal()" style="display:none">+ הוסף מנופאי</button>
       </div>
-      <div class="op-status-pills" id="op-stats-grid"></div>
+      <div class="stats-grid" id="op-stats-grid"></div>
       <div class="section-card">
         <div class="section-head">
           <div class="filter-row" style="margin:0">
@@ -1532,6 +1533,24 @@ function getFilteredEquipment() {
   if (q) eqs = eqs.filter(e => (e.name||'').toLowerCase().includes(q) || (e.eqId||'').toLowerCase().includes(q) || (e.serialNumber||'').toLowerCase().includes(q));
   return eqs;
 }
+function renderEquipmentStats() {
+  const eqs = getUserEquipment();
+  const danger = eqs.filter(e => getOverallStatus(e) === 'danger').length;
+  const warn = eqs.filter(e => getOverallStatus(e) === 'warn').length;
+  const ok = eqs.length - danger - warn;
+  const stf = document.getElementById('filter-status') ? document.getElementById('filter-status').value : '';
+  const active = (f) => stf === f ? ' active' : '';
+  document.getElementById('eq-stats-grid').innerHTML = `
+    <div class="stat-card${active('')}" onclick="setEquipmentFilter('')"><div class="stat-icon blue">🏗️</div><div class="stat-info"><div class="stat-label">סה"כ אמצעים</div><div class="stat-value blue">${eqs.length}</div></div></div>
+    <div class="stat-card${active('danger')}" onclick="setEquipmentFilter('danger')"><div class="stat-icon red">🚨</div><div class="stat-info"><div class="stat-label">דחוף / פג תוקף</div><div class="stat-value red">${danger}</div></div></div>
+    <div class="stat-card${active('warn')}" onclick="setEquipmentFilter('warn')"><div class="stat-icon amber">⏰</div><div class="stat-info"><div class="stat-label">קרוב לבדיקה</div><div class="stat-value amber">${warn}</div></div></div>
+    <div class="stat-card${active('ok')}" onclick="setEquipmentFilter('ok')"><div class="stat-icon green">✅</div><div class="stat-info"><div class="stat-label">תקין</div><div class="stat-value green">${ok}</div></div></div>`;
+}
+function setEquipmentFilter(f) {
+  const sel = document.getElementById('filter-status');
+  sel.value = (sel.value === f) ? '' : f;
+  renderEquipmentTable();
+}
 function renderEquipmentTable() {
   const eqs = getFilteredEquipment();
   const isAdmin = currentUser.role === 'admin';
@@ -1551,6 +1570,7 @@ function renderEquipmentTable() {
       </div></td>
     </tr>`;
   }).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:2rem">לא נמצאו אמצעים</td></tr>';
+  renderEquipmentStats();
 }
 function viewEquipment(id) {
   const e = appData.equipment.find(x => x.id === id);
@@ -2245,10 +2265,10 @@ function renderOperatorStats() {
   const stf = document.getElementById('op-filter-status') ? document.getElementById('op-filter-status').value : '';
   const active = (f) => stf === f ? ' active' : '';
   document.getElementById('op-stats-grid').innerHTML = `
-    <button class="op-status-pill p-all${active('')}" onclick="setOperatorFilter('')"><span class="dot" style="background:var(--blue)"></span>הכל <strong>${ops.length}</strong></button>
-    <button class="op-status-pill p-danger${active('danger')}" onclick="setOperatorFilter('danger')"><span class="dot" style="background:var(--danger)"></span>דחוף / פג תוקף <strong>${danger}</strong></button>
-    <button class="op-status-pill p-warn${active('warn')}" onclick="setOperatorFilter('warn')"><span class="dot" style="background:var(--accent)"></span>קרוב לפוג תוקף <strong>${warn}</strong></button>
-    <button class="op-status-pill p-ok${active('ok')}" onclick="setOperatorFilter('ok')"><span class="dot" style="background:var(--success)"></span>בתוקף <strong>${ok}</strong></button>`;
+    <div class="stat-card${active('')}" onclick="setOperatorFilter('')"><div class="stat-icon blue">👷</div><div class="stat-info"><div class="stat-label">סה"כ מנופאים</div><div class="stat-value blue">${ops.length}</div></div></div>
+    <div class="stat-card${active('danger')}" onclick="setOperatorFilter('danger')"><div class="stat-icon red">🚨</div><div class="stat-info"><div class="stat-label">דחוף / פג תוקף</div><div class="stat-value red">${danger}</div></div></div>
+    <div class="stat-card${active('warn')}" onclick="setOperatorFilter('warn')"><div class="stat-icon amber">⏰</div><div class="stat-info"><div class="stat-label">קרוב לפוג תוקף</div><div class="stat-value amber">${warn}</div></div></div>
+    <div class="stat-card${active('ok')}" onclick="setOperatorFilter('ok')"><div class="stat-icon green">✅</div><div class="stat-info"><div class="stat-label">בתוקף</div><div class="stat-value green">${ok}</div></div></div>`;
 }
 function setOperatorFilter(f) {
   const sel = document.getElementById('op-filter-status');
