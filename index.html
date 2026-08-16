@@ -141,9 +141,10 @@ nav {
 .stat-card {
   background: var(--card); border-radius: var(--radius); border: 1px solid var(--border);
   padding: 1.25rem 1.5rem; display: flex; align-items: center; gap: 1rem;
-  transition: box-shadow 0.2s;
+  transition: box-shadow 0.2s, border-color 0.2s; cursor: pointer;
 }
 .stat-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+.stat-card.active { border-color: var(--blue); box-shadow: 0 0 0 2px rgba(30,77,183,0.15); }
 .stat-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
 .stat-icon.blue { background: rgba(30,77,183,0.1); }
 .stat-icon.red { background: rgba(220,38,38,0.1); }
@@ -171,15 +172,18 @@ nav {
 }
 .alert-item.red { background: var(--danger-light); border-color: #fecaca; }
 .alert-item.amber { background: var(--accent-light); border-color: #fde68a; }
+.alert-item.green { background: var(--success-light); border-color: #bbf7d0; }
 .alert-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 .alert-dot.red { background: var(--danger); }
 .alert-dot.amber { background: var(--accent); }
+.alert-dot.green { background: var(--success); }
 .alert-info { flex: 1; min-width: 0; }
 .alert-name { font-size: 14px; font-weight: 600; }
 .alert-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 .alert-days { font-size: 13px; font-weight: 700; white-space: nowrap; }
 .alert-days.red { color: var(--danger); }
 .alert-days.amber { color: #b45309; }
+.alert-days.green { color: var(--success); }
 
 /* BUTTONS */
 .btn-add {
@@ -649,7 +653,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
       <div class="stats-grid" id="stats-grid"></div>
       <div class="section-card">
         <div class="section-head">
-          <h3>⚠️ התראות קרובות</h3>
+          <h3 id="alerts-title">⚠️ התראות קרובות</h3>
         </div>
         <div class="section-body" id="alerts-list"></div>
       </div>
@@ -1083,6 +1087,7 @@ function togglePass() {
 // ===== PAGES / TABS =====
 function showPage(id) { document.querySelectorAll('.page').forEach(p => p.classList.remove('active')); document.getElementById(id).classList.add('active'); if (id === 'page-setup') document.getElementById('script-url-input').value = getScriptUrl(); }
 let currentTab = 'dashboard';
+let dashboardFilter = 'all'; // 'all' | 'danger' | 'warn' | 'ok' — set by clicking a dashboard stat card
 function showTab(tab, btn) {
   currentTab = tab;
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -1261,6 +1266,19 @@ function getDueChecks(eqs, maxDays = 30) {
   });
   return due.sort((a,b) => a.days - b.days);
 }
+// Returns the single soonest tracked date for an equipment (used when a dashboard
+// status filter is active, so even "ok" equipment far outside the 30-day window
+// still has a representative date to display)
+function getNextRelevantCheck(e) {
+  let best = null;
+  CHECK_FIELDS.forEach(cf => {
+    const val = e[cf.field];
+    if (!val || String(val).trim() === '') return;
+    const days = daysUntil(val);
+    if (!best || days < best.days) best = { kind: cf.kind, label: cf.label, date: val, days, waAction: cf.waAction, waWhat: cf.waWhat };
+  });
+  return best;
+}
 function statusBadge(st, days) {
   const L = { ok:'תקין', warn:'קרוב לבדיקה', danger: days < 0 ? 'פג תוקף!' : 'דחוף' };
   const C = { ok:'badge-ok', warn:'badge-warn', danger:'badge-danger' };
@@ -1306,29 +1324,56 @@ function renderDashboard() {
   const danger = eqs.filter(e => getOverallStatus(e) === 'danger').length;
   const warn = eqs.filter(e => getOverallStatus(e) === 'warn').length;
   const ok = eqs.length - danger - warn;
+  const active = (f) => dashboardFilter === f ? ' active' : '';
   document.getElementById('stats-grid').innerHTML = `
-    <div class="stat-card"><div class="stat-icon blue">🏗️</div><div class="stat-info"><div class="stat-label">סה"כ אמצעים</div><div class="stat-value blue">${eqs.length}</div></div></div>
-    <div class="stat-card"><div class="stat-icon red">🚨</div><div class="stat-info"><div class="stat-label">דחוף / פג תוקף</div><div class="stat-value red">${danger}</div></div></div>
-    <div class="stat-card"><div class="stat-icon amber">⏰</div><div class="stat-info"><div class="stat-label">קרוב לבדיקה</div><div class="stat-value amber">${warn}</div></div></div>
-    <div class="stat-card"><div class="stat-icon green">✅</div><div class="stat-info"><div class="stat-label">תקין</div><div class="stat-value green">${ok}</div></div></div>`;
-  const due = getDueChecks(eqs, 30);
-  if (!due.length) { document.getElementById('alerts-list').innerHTML = '<div style="color:var(--text-muted);font-size:14px;padding:0.5rem 0;display:flex;align-items:center;gap:8px"><span style="font-size:20px">✅</span> אין התראות פעילות — כל האמצעים תקינים</div>'; return; }
-  document.getElementById('alerts-list').innerHTML = due.map(d => {
+    <div class="stat-card${active('all')}" onclick="setDashboardFilter('all')"><div class="stat-icon blue">🏗️</div><div class="stat-info"><div class="stat-label">סה"כ אמצעים</div><div class="stat-value blue">${eqs.length}</div></div></div>
+    <div class="stat-card${active('danger')}" onclick="setDashboardFilter('danger')"><div class="stat-icon red">🚨</div><div class="stat-info"><div class="stat-label">דחוף / פג תוקף</div><div class="stat-value red">${danger}</div></div></div>
+    <div class="stat-card${active('warn')}" onclick="setDashboardFilter('warn')"><div class="stat-icon amber">⏰</div><div class="stat-info"><div class="stat-label">קרוב לבדיקה</div><div class="stat-value amber">${warn}</div></div></div>
+    <div class="stat-card${active('ok')}" onclick="setDashboardFilter('ok')"><div class="stat-icon green">✅</div><div class="stat-info"><div class="stat-label">תקין</div><div class="stat-value green">${ok}</div></div></div>`;
+
+  const titleMap = { all: '⚠️ התראות קרובות', danger: '🚨 דחוף / פג תוקף', warn: '⏰ קרוב לבדיקה', ok: '✅ תקין' };
+  const clearBtn = dashboardFilter !== 'all' ? ` <button onclick="setDashboardFilter('all')" class="btn-secondary" style="font-size:11px;padding:3px 10px;margin-right:8px;font-weight:500">✕ נקה סינון</button>` : '';
+  document.getElementById('alerts-title').innerHTML = titleMap[dashboardFilter] + clearBtn;
+
+  let items;
+  if (dashboardFilter === 'all') {
+    items = getDueChecks(eqs, 30);
+  } else {
+    // A status filter is active: show every matching equipment (not just those due within 30 days),
+    // using each one's soonest tracked date for display.
+    items = eqs.filter(e => getOverallStatus(e) === dashboardFilter).map(e => {
+      const nc = getNextRelevantCheck(e);
+      return nc ? { eq: e, kind: nc.kind, label: nc.label, date: nc.date, days: nc.days } : { eq: e, kind: 'check', label: '', date: '', days: 9999 };
+    }).sort((a,b) => a.days - b.days);
+  }
+
+  if (!items.length) {
+    const emptyMsg = dashboardFilter === 'all' ? 'אין התראות פעילות — כל האמצעים תקינים' : 'אין אמצעים התואמים לסינון זה';
+    document.getElementById('alerts-list').innerHTML = `<div style="color:var(--text-muted);font-size:14px;padding:0.5rem 0;display:flex;align-items:center;gap:8px"><span style="font-size:20px">✅</span> ${emptyMsg}</div>`;
+    return;
+  }
+
+  document.getElementById('alerts-list').innerHTML = items.map(d => {
     const e = d.eq;
     const days = d.days;
-    const cls = days <= 14 ? 'red' : 'amber';
-    const daysTxt = days < 0 ? `פג לפני ${Math.abs(days)} ימים` : days === 0 ? 'היום!' : `${days} ימים`;
-    const kindTag = d.kind !== 'check' ? `<span class="badge badge-warn" style="font-size:10px;margin-right:6px">${d.label}</span>` : '';
+    const cls = days <= 14 ? 'red' : days <= 30 ? 'amber' : 'green';
+    const daysTxt = !d.date ? 'אין תאריך' : days < 0 ? `פג לפני ${Math.abs(days)} ימים` : days === 0 ? 'היום!' : `${days} ימים`;
+    const kindTag = (d.kind && d.kind !== 'check') ? `<span class="badge badge-warn" style="font-size:10px;margin-right:6px">${d.label}</span>` : '';
+    const metaLine = d.date ? `שילדה: ${e.name||'—'} · 📅 ${d.label}: ${formatDate(d.date)}` : `שילדה: ${e.name||'—'} · אין תאריך בדיקה רשום`;
     return `<div class="alert-item ${cls}">
       <div class="alert-dot ${cls}"></div>
       <div class="alert-info">
-        <div class="alert-name">${kindTag}${e.serialNumber||'—'} <span style="color:var(--text-muted);font-size:12px;font-weight:400">(${e.name||'—'})</span></div>
-        <div class="alert-meta">📍 ${getSiteName(e.siteId)} · 📅 ${d.label}: ${formatDate(d.date)}</div>
+        <div class="alert-name">${kindTag}${getSiteName(e.siteId)} · ${e.serialNumber||'—'} · ${e.type||'—'}</div>
+        <div class="alert-meta">${metaLine}</div>
       </div>
       <span class="alert-days ${cls}">${daysTxt}</span>
       ${waLink(e.phone, e.serialNumber||e.name, e.siteId, d.date, d.kind)}
     </div>`;
   }).join('');
+}
+function setDashboardFilter(f) {
+  dashboardFilter = (dashboardFilter === f) ? 'all' : f;
+  renderDashboard();
 }
 
 // ===== EQUIPMENT =====
@@ -2425,8 +2470,8 @@ function loadExpiryReminders() {
       html += `<div class="alert-item ${cls}" style="margin-bottom:8px">
         <div class="alert-dot ${cls}"></div>
         <div class="alert-info">
-          <div class="alert-name">${kindTag}${e.serialNumber||'—'} <span style="font-size:12px;color:var(--text-muted)">(${e.name||'—'})</span></div>
-          <div class="alert-meta">📍 ${getSiteName(e.siteId)} · 📅 ${d.label}: ${formatDate(d.date)} · ${dLabel}</div>
+          <div class="alert-name">${kindTag}${getSiteName(e.siteId)} · ${e.serialNumber||'—'} · ${e.type||'—'}</div>
+          <div class="alert-meta">שילדה: ${e.name||'—'} · 📅 ${d.label}: ${formatDate(d.date)} · ${dLabel}</div>
           ${responsible
             ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">אחראי: ${responsible.fullname||responsible.username} ${formatPhone(responsible.phone)}</div>`
             : '<div style="font-size:11px;color:var(--danger);margin-top:2px">⚠️ אין אחראי משויך</div>'}
