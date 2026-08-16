@@ -274,6 +274,10 @@ tr:hover td { background: rgba(30,77,183,0.02); }
 /* SETTINGS */
 .settings-card { background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); padding: 1.5rem; margin-bottom: 1rem; }
 .settings-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px; }
+.settings-subnav { display: flex; gap: 8px; margin-bottom: 1.5rem; flex-wrap: wrap; position: sticky; top: 64px; z-index: 10; background: var(--bg); padding: 4px 0; }
+.settings-subnav-btn { flex: 1; min-width: 140px; padding: 10px 14px; border-radius: var(--radius-sm); border: 1.5px solid var(--border); background: var(--card); cursor: pointer; font-family: inherit; font-size: 14px; font-weight: 600; color: var(--text-muted); display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.15s; }
+.settings-subnav-btn:hover { border-color: var(--blue); color: var(--blue); }
+.settings-subnav-btn.active { border-color: var(--blue); background: rgba(30,77,183,0.06); color: var(--blue); }
 .user-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
 .user-row:last-child { border-bottom: none; }
 .api-notice { background: var(--accent-light); border: 1px solid #fde68a; border-radius: var(--radius-sm); padding: 10px 14px; font-size: 13px; color: #92400e; margin-bottom: 1rem; }
@@ -692,8 +696,14 @@ tr:hover td { background: rgba(30,77,183,0.02); }
         <div><h2>⚙️ הגדרות</h2><p>ניהול משתמשים, אתרים וסוגי אמצעים</p></div>
       </div>
 
+      <div class="settings-subnav">
+        <button class="settings-subnav-btn" id="settings-subnav-types" onclick="showSettingsSection('types',this)"><span>🔧</span> סוגי אמצעים</button>
+        <button class="settings-subnav-btn" id="settings-subnav-sites" onclick="showSettingsSection('sites',this)"><span>📍</span> אתרים</button>
+        <button class="settings-subnav-btn" id="settings-subnav-users" onclick="showSettingsSection('users',this)"><span>👥</span> משתמשים</button>
+      </div>
+
       <!-- Equipment Types -->
-      <div class="settings-card">
+      <div class="settings-card" id="settings-section-types">
         <h3>🔧 סוגי אמצעים</h3>
         <div id="settings-types-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:1rem"></div>
         <div style="display:flex;gap:8px">
@@ -703,7 +713,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
       </div>
 
       <!-- Sites -->
-      <div class="settings-card">
+      <div class="settings-card" id="settings-section-sites">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
           <h3 style="margin:0">📍 אתרים</h3>
           <button class="btn-add" onclick="openSiteModal()">+ הוסף אתר</button>
@@ -717,7 +727,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
       </div>
 
       <!-- Users -->
-      <div class="settings-card">
+      <div class="settings-card" id="settings-section-users">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
           <h3 style="margin:0">👥 משתמשים</h3>
           <button class="btn-add" onclick="openUserModal()">+ הוסף משתמש</button>
@@ -1082,8 +1092,20 @@ function showTab(tab, btn) {
     renderSettingsSitesList();
     renderUsersTable();
     renderEquipmentTypesSettings();
+    showSettingsSection(currentSettingsSection, document.getElementById('settings-subnav-' + currentSettingsSection));
   }
   if (tab === 'whatsapp') { document.getElementById('tab-wa-content').style.display = ''; renderWaTab(); }
+}
+let currentSettingsSection = 'types';
+function showSettingsSection(section, btn) {
+  currentSettingsSection = section;
+  ['types','sites','users'].forEach(s => {
+    const card = document.getElementById('settings-section-' + s);
+    if (card) card.style.display = (s === section) ? '' : 'none';
+    const navBtn = document.getElementById('settings-subnav-' + s);
+    if (navBtn) navBtn.classList.toggle('active', s === section);
+  });
+  if (!btn) { const navBtn = document.getElementById('settings-subnav-' + section); if (navBtn) navBtn.classList.add('active'); }
 }
 function refreshCurrentTab() { 
   const activeBtn = document.querySelector('.tab-btn.active');
