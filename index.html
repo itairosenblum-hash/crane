@@ -377,7 +377,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
   table tbody tr:hover td { background: none; }
   /* Hide less important columns on mobile */
   table tbody td { display: none; }
-  table tbody td:nth-child(1) { /* תסקיר */
+  table tbody td:nth-child(1) { /* רישוי */
     display: block; font-size: 15px; font-weight: 700;
     color: var(--blue); border-bottom: 1px solid var(--border);
     padding-bottom: 8px; margin-bottom: 8px;
@@ -1314,12 +1314,12 @@ function renderEquipmentTable() {
   if (sf) eqs = eqs.filter(e => e.siteId == sf);
   if (tf) eqs = eqs.filter(e => e.type === tf);
   if (stf) eqs = eqs.filter(e => getOverallStatus(e) === stf);
-  if (q) eqs = eqs.filter(e => (e.name||'').toLowerCase().includes(q) || (e.eqId||'').toLowerCase().includes(q));
+  if (q) eqs = eqs.filter(e => (e.name||'').toLowerCase().includes(q) || (e.eqId||'').toLowerCase().includes(q) || (e.serialNumber||'').toLowerCase().includes(q));
   const isAdmin = currentUser.role === 'admin';
   document.getElementById('eq-tbody').innerHTML = eqs.map(e => {
     const days = getRelevantDays(e); const st = getOverallStatus(e);
     return `<tr>
-      <td><strong style="color:var(--blue)">${e.eqId||'—'}</strong><br><span style='font-size:11px;color:var(--text-muted)'>${e.serialNumber||''}</span></td>
+      <td><strong style="color:var(--blue)">${e.serialNumber||'—'}</strong><br><span style='font-size:11px;color:var(--text-muted)'>${e.eqId||''}</span></td>
       <td>${e.name}</td><td><span style="color:var(--text-muted)">${e.type||'—'}</span></td>
       <td>📍 ${getSiteName(e.siteId)}</td>
       <td>${formatDate(e.lastCheck)}</td><td>${formatDate(e.nextCheck)}${e.btNext ? `<br><span style="font-size:11px;color:var(--text-muted)">ב.ת: ${formatDate(e.btNext)}</span>` : ''}</td>
@@ -1352,8 +1352,8 @@ function viewEquipment(id) {
   </div>` : ''}
     <table style="width:100%;font-size:14px;border-collapse:collapse">
       ${[
-      ['מספר תסקיר',`<strong style="color:var(--blue)">${e.eqId||'—'}</strong>`],
-      ['מספר רישוי / צ\' (רישוי צבאי)', e.serialNumber||'—'],
+      ['מספר רישוי / צ\' (רישוי צבאי)',`<strong style="color:var(--blue)">${e.serialNumber||'—'}</strong>`],
+      ['מספר תסקיר', e.eqId||'—'],
       ['שנת יצור', e.manufacturingYear||'—'],
       ['סוג', e.type||'—'],
       ['יצרן', e.manufacturer||'—'],
@@ -1851,7 +1851,7 @@ function renderSitesNew() {
               return `<div class="eq-item" onclick="viewEquipment(${e.id})">
                 <div class="eq-item-info">
                   <div class="eq-item-name">${dot} ${e.name||'—'}</div>
-                  <div class="eq-item-id">תסקיר: ${e.eqId||'—'} | ס/נ: ${e.serialNumber||'—'}</div>
+                  <div class="eq-item-id"><strong style="color:var(--blue)">רישוי: ${e.serialNumber||'—'}</strong> · תסקיר: ${e.eqId||'—'}</div>
                   <div class="eq-item-dates">בדיקה הבאה: ${formatDate(e.nextCheck)}${e.btNext ? ` · ב.ת: ${formatDate(e.btNext)}` : ''}</div>
                 </div>
                 ${statusBadge(st, days)}
@@ -2206,7 +2206,7 @@ function loadExpiryReminders() {
     const greeting = name ? `שלום ${name},\n\n` : 'שלום,\n\n';
     const lines = items.map((d, i) => {
       const e = d.eq;
-      return `${i+1}. 🔧 ${e.name} (${e.type||''})\n   📋 תסקיר: ${e.eqId}  |  ס/נ: ${e.serialNumber||'—'}\n   📍 ${getSiteName(e.siteId)}\n   📅 ${d.label}: ${formatDate(d.date)} — ${dLabelFor(d.days)}`;
+      return `${i+1}. 🔧 ${e.name} (${e.type||''})\n   🔢 *רישוי: ${e.serialNumber||'—'}*  |  📋 תסקיר: ${e.eqId}\n   📍 ${getSiteName(e.siteId)}\n   📅 ${d.label}: ${formatDate(d.date)} — ${dLabelFor(d.days)}`;
     }).join('\n\n');
     return greeting + `תזכורת — האמצעים הבאים דורשים תיאום בדיקה:\n\n${lines}\n\nנא לתאם בהקדם האפשרי.\n\nמערכת תסקירי הבטיחות — מדור צהר"מ זרוע הים`;
   }
@@ -2214,7 +2214,7 @@ function loadExpiryReminders() {
   function buildSingleMsg(d) {
     const e = d.eq;
     const what = d.waWhat || 'תסקיר הבטיחות';
-    return `שלום,\n\nתזכורת: ${what} של האמצעי הבא עומד לפוג:\n\n🔧 ${e.name} (${e.type||''})\n📋 תסקיר: ${e.eqId}\n🔢 ס/נ: ${e.serialNumber||'—'}\n📍 אתר: ${getSiteName(e.siteId)}\n📅 ${d.label}: ${formatDate(d.date)} (${dLabelFor(d.days)})\n\nנא לתאם בדיקה חדשה בהקדם.\n\nמערכת תסקירי הבטיחות — מדור צהר"מ זרוע הים`;
+    return `שלום,\n\nתזכורת: ${what} של האמצעי הבא עומד לפוג:\n\n🔧 ${e.name} (${e.type||''})\n🔢 *רישוי: ${e.serialNumber||'—'}*\n📋 תסקיר: ${e.eqId}\n📍 אתר: ${getSiteName(e.siteId)}\n📅 ${d.label}: ${formatDate(d.date)} (${dLabelFor(d.days)})\n\nנא לתאם בדיקה חדשה בהקדם.\n\nמערכת תסקירי הבטיחות — מדור צהר"מ זרוע הים`;
   }
 
   let html = '';
