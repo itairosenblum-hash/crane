@@ -1907,7 +1907,6 @@ function generateUserWorkPlan(username) {
   const eqs = getEquipmentForUser(user);
   const userSiteIds = String(user.siteId||'').split(',').map(s => s.trim()).filter(Boolean);
   const siteNames = userSiteIds.length ? userSiteIds.map(id => getSiteName(id)).join(', ') : 'כל האתרים';
-  const showSitePerEvent = userSiteIds.length > 1; // disambiguate only when the user spans multiple sites
   const personName = user.fullname || user.username;
 
   const today = new Date(); today.setHours(0,0,0,0);
@@ -1931,9 +1930,7 @@ function generateUserWorkPlan(username) {
       if (monthIdx < today.getFullYear()*12 + today.getMonth()) return; // skip fully-past months
       const daysFromToday = Math.round((d - today) / 86400000);
       const cls = daysFromToday <= 14 ? 'danger' : daysFromToday <= 30 ? 'warn' : 'ok';
-      const text = showSitePerEvent
-        ? `${e.serialNumber || e.eqId || '—'} · ${getSiteName(e.siteId)} · ${cf.label}`
-        : `${e.serialNumber || e.eqId || '—'} · ${cf.label}`;
+      const text = `${getSiteName(e.siteId)} · ${e.serialNumber || e.eqId || '—'} · ${e.type || '—'} · ${cf.label}`;
       const item = { text, cls };
       totalEvents++;
       if (monthIdx > horizonEndMonthIdx) { beyondHorizon.push({ text: `${text} — ${formatDate(val)}`, cls }); return; }
