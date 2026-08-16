@@ -701,7 +701,6 @@ tr:hover td { background: rgba(30,77,183,0.02); }
           <button class="btn-add" id="btn-add-eq" onclick="openAddModal()" style="display:none">+ הוסף אמצעי</button>
         </div>
       </div>
-      <div class="stats-grid" id="eq-stats-grid"></div>
       <div class="filter-row">
         <select id="filter-site" onchange="renderEquipmentTable()"><option value="">כל האתרים</option></select>
         <select id="filter-type" onchange="renderEquipmentTable()"><option value="">כל הסוגים</option></select>
@@ -1513,16 +1512,6 @@ function getFilteredEquipment() {
   return eqs;
 }
 function renderEquipmentStats() {
-  const eqs = getUserEquipment();
-  const danger = eqs.filter(e => getOverallStatus(e) === 'danger').length;
-  const warn = eqs.filter(e => getOverallStatus(e) === 'warn').length;
-  const ok = eqs.length - danger - warn;
-  const active = (f) => equipmentStatusFilter === f ? ' active' : '';
-  document.getElementById('eq-stats-grid').innerHTML = `
-    <div class="stat-card${active('')}" onclick="setEquipmentFilter('')"><div class="stat-icon blue">🏗️</div><div class="stat-info"><div class="stat-label">סה"כ אמצעים</div><div class="stat-value blue">${eqs.length}</div></div></div>
-    <div class="stat-card${active('danger')}" onclick="setEquipmentFilter('danger')"><div class="stat-icon red">🚨</div><div class="stat-info"><div class="stat-label">דחוף / פג תוקף</div><div class="stat-value red">${danger}</div></div></div>
-    <div class="stat-card${active('warn')}" onclick="setEquipmentFilter('warn')"><div class="stat-icon amber">⏰</div><div class="stat-info"><div class="stat-label">קרוב לבדיקה</div><div class="stat-value amber">${warn}</div></div></div>
-    <div class="stat-card${active('ok')}" onclick="setEquipmentFilter('ok')"><div class="stat-icon green">✅</div><div class="stat-info"><div class="stat-label">תקין</div><div class="stat-value green">${ok}</div></div></div>`;
   updateNavBadges();
 }
 // Shows/hides an exclamation-mark badge on the "אמצעים"/"מנופאים" bottom-nav icons
@@ -1534,10 +1523,6 @@ function updateNavBadges() {
   const opBadge = document.getElementById('op-tab-badge');
   if (eqBadge) eqBadge.style.display = eqExpired ? 'flex' : 'none';
   if (opBadge) opBadge.style.display = opExpired ? 'flex' : 'none';
-}
-function setEquipmentFilter(f) {
-  equipmentStatusFilter = (equipmentStatusFilter === f) ? '' : f;
-  renderEquipmentTable();
 }
 function renderEquipmentTable() {
   const eqs = getFilteredEquipment();
@@ -1552,8 +1537,12 @@ function renderEquipmentTable() {
     ? '<div class="site-empty">לא נמצאו אמצעים</div>'
     : typeKeys.map(type => {
         const items = byType[type];
-        return `<div class="eq-type-group">
-          <div class="eq-type-label">🔧 ${type} (${items.length})</div>
+        return `<div class="site-card">
+          <div class="site-card-header">
+            <h3>🔧 ${type}</h3>
+            <span style="color:#94a3b8;font-size:13px">${items.length} אמצעים</span>
+          </div>
+          <div class="site-card-body">
           <div class="eq-type-items">
             ${items.map(e => {
               const days = getRelevantDays(e);
@@ -1568,6 +1557,7 @@ function renderEquipmentTable() {
                 ${statusBadge(st, days)}
               </div>`;
             }).join('')}
+          </div>
           </div>
         </div>`;
       }).join('');
