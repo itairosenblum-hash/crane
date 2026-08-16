@@ -694,16 +694,12 @@ tr:hover td { background: rgba(30,77,183,0.02); }
         </div>
       </div>
       <div class="stats-grid" id="eq-stats-grid"></div>
-      <div class="section-card">
-        <div class="section-head">
-          <div class="filter-row" style="margin:0">
-            <select id="filter-site" onchange="renderEquipmentTable()"><option value="">כל האתרים</option></select>
-            <select id="filter-type" onchange="renderEquipmentTable()"><option value="">כל הסוגים</option></select>
-            <input type="text" id="filter-search" placeholder="🔍 חיפוש..." onkeyup="renderEquipmentTable()" style="flex:1;min-width:140px">
-          </div>
-        </div>
-        <div class="section-body" id="eq-tbody" style="padding:1rem"></div>
+      <div class="filter-row">
+        <select id="filter-site" onchange="renderEquipmentTable()"><option value="">כל האתרים</option></select>
+        <select id="filter-type" onchange="renderEquipmentTable()"><option value="">כל הסוגים</option></select>
+        <input type="text" id="filter-search" placeholder="🔍 חיפוש..." onkeyup="renderEquipmentTable()" style="flex:1;min-width:140px">
       </div>
+      <div id="eq-tbody"></div>
     </div>
 
     <!-- OPERATORS (מנופאים) -->
@@ -953,7 +949,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
   <div class="modal">
     <div class="modal-header"><h3>פרטי אמצעי</h3><button class="btn-close" onclick="closeModal('modal-view-eq')">×</button></div>
     <div class="modal-body" id="view-eq-body"></div>
-    <div class="modal-footer"><button class="btn-secondary" onclick="closeModal('modal-view-eq')">סגור</button></div>
+    <div class="modal-footer" id="view-eq-footer"><button class="btn-secondary" onclick="closeModal('modal-view-eq')">סגור</button></div>
   </div>
 </div>
 
@@ -1525,32 +1521,36 @@ function setEquipmentFilter(f) {
 }
 function renderEquipmentTable() {
   const eqs = getFilteredEquipment();
-  const isAdmin = currentUser.role === 'admin';
-  document.getElementById('eq-tbody').innerHTML = eqs.map(e => {
-    const days = getRelevantDays(e); const st = getOverallStatus(e);
-    const cls = st === 'danger' ? 'red' : st === 'warn' ? 'amber' : 'green';
-    const daysTxt = days >= 9000 ? 'אין תאריך' : days < 0 ? `פג לפני ${Math.abs(days)} ימים` : days === 0 ? 'היום!' : `${days} ימים`;
-    const dateParts = [];
-    if (e.nextCheck) dateParts.push(`תסקיר: ${formatDate(e.nextCheck)}`);
-    if (e.btNext) dateParts.push(`ב.ת: ${formatDate(e.btNext)}`);
-    const metaLine = `שילדה: ${e.name||'—'}` + (dateParts.length ? ` · 📅 ${dateParts.join(' · ')}` : '');
-    return `<div class="alert-item ${cls}" style="flex-direction:column;align-items:stretch;gap:0">
-      <div style="display:flex;align-items:center;gap:12px">
-        <div class="alert-dot ${cls}"></div>
-        <div class="alert-info">
-          <div class="alert-name">${getSiteName(e.siteId)} · ${e.serialNumber||'—'} · ${e.type||'—'}</div>
-          <div class="alert-meta">${metaLine}</div>
-        </div>
-        <span class="alert-days ${cls}">${daysTxt}</span>
-      </div>
-      <div style="display:flex;justify-content:flex-end;gap:8px;padding-top:10px;margin-top:10px;border-top:1px solid rgba(0,0,0,0.08)">
-        <button class="btn-icon" onclick="viewEquipment(${e.id})" title="פרטים">👁</button>
-        ${e.imageUrl && e.imageUrl.startsWith('http') ? `<a class="btn-icon" href="${e.imageUrl}" target="_blank" title="פתח תסקיר ב-Drive" style="text-decoration:none;color:var(--blue)">📄</a>` : ''}
-        ${isAdmin ? `<button class="btn-icon" onclick="editEquipment(${e.id})" title="עריכה">✏️</button>` : ''}
-        ${isAdmin ? `<button class="btn-icon del" onclick="deleteEquipment(${e.id})" title="מחיקה">🗑</button>` : ''}
-      </div>
-    </div>`;
-  }).join('') || '<div style="text-align:center;color:var(--text-muted);padding:2rem">לא נמצאו אמצעים</div>';
+  const byType = {};
+  eqs.forEach(e => {
+    const t = e.type || 'אחר';
+    if (!byType[t]) byType[t] = [];
+    byType[t].push(e);
+  });
+  const typeKeys = Object.keys(byType).sort((a,b) => a.localeCompare(b, 'he'));
+  document.getElementById('eq-tbody').innerHTML = typeKeys.length === 0
+    ? '<div class="site-empty">לא נמצאו אמצעים</div>'
+    : typeKeys.map(type => {
+        const items = byType[type];
+        return `<div class="eq-type-group">
+          <div class="eq-type-label">🔧 ${type} (${items.length})</div>
+          <div class="eq-type-items">
+            ${items.map(e => {
+              const days = getRelevantDays(e);
+              const st = getOverallStatus(e);
+              const dot = st === 'danger' ? '🔴' : st === 'warn' ? '🟡' : '🟢';
+              return `<div class="eq-item" onclick="viewEquipment(${e.id})">
+                <div class="eq-item-info">
+                  <div class="eq-item-name">${dot} ${e.serialNumber||'—'}</div>
+                  <div class="eq-item-id">שילדה: ${e.name||'—'} · תסקיר: ${e.eqId||'—'}</div>
+                  <div class="eq-item-dates">בדיקה הבאה: ${formatDate(e.nextCheck)}${e.btNext ? ` · ב.ת: ${formatDate(e.btNext)}` : ''}</div>
+                </div>
+                ${statusBadge(st, days)}
+              </div>`;
+            }).join('')}
+          </div>
+        </div>`;
+      }).join('');
   renderEquipmentStats();
 }
 function viewEquipment(id) {
@@ -1595,6 +1595,11 @@ function viewEquipment(id) {
     ].map((r,i)=>`<tr><td style="color:var(--text-muted);padding:9px 0;width:40%;${i>0?'border-top:1px solid var(--border)':''};font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">${r[0]}</td><td style="${i>0?'border-top:1px solid var(--border)':''}padding:9px 0">${r[1]}</td></tr>`).join('')}
     </table>
     </div>`;
+  const isAdmin = currentUser.role === 'admin';
+  document.getElementById('view-eq-footer').innerHTML = `
+    ${isAdmin ? `<button class="btn-secondary" onclick="closeModal('modal-view-eq');editEquipment(${e.id})">✏️ עריכה</button>` : ''}
+    ${isAdmin ? `<button class="btn-danger-sm" onclick="closeModal('modal-view-eq');deleteEquipment(${e.id})">🗑 מחיקה</button>` : ''}
+    <button class="btn-secondary" onclick="closeModal('modal-view-eq')">סגור</button>`;
   openModal('modal-view-eq');
 }
 async function deleteEquipment(id) {
