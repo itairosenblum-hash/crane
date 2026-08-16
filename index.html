@@ -674,7 +674,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
         </svg>
         <div><h2>אמצעי הרמה ובטיחות</h2><p>ניהול ומעקב אחר כלל האמצעים</p></div>
         <div style="display:flex;gap:8px">
-          <button class="btn-secondary" onclick="generateEquipmentPageWorkPlan()" style="color:#94a3b8;border-color:rgba(255,255,255,0.2)">📄 תכנית עבודה</button>
+          <button class="btn-secondary" onclick="openWorkPlanRangeModal()" style="color:#94a3b8;border-color:rgba(255,255,255,0.2)">📄 תכנית עבודה</button>
           <button class="btn-add" id="btn-add-eq" onclick="openAddModal()" style="display:none">+ הוסף אמצעי</button>
         </div>
       </div>
@@ -932,6 +932,24 @@ tr:hover td { background: rgba(30,77,183,0.02); }
     <div class="modal-header"><h3>פרטי אמצעי</h3><button class="btn-close" onclick="closeModal('modal-view-eq')">×</button></div>
     <div class="modal-body" id="view-eq-body"></div>
     <div class="modal-footer"><button class="btn-secondary" onclick="closeModal('modal-view-eq')">סגור</button></div>
+  </div>
+</div>
+
+<!-- WORK PLAN DATE RANGE -->
+<div class="modal-overlay" id="modal-workplan-range">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header"><h3>📄 הפקת תכנית עבודה</h3><button class="btn-close" onclick="closeModal('modal-workplan-range')">×</button></div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:1rem">בחר את טווח התאריכים שיוצג בלוח השנה. כל תא ביום ספציפי יסומן אם יש לאמצעי תאריך רלוונטי (תסקיר/ב.ת) שחל בו.</p>
+      <div class="form-row">
+        <div class="form-group"><label>מתאריך</label><input type="date" id="workplan-from-date"></div>
+        <div class="form-group"><label>עד תאריך</label><input type="date" id="workplan-to-date"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-workplan-range')">ביטול</button>
+      <button class="btn-primary-sm" onclick="confirmGenerateWorkPlan()">📄 הפק PDF</button>
+    </div>
   </div>
 </div>
 
@@ -1954,14 +1972,34 @@ function renderSitesNew() {
   }).join('');
 }
 
-// Opens a printable, RTL-formatted 12-month CALENDAR covering whatever equipment
-// is currently visible on the Equipment page (respecting its site/type/status/search
-// filters). Each equipment's upcoming check dates (תסקיר / ב.ת) are marked directly
-// on the calendar day they fall on, so the reader sees "license X expires on this
-// day" at a glance. Uses the browser's native print dialog ("Save as PDF") — this
-// avoids the poor Hebrew/RTL font support of client-side PDF-generation libraries
-// (e.g. jsPDF).
-function generateEquipmentPageWorkPlan() {
+function openWorkPlanRangeModal() {
+  const today = new Date();
+  const in12Months = new Date(today.getFullYear(), today.getMonth()+12, today.getDate());
+  const iso = (d) => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  document.getElementById('workplan-from-date').value = iso(today);
+  document.getElementById('workplan-to-date').value = iso(in12Months);
+  openModal('modal-workplan-range');
+}
+function confirmGenerateWorkPlan() {
+  const fromVal = document.getElementById('workplan-from-date').value;
+  const toVal = document.getElementById('workplan-to-date').value;
+  if (!fromVal || !toVal) { alert('נא לבחור טווח תאריכים'); return; }
+  const from = new Date(fromVal);
+  const to = new Date(toVal);
+  if (to < from) { alert('תאריך הסיום חייב להיות אחרי תאריך ההתחלה'); return; }
+  const monthsSpan = (to.getFullYear()*12 + to.getMonth()) - (from.getFullYear()*12 + from.getMonth()) + 1;
+  if (monthsSpan > 36 && !confirm(`הטווח שבחרת מכסה ${monthsSpan} חודשים ויפיק מסמך ארוך. להמשיך?`)) return;
+  closeModal('modal-workplan-range');
+  generateEquipmentPageWorkPlan(from, to);
+}
+// Opens a printable, RTL-formatted CALENDAR (spanning a caller-chosen date range)
+// covering whatever equipment is currently visible on the Equipment page (respecting
+// its site/type/status/search filters). Each equipment's upcoming check dates
+// (תסקיר / ב.ת) are marked directly on the calendar day they fall on, so the reader
+// sees "license X expires on this day" at a glance. Uses the browser's native print
+// dialog ("Save as PDF") — this avoids the poor Hebrew/RTL font support of
+// client-side PDF-generation libraries (e.g. jsPDF).
+function generateEquipmentPageWorkPlan(rangeStart, rangeEnd) {
   const eqs = getFilteredEquipment();
 
   const sf = document.getElementById('filter-site').value;
@@ -1978,10 +2016,17 @@ function generateEquipmentPageWorkPlan() {
   const filterSubtitle = filterParts.length ? ' · ' + filterParts.join(' · ') : '';
 
   const today = new Date(); today.setHours(0,0,0,0);
+  const rangeFrom = rangeStart ? new Date(rangeStart) : new Date(today);
+  rangeFrom.setHours(0,0,0,0);
+  const rangeTo = rangeEnd ? new Date(rangeEnd) : new Date(today.getFullYear(), today.getMonth()+11, today.getDate());
+  rangeTo.setHours(0,0,0,0);
   const dateStr = String(today.getDate()).padStart(2,'0') + '/' + String(today.getMonth()+1).padStart(2,'0') + '/' + today.getFullYear();
+  const rangeFromStr = String(rangeFrom.getDate()).padStart(2,'0') + '/' + String(rangeFrom.getMonth()+1).padStart(2,'0') + '/' + rangeFrom.getFullYear();
+  const rangeToStr = String(rangeTo.getDate()).padStart(2,'0') + '/' + String(rangeTo.getMonth()+1).padStart(2,'0') + '/' + rangeTo.getFullYear();
   const dateKey = (d) => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
-  const HORIZON_MONTHS = 12;
-  const horizonEndMonthIdx = today.getFullYear()*12 + today.getMonth() + (HORIZON_MONTHS - 1); // inclusive last month index
+  const startMonthIdx = rangeFrom.getFullYear()*12 + rangeFrom.getMonth();
+  const endMonthIdx = rangeTo.getFullYear()*12 + rangeTo.getMonth(); // inclusive last month index
+  const totalMonths = Math.max(1, endMonthIdx - startMonthIdx + 1);
 
   // Collect one calendar event per (equipment × tracked date field)
   const eventsByDate = {};
@@ -1995,13 +2040,13 @@ function generateEquipmentPageWorkPlan() {
       if (!d) return;
       d.setHours(0,0,0,0);
       const monthIdx = d.getFullYear()*12 + d.getMonth();
-      if (monthIdx < today.getFullYear()*12 + today.getMonth()) return; // skip fully-past months
+      if (monthIdx < startMonthIdx) return; // before the selected range — not relevant
       const daysFromToday = Math.round((d - today) / 86400000);
       const cls = daysFromToday <= 14 ? 'danger' : daysFromToday <= 30 ? 'warn' : 'ok';
       const text = `${getSiteName(e.siteId)} · ${e.serialNumber || e.eqId || '—'} · ${e.type || '—'} · ${cf.label}`;
       const item = { text, cls };
       totalEvents++;
-      if (monthIdx > horizonEndMonthIdx) { beyondHorizon.push({ text: `${text} — ${formatDate(val)}`, cls }); return; }
+      if (monthIdx > endMonthIdx) { beyondHorizon.push({ text: `${text} — ${formatDate(val)}`, cls }); return; }
       const key = dateKey(d);
       (eventsByDate[key] = eventsByDate[key] || []).push(item);
     });
@@ -2010,9 +2055,9 @@ function generateEquipmentPageWorkPlan() {
   const monthNames = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
   const todayKey = dateKey(today);
   let monthsHtml = '';
-  for (let i = 0; i < HORIZON_MONTHS; i++) {
-    const y = today.getFullYear() + Math.floor((today.getMonth()+i)/12);
-    const m = (today.getMonth()+i) % 12;
+  for (let i = 0; i < totalMonths; i++) {
+    const y = Math.floor((startMonthIdx+i)/12);
+    const m = (startMonthIdx+i) % 12;
     const firstDow = new Date(y, m, 1).getDay(); // 0=Sunday
     const daysInMonth = new Date(y, m+1, 0).getDate();
     let cells = '';
@@ -2027,7 +2072,7 @@ function generateEquipmentPageWorkPlan() {
     const totalCells = firstDow + daysInMonth;
     const trailing = (7 - (totalCells % 7)) % 7;
     for (let k = 0; k < trailing; k++) cells += `<div class="cal-day empty"></div>`;
-    monthsHtml += `<div class="month-page${i === HORIZON_MONTHS - 1 ? ' last' : ''}">
+    monthsHtml += `<div class="month-page${i === totalMonths - 1 ? ' last' : ''}">
       <div class="month-title">${monthNames[m]} ${y}</div>
       <div class="cal-grid">
         <div class="cal-dow">א</div><div class="cal-dow">ב</div><div class="cal-dow">ג</div><div class="cal-dow">ד</div><div class="cal-dow">ה</div><div class="cal-dow">ו</div><div class="cal-dow">ש</div>
@@ -2037,7 +2082,7 @@ function generateEquipmentPageWorkPlan() {
   }
 
   const beyondHtml = beyondHorizon.length ? `<div class="beyond">
-    <strong>תאריכים מעבר לטווח המוצג (${HORIZON_MONTHS} חודשים):</strong>
+    <strong>תאריכים מעבר לטווח שנבחר:</strong>
     <ul>${beyondHorizon.map(b => `<li><span class="cal-event ${b.cls}" style="display:inline-block">${b.text}</span></li>`).join('')}</ul>
   </div>` : '';
 
@@ -2084,7 +2129,7 @@ function generateEquipmentPageWorkPlan() {
         <h1>תכנית עבודה — לוח שנה — ${personName}</h1>
         <p>מערכת תסקירי הבטיחות — מדור צהר"מ זרוע הים${filterSubtitle}</p>
       </div>
-      <div class="meta">תאריך הפקה: ${dateStr}<br>סה"כ אמצעים: ${eqs.length} · סה"כ תאריכים: ${totalEvents}</div>
+      <div class="meta">תאריך הפקה: ${dateStr}<br>טווח: <span dir="ltr">${rangeFromStr} — ${rangeToStr}</span><br>סה"כ אמצעים: ${eqs.length} · סה"כ תאריכים: ${totalEvents}</div>
     </div>
     <div class="legend">
       <span><span class="dot" style="background:#fef2f2;border:1px solid #fecaca"></span>דחוף (14 ימים)</span>
