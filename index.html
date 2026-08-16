@@ -630,6 +630,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
     <div class="tabs-wrap">
       <button class="tab-btn active" onclick="showTab('dashboard',this)"><span class="tab-icon">📊</span> לוח בקרה</button>
       <button class="tab-btn" onclick="showTab('equipment',this)"><span class="tab-icon">🏗️</span> אמצעים</button>
+      <button class="tab-btn" onclick="showTab('operators',this)"><span class="tab-icon">👷</span> מנופאים</button>
       <button class="tab-btn" id="tab-sites-btn" onclick="showTab('sites',this)"><span class="tab-icon">📍</span> אתרים</button>
       <button class="tab-btn" id="tab-settings-btn" onclick="showTab('settings',this)"><span class="tab-icon">⚙️</span> הגדרות</button>
       <button class="tab-btn" id="tab-wa-btn" onclick="showTab('whatsapp',this)"><span class="tab-icon">💬</span> WhatsApp</button>
@@ -699,6 +700,36 @@ tr:hover td { background: rgba(30,77,183,0.02); }
               <th>בדיקה אחרונה</th><th>בדיקה הבאה</th><th>סטטוס</th><th>פעולות</th>
             </tr></thead>
             <tbody id="eq-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- OPERATORS (מנופאים) -->
+    <div id="tab-operators" style="display:none">
+      <div class="page-header">
+        <div><h2>👷 מנופאים</h2><p>מעקב אחר מנופאים, רישיונות ותוקפים</p></div>
+        <button class="btn-add" id="btn-add-op" onclick="openAddOperatorModal()" style="display:none">+ הוסף מנופאי</button>
+      </div>
+      <div class="section-card">
+        <div class="section-head">
+          <div class="filter-row" style="margin:0">
+            <select id="op-filter-site" onchange="renderOperatorsTable()"><option value="">כל האתרים</option></select>
+            <select id="op-filter-status" onchange="renderOperatorsTable()">
+              <option value="">כל הסטטוסים</option>
+              <option value="ok">תקין</option>
+              <option value="warn">קרוב לפג תוקף</option>
+              <option value="danger">דחוף / פג תוקף</option>
+            </select>
+            <input type="text" id="op-filter-search" placeholder="🔍 חיפוש..." onkeyup="renderOperatorsTable()" style="flex:1;min-width:140px">
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>שם המנופאי</th><th>אתר</th><th>תוקפי רישיונות</th><th>סטטוס</th><th>טלפון</th><th>פעולות</th>
+            </tr></thead>
+            <tbody id="op-tbody"></tbody>
           </table>
         </div>
       </div>
@@ -935,6 +966,30 @@ tr:hover td { background: rgba(30,77,183,0.02); }
   </div>
 </div>
 
+<!-- ADD/EDIT OPERATOR -->
+<div class="modal-overlay" id="modal-add-operator">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-op-title">הוספת מנופאי חדש</h3>
+      <button class="btn-close" onclick="closeModal('modal-add-operator')">×</button>
+    </div>
+    <div class="modal-body" id="modal-op-body"></div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-add-operator')">ביטול</button>
+      <button class="btn-primary-sm" onclick="saveOperator()">💾 שמור</button>
+    </div>
+  </div>
+</div>
+
+<!-- VIEW OPERATOR -->
+<div class="modal-overlay" id="modal-view-operator">
+  <div class="modal">
+    <div class="modal-header"><h3>פרטי מנופאי</h3><button class="btn-close" onclick="closeModal('modal-view-operator')">×</button></div>
+    <div class="modal-body" id="view-op-body"></div>
+    <div class="modal-footer"><button class="btn-secondary" onclick="closeModal('modal-view-operator')">סגור</button></div>
+  </div>
+</div>
+
 <!-- WORK PLAN DATE RANGE -->
 <div class="modal-overlay" id="modal-workplan-range">
   <div class="modal" style="max-width:420px">
@@ -960,7 +1015,7 @@ const GEMINI_KEY_STORE = 'safety_or_key';
 const SCRIPT_URL_STORE = 'safety_script_url';
 const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw3kpsA7h1e_5Rg-vs1ndNULRTH-Vjkz7thKquEE-LDhvVbsaflrmwrsXMHYiJ5Lv1PKw/exec';
 
-let appData = { sites: [], equipment: [], users: [], equipmentTypes: [] };
+let appData = { sites: [], equipment: [], users: [], equipmentTypes: [], operators: [] };
 let currentUser = null;
 let editingEqId = null;
 
@@ -1016,6 +1071,21 @@ async function loadData(silent = false) {
     console.log('Equipment with images:', appData.equipment.filter(e=>e.imageUrl).map(e=>({id:e.id,url:e.imageUrl})));
     appData.users = data.users || [];
     appData.equipmentTypes = (data.equipmentTypes || []).map(t => String(t||'').trim()).filter(Boolean);
+    appData.operators = (data.operators || []).map(o => ({
+      ...o,
+      id: parseInt(o.id),
+      siteId: parseInt(o.siteId),
+      name: String(o.name||''),
+      personalNum: String(o.personalNum||''),
+      idNumber: String(o.idNumber||''),
+      licenseNumber: String(o.licenseNumber||''),
+      profile: String(o.profile||''),
+      tatash: String(o.tatash||''),
+      civilianLicenseExpiry: normalizeDate(o.civilianLicenseExpiry),
+      militaryLicenseExpiry: normalizeDate(o.militaryLicenseExpiry),
+      craneLicenseExpiry: normalizeDate(o.craneLicenseExpiry),
+      licenseImageUrl: (o.licenseImageUrl && String(o.licenseImageUrl) !== 'null' && String(o.licenseImageUrl) !== 'undefined' && String(o.licenseImageUrl).startsWith('http')) ? String(o.licenseImageUrl) : ''
+    }));
     setSyncStatus('ok', '● מחובר');
     refreshCurrentTab();
   } catch(e) { setSyncStatus('err', '● שגיאה'); }
@@ -1074,6 +1144,7 @@ async function doLogin() {
       document.getElementById('tab-wa-btn').style.display = 'none';
     } else {
       document.getElementById('btn-add-eq').style.display = '';
+      document.getElementById('btn-add-op').style.display = '';
     }
     showPage('page-app');
     await loadData();
@@ -1112,12 +1183,17 @@ function showTab(tab, btn) {
   currentTab = tab;
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  ['tab-dashboard','tab-equipment','tab-sites-content','tab-settings-content','tab-wa-content'].forEach(id => document.getElementById(id).style.display = 'none');
+  ['tab-dashboard','tab-equipment','tab-operators','tab-sites-content','tab-settings-content','tab-wa-content'].forEach(id => document.getElementById(id).style.display = 'none');
   if (tab === 'dashboard') { document.getElementById('tab-dashboard').style.display = ''; renderDashboard(); }
   if (tab === 'equipment') { 
     document.getElementById('tab-equipment').style.display = ''; 
     populateSiteFilter(); 
     renderEquipmentTable(); 
+  }
+  if (tab === 'operators') {
+    document.getElementById('tab-operators').style.display = '';
+    populateOperatorSiteFilter();
+    renderOperatorsTable();
   }
   if (tab === 'sites') { document.getElementById('tab-sites-content').style.display = ''; renderSitesNew(); }
   if (tab === 'settings') {
@@ -1298,6 +1374,29 @@ function getNextRelevantCheck(e) {
     if (!best || days < best.days) best = { kind: cf.kind, label: cf.label, date: val, days, waAction: cf.waAction, waWhat: cf.waWhat };
   });
   return best;
+}
+// ===== OPERATORS (מנופאים) status tracking =====
+const OPERATOR_CHECK_FIELDS = [
+  { field: 'civilianLicenseExpiry', label: 'רישיון אזרחי' },
+  { field: 'militaryLicenseExpiry', label: 'רישיון צבאי' },
+  { field: 'craneLicenseExpiry',    label: 'רישיון מנוף' }
+];
+function getOperatorStatus(op) {
+  const order = { danger: 2, warn: 1, ok: 0 };
+  let worst = 'ok';
+  OPERATOR_CHECK_FIELDS.forEach(cf => { const s = getStatus(op[cf.field]); if (order[s] > order[worst]) worst = s; });
+  return worst;
+}
+function getOperatorRelevantDays(op) {
+  let min = 9999;
+  OPERATOR_CHECK_FIELDS.forEach(cf => { if (op[cf.field]) { const d = daysUntil(op[cf.field]); if (d < min) min = d; } });
+  return min;
+}
+function getUserOperators() {
+  if (!currentUser || currentUser.role === 'admin') return appData.operators;
+  const userSites = String(currentUser.siteId||'').split(',').map(s => s.trim()).filter(Boolean);
+  if (!userSites.length) return appData.operators;
+  return appData.operators.filter(o => userSites.includes(String(o.siteId)));
 }
 function statusBadge(st, days) {
   const L = { ok:'תקין', warn:'קרוב לבדיקה', danger: days < 0 ? 'פג תוקף!' : 'דחוף' };
@@ -1909,6 +2008,245 @@ Rules: dates as DD/MM/YYYY, null for missing, JSON only.`;
     document.getElementById('ai-loading').style.display = 'none';
     alert('שגיאה: ' + err.message);
   }
+}
+
+// ===== OPERATORS (מנופאים) =====
+const MODAL_OP_TEMPLATE = `<div class="modal-body">
+      <form autocomplete="off" style="display:contents">
+      <input type="file" id="op-file-input-camera" accept="image/*" capture="environment" style="display:none">
+      <input type="file" id="op-file-input-gallery" accept="image/*" style="display:none">
+      <div id="op-upload-zone"
+           ondragover="event.preventDefault();this.classList.add('drag')"
+           ondragleave="this.classList.remove('drag')"
+           ondrop="handleOperatorDrop(event)"
+           style="border:2px dashed #cbd5e1;border-radius:var(--radius-sm);padding:1.25rem;margin-bottom:1rem;background:var(--bg)">
+        <div style="text-align:center;font-size:13px;color:var(--text-muted);margin-bottom:12px">🪪 העלה תמונת רישיון נהיגה (לא חובה)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <button type="button" onclick="document.getElementById('op-file-input-camera').click()"
+            style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 8px;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-family:inherit;font-size:13px;color:var(--text);font-weight:500">
+            <span style="font-size:26px">📷</span>מצלמה
+          </button>
+          <button type="button" onclick="document.getElementById('op-file-input-gallery').click()"
+            style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 8px;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-family:inherit;font-size:13px;color:var(--text);font-weight:500">
+            <span style="font-size:26px">🖼️</span>גלריה
+          </button>
+        </div>
+      </div>
+      <img id="op-img-preview" class="img-preview">
+      <div class="form-row">
+        <div class="form-group"><label>שם המנופאי *</label><input type="text" id="op-name" placeholder="שם מלא" autocomplete="off"></div>
+        <div class="form-group"><label>אתר *</label><select id="op-site"></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>מ.א (מספר אישי)</label><input type="text" id="op-personal-num" placeholder="מספר אישי" autocomplete="off"></div>
+        <div class="form-group"><label>ת.ז</label><input type="text" id="op-id-number" placeholder="תעודת זהות" autocomplete="off"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>מספר רישיון נהיגה</label><input type="text" id="op-license-number" placeholder="מספר רישיון" autocomplete="off"></div>
+        <div class="form-group"><label>פרופיל</label><input type="text" id="op-profile" placeholder="פרופיל" autocomplete="off"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>תוקף רישיון אזרחי (DD/MM/YYYY)</label><input type="text" id="op-civilian-expiry" placeholder="DD/MM/YYYY" autocomplete="off"></div>
+        <div class="form-group"><label>תוקף רישיון צבאי (DD/MM/YYYY)</label><input type="text" id="op-military-expiry" placeholder="DD/MM/YYYY" autocomplete="off"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>תוקף רישיון מנוף נייד (DD/MM/YYYY)</label><input type="text" id="op-crane-expiry" placeholder="DD/MM/YYYY" autocomplete="off"></div>
+        <div class="form-group"><label>תת"ש</label><input type="text" id="op-tatash" placeholder="תת&quot;ש" autocomplete="off"></div>
+      </div>
+      <div class="form-group"><label>טלפון</label><input type="tel" id="op-phone" placeholder="050-000-0000" oninput="maskPhone(this)" maxlength="12"></div>
+    </form>
+    </div>`;
+
+function rebuildOperatorModalBody() {
+  const container = document.getElementById('modal-op-body');
+  container.innerHTML = MODAL_OP_TEMPLATE;
+  ['op-file-input-camera','op-file-input-gallery'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.onchange = function() { handleOperatorFile(this.files[0]); };
+  });
+  const zone = document.getElementById('op-upload-zone');
+  if (zone) {
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+    zone.addEventListener('drop', handleOperatorDrop);
+  }
+  container.querySelectorAll('input:not([type=file])').forEach(el => {
+    el.setAttribute('name', 'field_' + Math.random().toString(36).substr(2,9));
+    el.value = '';
+  });
+  populateOperatorSites();
+}
+function populateOperatorSites() {
+  const sel = document.getElementById('op-site');
+  if (!sel) return;
+  sel.innerHTML = appData.sites.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+  if (currentUser && currentUser.siteId) sel.value = String(currentUser.siteId).split(',')[0].trim();
+}
+let editingOperatorId = null;
+function openAddOperatorModal() {
+  editingOperatorId = null;
+  document.getElementById('modal-op-title').textContent = 'הוספת מנופאי חדש';
+  rebuildOperatorModalBody();
+  openModal('modal-add-operator');
+}
+function editOperator(id) {
+  editingOperatorId = id;
+  const op = appData.operators.find(x => x.id === id);
+  if (!op) return;
+  rebuildOperatorModalBody();
+  document.getElementById('modal-op-title').textContent = 'עריכת מנופאי';
+  const sv = (fid, val) => { const el = document.getElementById(fid); if (el) el.value = val || ''; };
+  sv('op-name', op.name);
+  const siteEl = document.getElementById('op-site'); if (siteEl) siteEl.value = op.siteId;
+  sv('op-personal-num', op.personalNum);
+  sv('op-id-number', op.idNumber);
+  sv('op-license-number', op.licenseNumber);
+  sv('op-profile', op.profile);
+  sv('op-civilian-expiry', op.civilianLicenseExpiry);
+  sv('op-military-expiry', op.militaryLicenseExpiry);
+  sv('op-crane-expiry', op.craneLicenseExpiry);
+  sv('op-tatash', op.tatash);
+  sv('op-phone', formatPhone(op.phone) === '—' ? '' : formatPhone(op.phone));
+  const img = document.getElementById('op-img-preview');
+  if (img) {
+    if (op.licenseImageUrl && op.licenseImageUrl.startsWith('http')) { img.src = op.licenseImageUrl; img.style.display = 'block'; }
+    else { img.style.display = 'none'; img.src = ''; }
+  }
+  openModal('modal-add-operator');
+}
+function handleOperatorDrop(e) {
+  e.preventDefault();
+  document.getElementById('op-upload-zone').classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if (f && f.type.startsWith('image/')) handleOperatorFile(f);
+}
+function handleOperatorFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = document.getElementById('op-img-preview');
+    img.src = ev.target.result;
+    img.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+async function saveOperator() {
+  const name = document.getElementById('op-name').value.trim();
+  if (!name) { alert('נא למלא שם מנופאי'); return; }
+  const imgEl = document.getElementById('op-img-preview');
+  const hasNewImage = imgEl.style.display !== 'none' && imgEl.src.startsWith('data:');
+  let imageData = '';
+  if (hasNewImage) imageData = await compressImage(imgEl.src);
+  const existingImageUrl = !hasNewImage && editingOperatorId ? (appData.operators.find(o=>o.id===editingOperatorId)||{}).licenseImageUrl||'' : '';
+  const gv = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+  const data = {
+    id: editingOperatorId,
+    name,
+    siteId: parseInt(document.getElementById('op-site').value),
+    personalNum: gv('op-personal-num'),
+    idNumber: gv('op-id-number'),
+    licenseNumber: gv('op-license-number'),
+    profile: gv('op-profile'),
+    civilianLicenseExpiry: gv('op-civilian-expiry'),
+    militaryLicenseExpiry: gv('op-military-expiry'),
+    craneLicenseExpiry: gv('op-crane-expiry'),
+    tatash: gv('op-tatash'),
+    phone: gv('op-phone').replace(/\D/g,''),
+    licenseImageUrl: existingImageUrl
+  };
+  try {
+    showToast('שומר...');
+    const res = await apiPost({ action: editingOperatorId ? 'updateOperator' : 'addOperator', data });
+    if (!res) { alert('שגיאה: אין תגובה מהשרת'); return; }
+    if (res.ok === false) { alert('שגיאה משרת: ' + (res.msg||'לא ידוע')); return; }
+    const savedId = editingOperatorId || (res && res.id);
+    if (imageData && savedId) {
+      showToast('מעלה תמונה...');
+      try {
+        const imgRes = await apiPost({ action: 'uploadOperatorImage', data: { id: savedId, name, imageData } });
+        if (imgRes && imgRes.ok && imgRes.licenseImageUrl) showToast('מנופאי נשמר + תמונה הועלתה ✓');
+        else alert('שגיאה בהעלאת תמונה: ' + (imgRes ? JSON.stringify(imgRes) : 'אין תגובה'));
+      } catch(imgErr) { alert('שגיאת רשת בהעלאת תמונה: ' + imgErr.message); }
+    } else {
+      showToast(editingOperatorId ? 'מנופאי עודכן ✓' : 'מנופאי נוסף ✓');
+    }
+    closeModal('modal-add-operator');
+    loadData(true);
+  } catch(e) { alert('שגיאה כללית: ' + e.message); }
+}
+async function deleteOperator(id) {
+  if (!confirm('האם למחוק מנופאי זה?')) return;
+  appData.operators = appData.operators.filter(o => o.id !== id);
+  renderOperatorsTable();
+  showToast('מנופאי נמחק');
+  try {
+    const res = await apiPost({ action: 'deleteOperator', data: { id } });
+    if (!res || res.ok === false) { alert('שגיאה במחיקה: ' + (res && res.msg || '')); await loadData(); }
+  } catch(e) { alert('שגיאה: '+e.message); await loadData(); }
+}
+function viewOperator(id) {
+  const o = appData.operators.find(x => x.id === id);
+  if (!o) return;
+  const days = getOperatorRelevantDays(o);
+  const st = getOperatorStatus(o);
+  document.getElementById('view-op-body').innerHTML = `
+    ${(o.licenseImageUrl && String(o.licenseImageUrl).startsWith('http')) ? `
+  <div style="margin-bottom:1.5rem">
+    <a href="${o.licenseImageUrl}" target="_blank"
+       style="display:flex;align-items:center;justify-content:center;gap:10px;background:var(--blue);color:white;padding:14px;border-radius:8px;text-decoration:none;font-size:15px;font-weight:600;margin-bottom:8px">
+      🪪 פתח תמונת רישיון
+    </a>
+    <img src="${o.licenseImageUrl}" style="width:100%;border-radius:8px;border:1px solid var(--border);display:block">
+  </div>` : ''}
+    <table style="width:100%;font-size:14px;border-collapse:collapse">
+      ${[
+      ['שם המנופאי', `<strong>${o.name||'—'}</strong>`],
+      ['אתר', '📍 '+getSiteName(o.siteId)],
+      ['מ.א', o.personalNum||'—'],
+      ['ת.ז', o.idNumber||'—'],
+      ['מספר רישיון נהיגה', o.licenseNumber||'—'],
+      ['פרופיל', o.profile||'—'],
+      ['תוקף רישיון אזרחי', formatDate(o.civilianLicenseExpiry)],
+      ['תוקף רישיון צבאי', formatDate(o.militaryLicenseExpiry)],
+      ['תוקף רישיון מנוף נייד', formatDate(o.craneLicenseExpiry)],
+      ['תת"ש', o.tatash||'—'],
+      ['טלפון', formatPhone(o.phone)||'—'],
+      ['סטטוס', statusBadge(st,days)]
+    ].map((r,i)=>`<tr><td style="color:var(--text-muted);padding:9px 0;width:40%;${i>0?'border-top:1px solid var(--border)':''};font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">${r[0]}</td><td style="${i>0?'border-top:1px solid var(--border)':''}padding:9px 0">${r[1]}</td></tr>`).join('')}
+    </table>`;
+  openModal('modal-view-operator');
+}
+function populateOperatorSiteFilter() {
+  const sites = currentUser.role === 'admin' ? appData.sites : appData.sites.filter(s => String(currentUser.siteId||'').split(',').map(x=>x.trim()).includes(String(s.id)));
+  document.getElementById('op-filter-site').innerHTML = '<option value="">כל האתרים</option>' + sites.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+}
+function renderOperatorsTable() {
+  let ops = getUserOperators();
+  const sf = document.getElementById('op-filter-site').value;
+  const stf = document.getElementById('op-filter-status').value;
+  const q = document.getElementById('op-filter-search').value.toLowerCase();
+  if (sf) ops = ops.filter(o => o.siteId == sf);
+  if (stf) ops = ops.filter(o => getOperatorStatus(o) === stf);
+  if (q) ops = ops.filter(o => (o.name||'').toLowerCase().includes(q) || (o.idNumber||'').toLowerCase().includes(q) || (o.personalNum||'').toLowerCase().includes(q) || (o.licenseNumber||'').toLowerCase().includes(q));
+  const isAdmin = currentUser.role === 'admin';
+  document.getElementById('op-tbody').innerHTML = ops.map(o => {
+    const days = getOperatorRelevantDays(o);
+    const st = getOperatorStatus(o);
+    const expiryLines = OPERATOR_CHECK_FIELDS.filter(cf => o[cf.field]).map(cf => `${cf.label}: ${formatDate(o[cf.field])}`).join('<br>') || '—';
+    return `<tr>
+      <td><strong style="color:var(--blue)">${o.name||'—'}</strong><br><span style='font-size:11px;color:var(--text-muted)'>ת.ז: ${o.idNumber||'—'}</span></td>
+      <td>📍 ${getSiteName(o.siteId)}</td>
+      <td style="font-size:12px;color:var(--text-muted)">${expiryLines}</td>
+      <td>${statusBadge(st,days)}</td>
+      <td>${formatPhone(o.phone)}</td>
+      <td><div class="actions-cell">
+        <button class="btn-icon" onclick="viewOperator(${o.id})" title="פרטים">👁</button>
+        ${o.licenseImageUrl && o.licenseImageUrl.startsWith('http') ? `<a class="btn-icon" href="${o.licenseImageUrl}" target="_blank" title="תמונת רישיון" style="text-decoration:none;color:var(--blue)">🪪</a>` : ''}
+        ${isAdmin ? `<button class="btn-icon" onclick="editOperator(${o.id})" title="עריכה">✏️</button>` : ''}
+        ${isAdmin ? `<button class="btn-icon del" onclick="deleteOperator(${o.id})" title="מחיקה">🗑</button>` : ''}
+      </div></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:2rem">לא נמצאו מנופאים</td></tr>';
 }
 
 // ===== SITES =====
@@ -2589,6 +2927,13 @@ function closeModal(id) {
     document.getElementById('ai-loading').style.display = 'none';
     ['file-input-camera','file-input-gallery','file-input-pdf'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
     document.getElementById('modal-eq-title').textContent = 'הוספת אמצעי חדש';
+  }
+  // If closing the operator modal, reset it fully
+  if (id === 'modal-add-operator') {
+    editingOperatorId = null;
+    document.getElementById('modal-op-title').textContent = 'הוספת מנופאי חדש';
+    const img = document.getElementById('op-img-preview');
+    if (img) { img.style.display = 'none'; img.src = ''; }
   }
 }
 document.querySelectorAll('.modal-overlay').forEach(m => { m.addEventListener('click', function(e) { if (e.target === this) closeModal(this.id); }); });
