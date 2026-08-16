@@ -708,15 +708,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
             <input type="text" id="filter-search" placeholder="🔍 חיפוש..." onkeyup="renderEquipmentTable()" style="flex:1;min-width:140px">
           </div>
         </div>
-        <div class="table-wrap">
-          <table class="eq-mobile-table">
-            <thead><tr>
-              <th>מ. מזהה</th><th>מס' שילדה</th><th>סוג</th><th>אתר</th>
-              <th>בדיקה אחרונה</th><th>בדיקה הבאה</th><th>סטטוס</th><th>פעולות</th>
-            </tr></thead>
-            <tbody id="eq-tbody"></tbody>
-          </table>
-        </div>
+        <div class="section-body" id="eq-tbody" style="padding:1rem"></div>
       </div>
     </div>
 
@@ -740,14 +732,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
             <input type="text" id="op-filter-search" placeholder="🔍 חיפוש..." onkeyup="renderOperatorsTable()" style="flex:1;min-width:140px">
           </div>
         </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr>
-              <th>שם המנופאי</th><th>אתר</th><th>תוקפי רישיונות</th><th>סטטוס</th><th>טלפון</th><th>פעולות</th>
-            </tr></thead>
-            <tbody id="op-tbody"></tbody>
-          </table>
-        </div>
+        <div class="section-body" id="op-tbody" style="padding:1rem"></div>
       </div>
     </div>
 
@@ -1555,20 +1540,29 @@ function renderEquipmentTable() {
   const isAdmin = currentUser.role === 'admin';
   document.getElementById('eq-tbody').innerHTML = eqs.map(e => {
     const days = getRelevantDays(e); const st = getOverallStatus(e);
-    return `<tr>
-      <td><strong style="color:var(--blue)">${e.serialNumber||'—'}</strong><br><span style='font-size:11px;color:var(--text-muted)'>${e.eqId||''}</span></td>
-      <td>${e.name}</td><td><span style="color:var(--text-muted)">${e.type||'—'}</span></td>
-      <td>📍 ${getSiteName(e.siteId)}</td>
-      <td>${formatDate(e.lastCheck)}</td><td>${formatDate(e.nextCheck)}${e.btNext ? `<br><span style="font-size:11px;color:var(--text-muted)">ב.ת: ${formatDate(e.btNext)}</span>` : ''}</td>
-      <td>${statusBadge(st,days)}</td>
-      <td><div class="actions-cell">
+    const cls = st === 'danger' ? 'red' : st === 'warn' ? 'amber' : 'green';
+    const daysTxt = days >= 9000 ? 'אין תאריך' : days < 0 ? `פג לפני ${Math.abs(days)} ימים` : days === 0 ? 'היום!' : `${days} ימים`;
+    const dateParts = [];
+    if (e.nextCheck) dateParts.push(`תסקיר: ${formatDate(e.nextCheck)}`);
+    if (e.btNext) dateParts.push(`ב.ת: ${formatDate(e.btNext)}`);
+    const metaLine = `שילדה: ${e.name||'—'}` + (dateParts.length ? ` · 📅 ${dateParts.join(' · ')}` : '');
+    return `<div class="alert-item ${cls}" style="flex-direction:column;align-items:stretch;gap:0">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="alert-dot ${cls}"></div>
+        <div class="alert-info">
+          <div class="alert-name">${getSiteName(e.siteId)} · ${e.serialNumber||'—'} · ${e.type||'—'}</div>
+          <div class="alert-meta">${metaLine}</div>
+        </div>
+        <span class="alert-days ${cls}">${daysTxt}</span>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;padding-top:10px;margin-top:10px;border-top:1px solid rgba(0,0,0,0.08)">
         <button class="btn-icon" onclick="viewEquipment(${e.id})" title="פרטים">👁</button>
         ${e.imageUrl && e.imageUrl.startsWith('http') ? `<a class="btn-icon" href="${e.imageUrl}" target="_blank" title="פתח תסקיר ב-Drive" style="text-decoration:none;color:var(--blue)">📄</a>` : ''}
         ${isAdmin ? `<button class="btn-icon" onclick="editEquipment(${e.id})" title="עריכה">✏️</button>` : ''}
         ${isAdmin ? `<button class="btn-icon del" onclick="deleteEquipment(${e.id})" title="מחיקה">🗑</button>` : ''}
-      </div></td>
-    </tr>`;
-  }).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:2rem">לא נמצאו אמצעים</td></tr>';
+      </div>
+    </div>`;
+  }).join('') || '<div style="text-align:center;color:var(--text-muted);padding:2rem">לא נמצאו אמצעים</div>';
   renderEquipmentStats();
 }
 function viewEquipment(id) {
@@ -2303,22 +2297,28 @@ function renderOperatorsTable() {
   document.getElementById('op-tbody').innerHTML = ops.map(o => {
     const days = getOperatorRelevantDays(o);
     const st = getOperatorStatus(o);
-    const expiryLines = OPERATOR_CHECK_FIELDS.filter(cf => o[cf.field]).map(cf => `${cf.label}: ${formatDate(o[cf.field])}`).join('<br>') || '—';
-    return `<tr>
-      <td><strong style="color:var(--blue)">${o.name||'—'}</strong><br><span style='font-size:11px;color:var(--text-muted)'>ת.ז: ${o.idNumber||'—'}</span></td>
-      <td>📍 ${getSiteName(o.siteId)}</td>
-      <td style="font-size:12px;color:var(--text-muted)">${expiryLines}</td>
-      <td>${statusBadge(st,days)}</td>
-      <td>${formatPhone(o.phone)}</td>
-      <td><div class="actions-cell">
+    const cls = st === 'danger' ? 'red' : st === 'warn' ? 'amber' : 'green';
+    const daysTxt = days >= 9000 ? 'אין תאריך' : days < 0 ? `פג לפני ${Math.abs(days)} ימים` : days === 0 ? 'היום!' : `${days} ימים`;
+    const dateParts = OPERATOR_CHECK_FIELDS.filter(cf => o[cf.field]).map(cf => `${cf.label}: ${formatDate(o[cf.field])}`);
+    const metaLine = (dateParts.length ? `📅 ${dateParts.join(' · ')} · ` : '') + `📞 ${formatPhone(o.phone)}`;
+    return `<div class="alert-item ${cls}" style="flex-direction:column;align-items:stretch;gap:0">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="alert-dot ${cls}"></div>
+        <div class="alert-info">
+          <div class="alert-name">${getSiteName(o.siteId)} · ${o.name||'—'} · ת.ז ${o.idNumber||'—'}</div>
+          <div class="alert-meta">${metaLine}</div>
+        </div>
+        <span class="alert-days ${cls}">${daysTxt}</span>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;padding-top:10px;margin-top:10px;border-top:1px solid rgba(0,0,0,0.08)">
         <button class="btn-icon" onclick="viewOperator(${o.id})" title="פרטים">👁</button>
         ${o.licenseImageUrl && o.licenseImageUrl.startsWith('http') ? `<a class="btn-icon" href="${o.licenseImageUrl}" target="_blank" title="תמונת רישיון" style="text-decoration:none;color:var(--blue)">🪪</a>` : ''}
         ${operatorWaLink(o)}
         ${isAdmin ? `<button class="btn-icon" onclick="editOperator(${o.id})" title="עריכה">✏️</button>` : ''}
         ${isAdmin ? `<button class="btn-icon del" onclick="deleteOperator(${o.id})" title="מחיקה">🗑</button>` : ''}
-      </div></td>
-    </tr>`;
-  }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:2rem">לא נמצאו מנופאים</td></tr>';
+      </div>
+    </div>`;
+  }).join('') || '<div style="text-align:center;color:var(--text-muted);padding:2rem">לא נמצאו מנופאים</div>';
   renderOperatorStats();
 }
 
