@@ -989,10 +989,18 @@ tr:hover td { background: rgba(30,77,183,0.02); }
   <div class="modal" style="max-width:420px">
     <div class="modal-header"><h3>📄 הפקת תכנית עבודה</h3><button class="btn-close" onclick="closeModal('modal-workplan-range')">×</button></div>
     <div class="modal-body">
-      <p style="font-size:13px;color:var(--text-muted);margin-bottom:1rem">בחר את טווח התאריכים שיוצג בלוח השנה. כל תא ביום ספציפי יסומן אם יש לאמצעי תאריך רלוונטי (תסקיר/ב.ת) שחל בו.</p>
-      <div class="form-row">
-        <div class="form-group"><label>מתאריך</label><input type="date" id="workplan-from-date"></div>
-        <div class="form-group"><label>עד תאריך</label><input type="date" id="workplan-to-date"></div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:1rem">בחר חודש בודד או שנת עבודה שלמה. כל תא ביום ספציפי יסומן אם יש לאמצעי תאריך רלוונטי (תסקיר/ב.ת) שחל בו.</p>
+      <div style="display:flex;gap:8px;margin-bottom:1.25rem">
+        <button type="button" id="wp-mode-month-btn" class="btn-secondary" onclick="setWorkPlanMode('month')" style="flex:1">📅 חודש בודד</button>
+        <button type="button" id="wp-mode-year-btn" class="btn-secondary" onclick="setWorkPlanMode('year')" style="flex:1">🗓️ שנת עבודה</button>
+      </div>
+      <div class="form-group" id="wp-month-group">
+        <label>בחר חודש</label>
+        <input type="month" id="workplan-month">
+      </div>
+      <div class="form-group" id="wp-year-group" style="display:none">
+        <label>בחר שנה</label>
+        <select id="workplan-year"></select>
       </div>
     </div>
     <div class="modal-footer">
@@ -2409,23 +2417,52 @@ function renderSitesNew() {
   }).join('');
 }
 
+let workPlanMode = 'month';
+function setWorkPlanMode(mode) {
+  workPlanMode = mode;
+  const monthBtn = document.getElementById('wp-mode-month-btn');
+  const yearBtn = document.getElementById('wp-mode-year-btn');
+  const monthGroup = document.getElementById('wp-month-group');
+  const yearGroup = document.getElementById('wp-year-group');
+  const activeStyle = (btn, active) => {
+    btn.style.borderColor = active ? 'var(--blue)' : 'var(--border)';
+    btn.style.color = active ? 'var(--blue)' : 'var(--text-muted)';
+    btn.style.background = active ? 'rgba(30,77,183,0.06)' : 'var(--card)';
+  };
+  activeStyle(monthBtn, mode === 'month');
+  activeStyle(yearBtn, mode === 'year');
+  monthGroup.style.display = mode === 'month' ? '' : 'none';
+  yearGroup.style.display = mode === 'year' ? '' : 'none';
+}
 function openWorkPlanRangeModal() {
   const today = new Date();
-  const in12Months = new Date(today.getFullYear(), today.getMonth()+12, today.getDate());
-  const iso = (d) => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
-  document.getElementById('workplan-from-date').value = iso(today);
-  document.getElementById('workplan-to-date').value = iso(in12Months);
+  document.getElementById('workplan-month').value = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0');
+  const yearSel = document.getElementById('workplan-year');
+  const curYear = today.getFullYear();
+  yearSel.innerHTML = '';
+  for (let y = curYear - 1; y <= curYear + 3; y++) {
+    const opt = document.createElement('option');
+    opt.value = y; opt.textContent = y;
+    if (y === curYear) opt.selected = true;
+    yearSel.appendChild(opt);
+  }
+  setWorkPlanMode('month');
   openModal('modal-workplan-range');
 }
 function confirmGenerateWorkPlan() {
-  const fromVal = document.getElementById('workplan-from-date').value;
-  const toVal = document.getElementById('workplan-to-date').value;
-  if (!fromVal || !toVal) { alert('נא לבחור טווח תאריכים'); return; }
-  const from = new Date(fromVal);
-  const to = new Date(toVal);
-  if (to < from) { alert('תאריך הסיום חייב להיות אחרי תאריך ההתחלה'); return; }
-  const monthsSpan = (to.getFullYear()*12 + to.getMonth()) - (from.getFullYear()*12 + from.getMonth()) + 1;
-  if (monthsSpan > 36 && !confirm(`הטווח שבחרת מכסה ${monthsSpan} חודשים ויפיק מסמך ארוך. להמשיך?`)) return;
+  let from, to;
+  if (workPlanMode === 'month') {
+    const val = document.getElementById('workplan-month').value; // 'YYYY-MM'
+    if (!val) { alert('נא לבחור חודש'); return; }
+    const [y, m] = val.split('-').map(Number);
+    from = new Date(y, m-1, 1);
+    to = new Date(y, m, 0); // last day of that month
+  } else {
+    const y = parseInt(document.getElementById('workplan-year').value);
+    if (!y) { alert('נא לבחור שנה'); return; }
+    from = new Date(y, 0, 1);
+    to = new Date(y, 11, 31);
+  }
   closeModal('modal-workplan-range');
   generateEquipmentPageWorkPlan(from, to);
 }
