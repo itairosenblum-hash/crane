@@ -630,7 +630,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
     <div class="tabs-wrap">
       <button class="tab-btn active" onclick="showTab('dashboard',this)"><span class="tab-icon">📊</span> לוח בקרה</button>
       <button class="tab-btn" onclick="showTab('equipment',this)"><span class="tab-icon">🏗️</span> אמצעים</button>
-      <button class="tab-btn" onclick="showTab('operators',this)"><span class="tab-icon">👷</span> מנופאים</button>
+      <button class="tab-btn" id="tab-operators-btn" onclick="showTab('operators',this)"><span class="tab-icon">👷</span> מנופאים</button>
       <button class="tab-btn" id="tab-sites-btn" onclick="showTab('sites',this)"><span class="tab-icon">📍</span> אתרים</button>
       <button class="tab-btn" id="tab-settings-btn" onclick="showTab('settings',this)"><span class="tab-icon">⚙️</span> הגדרות</button>
       <button class="tab-btn" id="tab-wa-btn" onclick="showTab('whatsapp',this)"><span class="tab-icon">💬</span> WhatsApp</button>
@@ -1142,6 +1142,7 @@ async function doLogin() {
       document.getElementById('tab-sites-btn').style.display = 'none';
       document.getElementById('tab-settings-btn').style.display = 'none';
       document.getElementById('tab-wa-btn').style.display = 'none';
+      document.getElementById('tab-operators-btn').style.display = 'none';
     } else {
       document.getElementById('btn-add-eq').style.display = '';
       document.getElementById('btn-add-op').style.display = '';
