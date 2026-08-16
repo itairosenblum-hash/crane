@@ -267,6 +267,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
 .loading { display: flex; align-items: center; gap: 10px; color: var(--blue); font-size: 14px; padding: 0.75rem 0; }
 .spinner { width: 20px; height: 20px; border: 2px solid rgba(30,77,183,0.2); border-top-color: var(--blue); border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
+#nav-refresh-btn.spinning { animation: spin 0.7s linear infinite; pointer-events: none; opacity: 0.7; }
 .img-preview { max-width: 100%; max-height: 180px; border-radius: var(--radius-sm); margin-bottom: 1rem; display: none; object-fit: cover; border: 1px solid var(--border); }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
@@ -480,6 +481,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
   <div class="nav-right">
     <span class="sync-status sync-ok" id="sync-status">● מחובר</span>
     <span class="nav-user" id="nav-user-name"></span>
+    <button id="nav-refresh-btn" onclick="manualRefresh()" title="רענן נתונים" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:var(--radius-sm);padding:7px 10px;cursor:pointer;color:#cbd5e1;font-size:16px;display:flex;align-items:center;justify-content:center">🔄</button>
     <button id="nav-settings-btn" onclick="toggleSettingsPanel()" title="הגדרות" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:var(--radius-sm);padding:7px 10px;cursor:pointer;color:#cbd5e1;font-size:16px">⚙️</button>
     <button class="btn-logout" onclick="logout()">יציאה</button>
   </div>
@@ -975,6 +977,18 @@ async function loadData(silent = false) {
     setSyncStatus('ok', '● מחובר');
     refreshCurrentTab();
   } catch(e) { setSyncStatus('err', '● שגיאה'); }
+}
+
+// Manual refresh from the nav bar — reloads data from Sheets without reloading the page
+async function manualRefresh() {
+  const btn = document.getElementById('nav-refresh-btn');
+  if (btn) btn.classList.add('spinning');
+  try {
+    await loadData();
+    showToast('הנתונים עודכנו ✓');
+  } finally {
+    if (btn) btn.classList.remove('spinning');
+  }
 }
 
 // Update local data without re-fetching from Sheets
