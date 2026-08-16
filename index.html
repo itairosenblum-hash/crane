@@ -135,6 +135,14 @@ nav {
 .tab-btn:hover { background: var(--bg); color: var(--text); }
 .tab-btn.active { color: var(--blue); border-bottom-color: var(--blue); background: rgba(30,77,183,0.04); font-weight: 600; }
 .tab-icon { font-size: 16px; }
+.tab-badge {
+  position: absolute; top: -6px; left: -8px;
+  background: var(--danger); color: white;
+  font-size: 10px; font-weight: 800; line-height: 1;
+  min-width: 15px; height: 15px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid var(--card); box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
 
 /* STATS */
 .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
@@ -644,8 +652,8 @@ tr:hover td { background: rgba(30,77,183,0.02); }
     <!-- TABS -->
     <div class="tabs-wrap">
       <button class="tab-btn active" onclick="showTab('dashboard',this)"><span class="tab-icon">📊</span> לוח בקרה</button>
-      <button class="tab-btn" onclick="showTab('equipment',this)"><span class="tab-icon">🏗️</span> אמצעים</button>
-      <button class="tab-btn" id="tab-operators-btn" onclick="showTab('operators',this)"><span class="tab-icon">👷</span> מנופאים</button>
+      <button class="tab-btn" id="tab-equipment-btn" onclick="showTab('equipment',this)"><span class="tab-icon" style="position:relative">🏗️<span class="tab-badge" id="eq-tab-badge" style="display:none">!</span></span> אמצעים</button>
+      <button class="tab-btn" id="tab-operators-btn" onclick="showTab('operators',this)"><span class="tab-icon" style="position:relative">👷<span class="tab-badge" id="op-tab-badge" style="display:none">!</span></span> מנופאים</button>
       <button class="tab-btn" id="tab-sites-btn" onclick="showTab('sites',this)"><span class="tab-icon">📍</span> אתרים</button>
       <button class="tab-btn" id="tab-settings-btn" onclick="showTab('settings',this)"><span class="tab-icon">⚙️</span> הגדרות</button>
       <button class="tab-btn" id="tab-wa-btn" onclick="showTab('whatsapp',this)"><span class="tab-icon">💬</span> WhatsApp</button>
@@ -1075,6 +1083,7 @@ async function loadData(silent = false) {
     }));
     setSyncStatus('ok', '● מחובר');
     refreshCurrentTab();
+    updateNavBadges();
   } catch(e) { setSyncStatus('err', '● שגיאה'); }
 }
 
@@ -1514,6 +1523,17 @@ function renderEquipmentStats() {
     <div class="stat-card${active('danger')}" onclick="setEquipmentFilter('danger')"><div class="stat-icon red">🚨</div><div class="stat-info"><div class="stat-label">דחוף / פג תוקף</div><div class="stat-value red">${danger}</div></div></div>
     <div class="stat-card${active('warn')}" onclick="setEquipmentFilter('warn')"><div class="stat-icon amber">⏰</div><div class="stat-info"><div class="stat-label">קרוב לבדיקה</div><div class="stat-value amber">${warn}</div></div></div>
     <div class="stat-card${active('ok')}" onclick="setEquipmentFilter('ok')"><div class="stat-icon green">✅</div><div class="stat-info"><div class="stat-label">תקין</div><div class="stat-value green">${ok}</div></div></div>`;
+  updateNavBadges();
+}
+// Shows/hides an exclamation-mark badge on the "אמצעים"/"מנופאים" bottom-nav icons
+// whenever at least one item is genuinely overdue (not just "urgent" — actually past its date).
+function updateNavBadges() {
+  const eqExpired = getUserEquipment().some(e => getRelevantDays(e) < 0);
+  const opExpired = getUserOperators().some(o => OPERATOR_CHECK_FIELDS.some(cf => o[cf.field] && daysUntil(o[cf.field]) < 0));
+  const eqBadge = document.getElementById('eq-tab-badge');
+  const opBadge = document.getElementById('op-tab-badge');
+  if (eqBadge) eqBadge.style.display = eqExpired ? 'flex' : 'none';
+  if (opBadge) opBadge.style.display = opExpired ? 'flex' : 'none';
 }
 function setEquipmentFilter(f) {
   equipmentStatusFilter = (equipmentStatusFilter === f) ? '' : f;
@@ -2263,6 +2283,7 @@ function renderOperatorStats() {
     <div class="stat-card${active('danger')}" onclick="setOperatorFilter('danger')"><div class="stat-icon red">🚨</div><div class="stat-info"><div class="stat-label">דחוף / פג תוקף</div><div class="stat-value red">${danger}</div></div></div>
     <div class="stat-card${active('warn')}" onclick="setOperatorFilter('warn')"><div class="stat-icon amber">⏰</div><div class="stat-info"><div class="stat-label">קרוב לפוג תוקף</div><div class="stat-value amber">${warn}</div></div></div>
     <div class="stat-card${active('ok')}" onclick="setOperatorFilter('ok')"><div class="stat-icon green">✅</div><div class="stat-info"><div class="stat-label">בתוקף</div><div class="stat-value green">${ok}</div></div></div>`;
+  updateNavBadges();
 }
 function setOperatorFilter(f) {
   const sel = document.getElementById('op-filter-status');
