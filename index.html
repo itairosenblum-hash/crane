@@ -1402,6 +1402,30 @@ function getUserOperators() {
   if (!userSites.length) return appData.operators;
   return appData.operators.filter(o => userSites.includes(String(o.siteId)));
 }
+// Mirrors getDueChecks()/getNextRelevantCheck() for operators, used to fold operator
+// license alerts into the admin dashboard alongside equipment alerts.
+function getDueOperatorChecks(ops, maxDays = 30) {
+  const due = [];
+  ops.forEach(o => {
+    OPERATOR_CHECK_FIELDS.forEach(cf => {
+      const val = o[cf.field];
+      if (val && String(val).trim() !== '' && daysUntil(val) <= maxDays) {
+        due.push({ op: o, label: cf.label, date: val, days: daysUntil(val) });
+      }
+    });
+  });
+  return due;
+}
+function getNextOperatorCheck(o) {
+  let best = null;
+  OPERATOR_CHECK_FIELDS.forEach(cf => {
+    const val = o[cf.field];
+    if (!val || String(val).trim() === '') return;
+    const days = daysUntil(val);
+    if (!best || days < best.days) best = { label: cf.label, date: val, days };
+  });
+  return best;
+}
 function statusBadge(st, days) {
   const L = { ok:'תקין', warn:'קרוב לבדיקה', danger: days < 0 ? 'פג תוקף!' : 'דחוף' };
   const C = { ok:'badge-ok', warn:'badge-warn', danger:'badge-danger' };
@@ -1458,25 +1482,54 @@ function renderDashboard() {
   const clearBtn = dashboardFilter !== 'all' ? ` <button onclick="setDashboardFilter('all')" class="btn-secondary" style="font-size:11px;padding:3px 10px;margin-right:8px;font-weight:500">✕ נקה סינון</button>` : '';
   document.getElementById('alerts-title').innerHTML = titleMap[dashboardFilter] + clearBtn;
 
+  const isAdmin = currentUser.role === 'admin';
   let items;
   if (dashboardFilter === 'all') {
-    items = getDueChecks(eqs, 30);
+    items = getDueChecks(eqs, 30).map(d => ({ entityType: 'equipment', ...d }));
+    if (isAdmin) {
+      items = items.concat(getDueOperatorChecks(getUserOperators(), 30).map(d => ({ entityType: 'operator', ...d })));
+    }
+    items.sort((a,b) => a.days - b.days);
   } else {
-    // A status filter is active: show every matching equipment (not just those due within 30 days),
-    // using each one's soonest tracked date for display.
+    // A status filter is active: show every matching equipment/operator (not just those due
+    // within 30 days), using each one's soonest tracked date for display.
     items = eqs.filter(e => getOverallStatus(e) === dashboardFilter).map(e => {
       const nc = getNextRelevantCheck(e);
-      return nc ? { eq: e, kind: nc.kind, label: nc.label, date: nc.date, days: nc.days } : { eq: e, kind: 'check', label: '', date: '', days: 9999 };
-    }).sort((a,b) => a.days - b.days);
+      return nc ? { entityType: 'equipment', eq: e, kind: nc.kind, label: nc.label, date: nc.date, days: nc.days } : { entityType: 'equipment', eq: e, kind: 'check', label: '', date: '', days: 9999 };
+    });
+    if (isAdmin) {
+      const opItems = getUserOperators().filter(o => getOperatorStatus(o) === dashboardFilter).map(o => {
+        const nc = getNextOperatorCheck(o);
+        return nc ? { entityType: 'operator', op: o, label: nc.label, date: nc.date, days: nc.days } : { entityType: 'operator', op: o, label: '', date: '', days: 9999 };
+      });
+      items = items.concat(opItems);
+    }
+    items.sort((a,b) => a.days - b.days);
   }
 
   if (!items.length) {
-    const emptyMsg = dashboardFilter === 'all' ? 'אין התראות פעילות — כל האמצעים תקינים' : 'אין אמצעים התואמים לסינון זה';
+    const emptyMsg = dashboardFilter === 'all' ? 'אין התראות פעילות — הכל תקין' : 'אין התאמות לסינון זה';
     document.getElementById('alerts-list').innerHTML = `<div style="color:var(--text-muted);font-size:14px;padding:0.5rem 0;display:flex;align-items:center;gap:8px"><span style="font-size:20px">✅</span> ${emptyMsg}</div>`;
     return;
   }
 
   document.getElementById('alerts-list').innerHTML = items.map(d => {
+    if (d.entityType === 'operator') {
+      const o = d.op;
+      const days = d.days;
+      const cls = days <= 14 ? 'red' : days <= 30 ? 'amber' : 'green';
+      const daysTxt = !d.date ? 'אין תאריך' : days < 0 ? `פג לפני ${Math.abs(days)} ימים` : days === 0 ? 'היום!' : `${days} ימים`;
+      const metaLine = d.date ? `${d.label}: ${formatDate(d.date)}${o.phone ? ' · 📞 '+formatPhone(o.phone) : ''}` : `אין תאריך רישיון רשום${o.phone ? ' · 📞 '+formatPhone(o.phone) : ''}`;
+      return `<div class="alert-item ${cls}">
+        <div class="alert-dot ${cls}"></div>
+        <div class="alert-info">
+          <div class="alert-name">👷 ${getSiteName(o.siteId)} · ${o.name||'—'} · ת.ז ${o.idNumber||'—'}</div>
+          <div class="alert-meta">${metaLine}</div>
+        </div>
+        <span class="alert-days ${cls}">${daysTxt}</span>
+        ${operatorWaLink(o)}
+      </div>`;
+    }
     const e = d.eq;
     const days = d.days;
     const cls = days <= 14 ? 'red' : days <= 30 ? 'amber' : 'green';
@@ -1486,7 +1539,7 @@ function renderDashboard() {
     return `<div class="alert-item ${cls}">
       <div class="alert-dot ${cls}"></div>
       <div class="alert-info">
-        <div class="alert-name">${kindTag}${getSiteName(e.siteId)} · ${e.serialNumber||'—'} · ${e.type||'—'}</div>
+        <div class="alert-name">${kindTag}🏗️ ${getSiteName(e.siteId)} · ${e.serialNumber||'—'} · ${e.type||'—'}</div>
         <div class="alert-meta">${metaLine}</div>
       </div>
       <span class="alert-days ${cls}">${daysTxt}</span>
