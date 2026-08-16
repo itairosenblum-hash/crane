@@ -1288,11 +1288,11 @@ function renderDashboard() {
     return `<div class="alert-item ${cls}">
       <div class="alert-dot ${cls}"></div>
       <div class="alert-info">
-        <div class="alert-name">${kindTag}${e.name} <span style="color:var(--text-muted);font-size:12px;font-weight:400">(${e.serialNumber||'—'})</span></div>
+        <div class="alert-name">${kindTag}${e.serialNumber||'—'} <span style="color:var(--text-muted);font-size:12px;font-weight:400">(${e.name||'—'})</span></div>
         <div class="alert-meta">📍 ${getSiteName(e.siteId)} · 📅 ${d.label}: ${formatDate(d.date)}</div>
       </div>
       <span class="alert-days ${cls}">${daysTxt}</span>
-      ${waLink(e.phone, e.name, e.siteId, d.date, d.kind)}
+      ${waLink(e.phone, e.serialNumber||e.name, e.siteId, d.date, d.kind)}
     </div>`;
   }).join('');
 }
@@ -1850,8 +1850,8 @@ function renderSitesNew() {
               const dot = st === 'danger' ? '🔴' : st === 'warn' ? '🟡' : '🟢';
               return `<div class="eq-item" onclick="viewEquipment(${e.id})">
                 <div class="eq-item-info">
-                  <div class="eq-item-name">${dot} ${e.name||'—'}</div>
-                  <div class="eq-item-id"><strong style="color:var(--blue)">רישוי: ${e.serialNumber||'—'}</strong> · תסקיר: ${e.eqId||'—'}</div>
+                  <div class="eq-item-name">${dot} ${e.serialNumber||'—'}</div>
+                  <div class="eq-item-id">שילדה: ${e.name||'—'} · תסקיר: ${e.eqId||'—'}</div>
                   <div class="eq-item-dates">בדיקה הבאה: ${formatDate(e.nextCheck)}${e.btNext ? ` · ב.ת: ${formatDate(e.btNext)}` : ''}</div>
                 </div>
                 ${statusBadge(st, days)}
@@ -2206,7 +2206,7 @@ function loadExpiryReminders() {
     const greeting = name ? `שלום ${name},\n\n` : 'שלום,\n\n';
     const lines = items.map((d, i) => {
       const e = d.eq;
-      return `${i+1}. 🔧 ${e.name} (${e.type||''})\n   🔢 *רישוי: ${e.serialNumber||'—'}*  |  📋 תסקיר: ${e.eqId}\n   📍 ${getSiteName(e.siteId)}\n   📅 ${d.label}: ${formatDate(d.date)} — ${dLabelFor(d.days)}`;
+      return `${i+1}. 🔧 *רישוי: ${e.serialNumber||'—'}* (${e.type||''})\n   🪪 שילדה: ${e.name||'—'}  |  📋 תסקיר: ${e.eqId}\n   📍 ${getSiteName(e.siteId)}\n   📅 ${d.label}: ${formatDate(d.date)} — ${dLabelFor(d.days)}`;
     }).join('\n\n');
     return greeting + `תזכורת — האמצעים הבאים דורשים תיאום בדיקה:\n\n${lines}\n\nנא לתאם בהקדם האפשרי.\n\nמערכת תסקירי הבטיחות — מדור צהר"מ זרוע הים`;
   }
@@ -2214,7 +2214,7 @@ function loadExpiryReminders() {
   function buildSingleMsg(d) {
     const e = d.eq;
     const what = d.waWhat || 'תסקיר הבטיחות';
-    return `שלום,\n\nתזכורת: ${what} של האמצעי הבא עומד לפוג:\n\n🔧 ${e.name} (${e.type||''})\n🔢 *רישוי: ${e.serialNumber||'—'}*\n📋 תסקיר: ${e.eqId}\n📍 אתר: ${getSiteName(e.siteId)}\n📅 ${d.label}: ${formatDate(d.date)} (${dLabelFor(d.days)})\n\nנא לתאם בדיקה חדשה בהקדם.\n\nמערכת תסקירי הבטיחות — מדור צהר"מ זרוע הים`;
+    return `שלום,\n\nתזכורת: ${what} של האמצעי הבא עומד לפוג:\n\n🔧 *רישוי: ${e.serialNumber||'—'}* (${e.type||''})\n🪪 שילדה: ${e.name||'—'}\n📋 תסקיר: ${e.eqId}\n📍 אתר: ${getSiteName(e.siteId)}\n📅 ${d.label}: ${formatDate(d.date)} (${dLabelFor(d.days)})\n\nנא לתאם בדיקה חדשה בהקדם.\n\nמערכת תסקירי הבטיחות — מדור צהר"מ זרוע הים`;
   }
 
   let html = '';
@@ -2250,7 +2250,7 @@ function loadExpiryReminders() {
       html += `<div class="alert-item ${cls}" style="margin-bottom:8px">
         <div class="alert-dot ${cls}"></div>
         <div class="alert-info">
-          <div class="alert-name">${kindTag}${e.name} <span style="font-size:12px;color:var(--text-muted)">(${e.serialNumber||'—'})</span></div>
+          <div class="alert-name">${kindTag}${e.serialNumber||'—'} <span style="font-size:12px;color:var(--text-muted)">(${e.name||'—'})</span></div>
           <div class="alert-meta">📍 ${getSiteName(e.siteId)} · 📅 ${d.label}: ${formatDate(d.date)} · ${dLabel}</div>
           ${responsible
             ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">אחראי: ${responsible.fullname||responsible.username} ${formatPhone(responsible.phone)}</div>`
