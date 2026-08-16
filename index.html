@@ -498,7 +498,6 @@ tr:hover td { background: rgba(30,77,183,0.02); }
     <span class="sync-status sync-ok" id="sync-status">● מחובר</span>
     <span class="nav-user" id="nav-user-name"></span>
     <button id="nav-refresh-btn" onclick="manualRefresh()" title="רענן נתונים" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:var(--radius-sm);padding:7px 10px;cursor:pointer;color:#cbd5e1;font-size:16px;display:flex;align-items:center;justify-content:center">🔄</button>
-    <button id="nav-settings-btn" onclick="toggleSettingsPanel()" title="הגדרות" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:var(--radius-sm);padding:7px 10px;cursor:pointer;color:#cbd5e1;font-size:16px">⚙️</button>
     <button class="btn-logout" onclick="logout()">יציאה</button>
   </div>
 </nav>
@@ -674,7 +673,10 @@ tr:hover td { background: rgba(30,77,183,0.02); }
           <circle cx="142" cy="83" r="6" fill="none" stroke="#f59e0b" stroke-width="3"/>
         </svg>
         <div><h2>אמצעי הרמה ובטיחות</h2><p>ניהול ומעקב אחר כלל האמצעים</p></div>
-        <button class="btn-add" id="btn-add-eq" onclick="openAddModal()" style="display:none">+ הוסף אמצעי</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn-secondary" onclick="generateEquipmentPageWorkPlan()" style="color:#94a3b8;border-color:rgba(255,255,255,0.2)">📄 תכנית עבודה</button>
+          <button class="btn-add" id="btn-add-eq" onclick="openAddModal()" style="display:none">+ הוסף אמצעי</button>
+        </div>
       </div>
       <div class="section-card">
         <div class="section-head">
@@ -1384,7 +1386,7 @@ function populateSiteFilter() {
   const types = [...new Set(getUserEquipment().map(e => e.type).filter(Boolean))].sort();
   document.getElementById('filter-type').innerHTML = '<option value="">כל הסוגים</option>' + types.map(t => `<option value="${t}">${t}</option>`).join('');
 }
-function renderEquipmentTable() {
+function getFilteredEquipment() {
   let eqs = getUserEquipment();
   const sf = document.getElementById('filter-site').value;
   const tf = document.getElementById('filter-type') ? document.getElementById('filter-type').value : '';
@@ -1394,6 +1396,10 @@ function renderEquipmentTable() {
   if (tf) eqs = eqs.filter(e => e.type === tf);
   if (stf) eqs = eqs.filter(e => getOverallStatus(e) === stf);
   if (q) eqs = eqs.filter(e => (e.name||'').toLowerCase().includes(q) || (e.eqId||'').toLowerCase().includes(q) || (e.serialNumber||'').toLowerCase().includes(q));
+  return eqs;
+}
+function renderEquipmentTable() {
+  const eqs = getFilteredEquipment();
   const isAdmin = currentUser.role === 'admin';
   document.getElementById('eq-tbody').innerHTML = eqs.map(e => {
     const days = getRelevantDays(e); const st = getOverallStatus(e);
@@ -1948,19 +1954,28 @@ function renderSitesNew() {
   }).join('');
 }
 
-// Opens a printable, RTL-formatted 12-month CALENDAR for a single user, covering
-// ALL equipment across every site assigned to them. Each equipment's upcoming check
-// dates (תסקיר / ב.ת) are marked directly on the calendar day they fall on, so the
-// reader sees "license X expires on this day" at a glance. Uses the browser's native
-// print dialog ("Save as PDF") — this avoids the poor Hebrew/RTL font support of
-// client-side PDF-generation libraries (e.g. jsPDF).
-function generateUserWorkPlan(username) {
-  const user = appData.users.find(u => u.username === username);
-  if (!user) return;
-  const eqs = getEquipmentForUser(user);
-  const userSiteIds = String(user.siteId||'').split(',').map(s => s.trim()).filter(Boolean);
-  const siteNames = userSiteIds.length ? userSiteIds.map(id => getSiteName(id)).join(', ') : 'כל האתרים';
-  const personName = user.fullname || user.username;
+// Opens a printable, RTL-formatted 12-month CALENDAR covering whatever equipment
+// is currently visible on the Equipment page (respecting its site/type/status/search
+// filters). Each equipment's upcoming check dates (תסקיר / ב.ת) are marked directly
+// on the calendar day they fall on, so the reader sees "license X expires on this
+// day" at a glance. Uses the browser's native print dialog ("Save as PDF") — this
+// avoids the poor Hebrew/RTL font support of client-side PDF-generation libraries
+// (e.g. jsPDF).
+function generateEquipmentPageWorkPlan() {
+  const eqs = getFilteredEquipment();
+
+  const sf = document.getElementById('filter-site').value;
+  const tf = document.getElementById('filter-type') ? document.getElementById('filter-type').value : '';
+  const stf = document.getElementById('filter-status').value;
+  const q = document.getElementById('filter-search').value.trim();
+
+  const personName = sf ? getSiteName(sf) : (currentUser.role === 'admin' ? 'כל האתרים' : (currentUser.fullname || currentUser.username));
+  const statusLabels = { ok: 'תקין', warn: 'קרוב לבדיקה', danger: 'דחוף / פג תוקף' };
+  const filterParts = [];
+  if (tf) filterParts.push('סוג: ' + tf);
+  if (stf) filterParts.push('סטטוס: ' + (statusLabels[stf] || stf));
+  if (q) filterParts.push(`חיפוש: "${q}"`);
+  const filterSubtitle = filterParts.length ? ' · ' + filterParts.join(' · ') : '';
 
   const today = new Date(); today.setHours(0,0,0,0);
   const dateStr = String(today.getDate()).padStart(2,'0') + '/' + String(today.getMonth()+1).padStart(2,'0') + '/' + today.getFullYear();
@@ -2067,7 +2082,7 @@ function generateUserWorkPlan(username) {
     <div class="cover-header">
       <div>
         <h1>תכנית עבודה — לוח שנה — ${personName}</h1>
-        <p>מערכת תסקירי הבטיחות — מדור צהר"מ זרוע הים · אתרים: ${siteNames}</p>
+        <p>מערכת תסקירי הבטיחות — מדור צהר"מ זרוע הים${filterSubtitle}</p>
       </div>
       <div class="meta">תאריך הפקה: ${dateStr}<br>סה"כ אמצעים: ${eqs.length} · סה"כ תאריכים: ${totalEvents}</div>
     </div>
@@ -2118,7 +2133,6 @@ function renderUsersTable() {
       <td>${siteName === 'כל האתרים' ? '🌐 כל האתרים' : '📍 '+siteName}</td>
       <td>${formatPhone(u.phone)}</td>
       <td><div class="actions-cell">
-        <button class="btn-icon" onclick="generateUserWorkPlan('${u.username}')" title="הפק תכנית עבודה PDF (לוח שנה)">📄</button>
         <button class="btn-icon" onclick="editUser('${u.username}')" title="עריכה">✏️</button>
         ${u.username !== 'admin' ? `<button class="btn-icon del" onclick="deleteUser('${u.username}')" title="מחיקה">🗑</button>` : ''}
       </div></td>
