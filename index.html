@@ -2076,7 +2076,16 @@ async function saveUser() {
 }
 async function deleteUser(username) {
   if (!confirm(`למחוק משתמש ${username}?`)) return;
-  try { await apiPost({ action:'deleteUser', data:{username} }); showToast('משתמש הוסר'); loadData(true).then(() => renderUsersTable()); } catch(e) { alert('שגיאה: '+e.message); }
+  try {
+    const res = await apiPost({ action:'deleteUser', data:{username} });
+    if (!res || res.ok === false) {
+      alert('שגיאה במחיקת משתמש: ' + (res && res.msg ? res.msg : 'לא ידוע'));
+      await loadData(true); renderUsersTable();
+      return;
+    }
+    showToast('משתמש הוסר');
+    await loadData(true); renderUsersTable();
+  } catch(e) { alert('שגיאה: '+e.message); }
 }
 
 // ===== WHATSAPP =====
