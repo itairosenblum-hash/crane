@@ -711,7 +711,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
       <div class="filter-row">
         <select id="filter-site" onchange="renderEquipmentTable()"><option value="">כל האתרים</option></select>
         <select id="filter-type" onchange="renderEquipmentTable()"><option value="">כל הסוגים</option></select>
-        <input type="text" id="filter-search" placeholder="🔍 חיפוש..." onkeyup="renderEquipmentTable()" style="flex:1;min-width:140px">
+        <input type="text" id="filter-search" placeholder="🔍 חיפוש..." oninput="renderEquipmentTable()" style="flex:1;min-width:140px">
       </div>
       <div id="eq-tbody"></div>
     </div>
@@ -731,7 +731,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
           <option value="warn">קרוב לפג תוקף</option>
           <option value="danger">דחוף / פג תוקף</option>
         </select>
-        <input type="text" id="op-filter-search" placeholder="🔍 חיפוש..." onkeyup="renderOperatorsTable()" style="flex:1;min-width:140px">
+        <input type="text" id="op-filter-search" placeholder="🔍 חיפוש..." oninput="renderOperatorsTable()" style="flex:1;min-width:140px">
       </div>
       <div id="op-tbody"></div>
     </div>
@@ -1576,7 +1576,7 @@ function getFilteredEquipment() {
   if (sf) eqs = eqs.filter(e => e.siteId == sf);
   if (tf) eqs = eqs.filter(e => e.type === tf);
   if (equipmentStatusFilter) eqs = eqs.filter(e => getOverallStatus(e) === equipmentStatusFilter);
-  if (q) eqs = eqs.filter(e => (e.name||'').toLowerCase().includes(q) || (e.eqId||'').toLowerCase().includes(q) || (e.serialNumber||'').toLowerCase().includes(q));
+  if (q) eqs = eqs.filter(e => (e.name||'').toLowerCase().includes(q) || (e.eqId||'').toLowerCase().includes(q) || (e.serialNumber||'').toLowerCase().includes(q) || (e.type||'').toLowerCase().includes(q) || (e.manufacturer||'').toLowerCase().includes(q) || getSiteName(e.siteId).toLowerCase().includes(q));
   return eqs;
 }
 function renderEquipmentStats() {
@@ -2370,7 +2370,7 @@ function renderOperatorsTable() {
   const stf = document.getElementById('op-filter-status').value;
   const q = document.getElementById('op-filter-search').value.toLowerCase();
   if (stf) ops = ops.filter(o => getOperatorStatus(o) === stf);
-  if (q) ops = ops.filter(o => (o.name||'').toLowerCase().includes(q) || (o.idNumber||'').toLowerCase().includes(q) || (o.personalNum||'').toLowerCase().includes(q) || (o.licenseNumber||'').toLowerCase().includes(q));
+  if (q) ops = ops.filter(o => (o.name||'').toLowerCase().includes(q) || (o.idNumber||'').toLowerCase().includes(q) || (o.personalNum||'').toLowerCase().includes(q) || (o.licenseNumber||'').toLowerCase().includes(q) || getSiteName(o.siteId).toLowerCase().includes(q) || String(o.phone||'').includes(q));
 
   const allowedSites = currentUser.role === 'admin' ? appData.sites : appData.sites.filter(s => String(currentUser.siteId||'').split(',').map(x=>x.trim()).includes(String(s.id)));
   const sitesToShow = sf ? allowedSites.filter(s => String(s.id) === String(sf)) : allowedSites;
