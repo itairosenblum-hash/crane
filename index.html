@@ -379,30 +379,38 @@ tr:hover td { background: rgba(30,77,183,0.02); }
     box-shadow: 0 1px 4px rgba(0,0,0,0.05);
   }
   table tbody tr:hover td { background: none; }
-  /* Hide less important columns on mobile */
-  table tbody td { display: none; }
-  table tbody td:nth-child(1) { /* רישוי */
+  /* Generic mobile card treatment: every column shown as a labelled row,
+     last column (assumed actions) right-aligned with a separator.
+     Used by any table that isn't the equipment table (e.g. Users, Sites). */
+  table tbody td { display: block; padding: 3px 0; font-size: 13px; }
+  table tbody td:first-child { font-size: 15px; font-weight: 700; color: var(--blue); border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 8px; }
+  table tbody td:last-child { display: flex; justify-content: flex-end; gap: 8px; padding-top: 10px; border-top: 1px solid var(--border); margin-top: 6px; }
+  /* Equipment table: specific column-by-index layout (its columns don't map 1:1 to "label: value") */
+  .eq-mobile-table tbody td { display: none; padding: 0; font-size: inherit; }
+  .eq-mobile-table tbody td:first-child { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
+  .eq-mobile-table tbody td:last-child { display: none; border-top: none; padding-top: 0; margin-top: 0; }
+  .eq-mobile-table tbody td:nth-child(1) { /* רישוי */
     display: block; font-size: 15px; font-weight: 700;
     color: var(--blue); border-bottom: 1px solid var(--border);
     padding-bottom: 8px; margin-bottom: 8px;
   }
-  table tbody td:nth-child(2) { /* שם */
+  .eq-mobile-table tbody td:nth-child(2) { /* שם */
     display: block; font-size: 14px; color: var(--text);
     padding: 2px 0;
   }
-  table tbody td:nth-child(4) { /* אתר */
+  .eq-mobile-table tbody td:nth-child(4) { /* אתר */
     display: block; font-size: 12px; color: var(--text-muted);
     padding: 2px 0;
   }
-  table tbody td:nth-child(6) { /* בדיקה הבאה */
+  .eq-mobile-table tbody td:nth-child(6) { /* בדיקה הבאה */
     display: flex; align-items: center; gap: 6px;
     font-size: 12px; color: var(--text-muted); padding: 2px 0;
   }
-  table tbody td:nth-child(6)::before { content: "📅 "; }
-  table tbody td:nth-child(7) { /* סטטוס */
+  .eq-mobile-table tbody td:nth-child(6)::before { content: "📅 "; }
+  .eq-mobile-table tbody td:nth-child(7) { /* סטטוס */
     display: block; padding: 6px 0 4px;
   }
-  table tbody td:nth-child(8) { /* פעולות */
+  .eq-mobile-table tbody td:nth-child(8) { /* פעולות */
     display: flex; justify-content: flex-end; gap: 8px;
     padding-top: 10px; border-top: 1px solid var(--border); margin-top: 4px;
   }
@@ -679,7 +687,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
           </div>
         </div>
         <div class="table-wrap">
-          <table>
+          <table class="eq-mobile-table">
             <thead><tr>
               <th>מ. מזהה</th><th>מס' שילדה</th><th>סוג</th><th>אתר</th>
               <th>בדיקה אחרונה</th><th>בדיקה הבאה</th><th>סטטוס</th><th>פעולות</th>
