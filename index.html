@@ -1261,8 +1261,12 @@ function statusBadge(st, days) {
 function getSiteName(id) { const s = appData.sites.find(x => x.id == id); return s ? s.name : '—'; }
 function getUserEquipment() {
   if (!currentUser || currentUser.role === 'admin') return appData.equipment;
-  // Support comma-separated site IDs
-  const userSites = String(currentUser.siteId||'').split(',').map(s => s.trim()).filter(Boolean);
+  return getEquipmentForUser(currentUser);
+}
+// Support comma-separated site IDs; falls back to all equipment if the user has no site assigned
+function getEquipmentForUser(user) {
+  if (!user) return appData.equipment;
+  const userSites = String(user.siteId||'').split(',').map(s => s.trim()).filter(Boolean);
   if (!userSites.length) return appData.equipment;
   return appData.equipment.filter(e => userSites.includes(String(e.siteId)));
 }
@@ -1884,25 +1888,27 @@ function renderSitesNew() {
     return `<div class="site-card">
       <div class="site-card-header">
         <h3>📍 ${site.name}</h3>
-        <div style="display:flex;align-items:center;gap:10px">
-          <span style="color:#94a3b8;font-size:13px">${siteEqs.length} אמצעים</span>
-          <button class="btn-icon" onclick="generateSiteWorkPlan(${site.id})" title="הפק תכנית עבודה PDF" style="border-color:rgba(255,255,255,0.2);color:white;background:rgba(255,255,255,0.1)">📄</button>
-        </div>
+        <span style="color:#94a3b8;font-size:13px">${siteEqs.length} אמצעים</span>
       </div>
       <div class="site-card-body">${typesHtml}</div>
     </div>`;
   }).join('');
 }
 
-// Opens a printable, RTL-formatted 12-month CALENDAR for a single site.
-// Each equipment's upcoming check dates (תסקיר / ב.ת) are marked directly on
-// the calendar day they fall on, so the reader sees "license X expires on this day"
-// at a glance. Uses the browser's native print dialog ("Save as PDF") — this avoids
-// the poor Hebrew/RTL font support of client-side PDF-generation libraries (e.g. jsPDF).
-function generateSiteWorkPlan(siteId) {
-  const site = appData.sites.find(s => s.id == siteId);
-  if (!site) return;
-  const eqs = appData.equipment.filter(e => e.siteId == siteId);
+// Opens a printable, RTL-formatted 12-month CALENDAR for a single user, covering
+// ALL equipment across every site assigned to them. Each equipment's upcoming check
+// dates (תסקיר / ב.ת) are marked directly on the calendar day they fall on, so the
+// reader sees "license X expires on this day" at a glance. Uses the browser's native
+// print dialog ("Save as PDF") — this avoids the poor Hebrew/RTL font support of
+// client-side PDF-generation libraries (e.g. jsPDF).
+function generateUserWorkPlan(username) {
+  const user = appData.users.find(u => u.username === username);
+  if (!user) return;
+  const eqs = getEquipmentForUser(user);
+  const userSiteIds = String(user.siteId||'').split(',').map(s => s.trim()).filter(Boolean);
+  const siteNames = userSiteIds.length ? userSiteIds.map(id => getSiteName(id)).join(', ') : 'כל האתרים';
+  const showSitePerEvent = userSiteIds.length > 1; // disambiguate only when the user spans multiple sites
+  const personName = user.fullname || user.username;
 
   const today = new Date(); today.setHours(0,0,0,0);
   const dateStr = String(today.getDate()).padStart(2,'0') + '/' + String(today.getMonth()+1).padStart(2,'0') + '/' + today.getFullYear();
@@ -1925,7 +1931,9 @@ function generateSiteWorkPlan(siteId) {
       if (monthIdx < today.getFullYear()*12 + today.getMonth()) return; // skip fully-past months
       const daysFromToday = Math.round((d - today) / 86400000);
       const cls = daysFromToday <= 14 ? 'danger' : daysFromToday <= 30 ? 'warn' : 'ok';
-      const text = `${e.serialNumber || e.eqId || '—'} · ${cf.label}`;
+      const text = showSitePerEvent
+        ? `${e.serialNumber || e.eqId || '—'} · ${getSiteName(e.siteId)} · ${cf.label}`
+        : `${e.serialNumber || e.eqId || '—'} · ${cf.label}`;
       const item = { text, cls };
       totalEvents++;
       if (monthIdx > horizonEndMonthIdx) { beyondHorizon.push({ text: `${text} — ${formatDate(val)}`, cls }); return; }
@@ -1970,7 +1978,7 @@ function generateSiteWorkPlan(siteId) {
 
   const html = `<!DOCTYPE html>
 <html lang="he" dir="rtl"><head><meta charset="UTF-8">
-<title>תכנית עבודה — לוח שנה — ${site.name}</title>
+<title>תכנית עבודה — לוח שנה — ${personName}</title>
 <style>
   * { box-sizing: border-box; }
   body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; color: #0f172a; }
@@ -2008,8 +2016,8 @@ function generateSiteWorkPlan(siteId) {
   <div class="month-page">
     <div class="cover-header">
       <div>
-        <h1>תכנית עבודה — לוח שנה — ${site.name}</h1>
-        <p>מערכת תסקירי הבטיחות — מדור צהר"מ זרוע הים</p>
+        <h1>תכנית עבודה — לוח שנה — ${personName}</h1>
+        <p>מערכת תסקירי הבטיחות — מדור צהר"מ זרוע הים · אתרים: ${siteNames}</p>
       </div>
       <div class="meta">תאריך הפקה: ${dateStr}<br>סה"כ אמצעים: ${eqs.length} · סה"כ תאריכים: ${totalEvents}</div>
     </div>
@@ -2060,6 +2068,7 @@ function renderUsersTable() {
       <td>${siteName === 'כל האתרים' ? '🌐 כל האתרים' : '📍 '+siteName}</td>
       <td>${formatPhone(u.phone)}</td>
       <td><div class="actions-cell">
+        <button class="btn-icon" onclick="generateUserWorkPlan('${u.username}')" title="הפק תכנית עבודה PDF (לוח שנה)">📄</button>
         <button class="btn-icon" onclick="editUser('${u.username}')" title="עריכה">✏️</button>
         ${u.username !== 'admin' ? `<button class="btn-icon del" onclick="deleteUser('${u.username}')" title="מחיקה">🗑</button>` : ''}
       </div></td>
