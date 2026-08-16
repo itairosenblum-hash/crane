@@ -425,11 +425,40 @@ tr:hover td { background: rgba(30,77,183,0.02); }
     display: flex; align-items: center; gap: 6px;
     font-size: 12px; color: var(--text-muted); padding: 2px 0;
   }
-  .eq-mobile-table tbody td:nth-child(6)::before { content: "📅 "; }
+  .eq-mobile-table tbody td:nth-child(6)::before { content: "📅 "; display: inline; }
   .eq-mobile-table tbody td:nth-child(7) { /* סטטוס */
     display: block; padding: 6px 0 4px;
   }
   .eq-mobile-table tbody td:nth-child(8) { /* פעולות */
+    display: flex; justify-content: flex-end; gap: 8px;
+    padding-top: 10px; border-top: 1px solid var(--border); margin-top: 4px;
+  }
+  /* Operators table mobile cards */
+  .op-mobile-table tbody td { display: none; padding: 0; font-size: inherit; }
+  .op-mobile-table tbody td:first-child { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
+  .op-mobile-table tbody td:last-child { display: none; border-top: none; padding-top: 0; margin-top: 0; }
+  .op-mobile-table tbody td:nth-child(1) { /* שם + ת.ז */
+    display: block; font-size: 15px; font-weight: 700;
+    color: var(--blue); border-bottom: 1px solid var(--border);
+    padding-bottom: 8px; margin-bottom: 8px;
+  }
+  .op-mobile-table tbody td:nth-child(2) { /* אתר */
+    display: block; font-size: 13px; color: var(--text-muted);
+    padding: 2px 0;
+  }
+  .op-mobile-table tbody td:nth-child(3) { /* תוקפי רישיונות */
+    display: block; font-size: 12px; color: var(--text-muted);
+    padding: 6px 0 2px;
+  }
+  .op-mobile-table tbody td:nth-child(4) { /* סטטוס */
+    display: block; padding: 6px 0 4px;
+  }
+  .op-mobile-table tbody td:nth-child(5) { /* טלפון */
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: var(--text-muted); padding: 2px 0;
+  }
+  .op-mobile-table tbody td:nth-child(5)::before { content: "📞 "; display: inline; }
+  .op-mobile-table tbody td:nth-child(6) { /* פעולות */
     display: flex; justify-content: flex-end; gap: 8px;
     padding-top: 10px; border-top: 1px solid var(--border); margin-top: 4px;
   }
@@ -741,7 +770,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
           </div>
         </div>
         <div class="table-wrap">
-          <table>
+          <table class="op-mobile-table">
             <thead><tr>
               <th>שם המנופאי</th><th>אתר</th><th>תוקפי רישיונות</th><th>סטטוס</th><th>טלפון</th><th>פעולות</th>
             </tr></thead>
