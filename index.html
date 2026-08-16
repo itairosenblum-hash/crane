@@ -2224,9 +2224,9 @@ function viewOperator(id) {
       ['ת.ז', o.idNumber||'—'],
       ['מספר רישיון נהיגה', o.licenseNumber||'—'],
       ['פרופיל', o.profile||'—'],
+      ['🏗️ תוקף רישיון מנוף נייד', `<strong style="color:var(--blue)">${formatDate(o.craneLicenseExpiry)}</strong>`],
       ['תוקף רישיון אזרחי', formatDate(o.civilianLicenseExpiry)],
       ['תוקף רישיון צבאי', formatDate(o.militaryLicenseExpiry)],
-      ['תוקף רישיון מנוף נייד', formatDate(o.craneLicenseExpiry)],
       ['תת"ש', o.tatash||'—'],
       ['טלפון', formatPhone(o.phone)||'—'],
       ['סטטוס', statusBadge(st,days)]
@@ -2307,12 +2307,15 @@ function renderOperatorsTable() {
             const days = getOperatorRelevantDays(o);
             const st = getOperatorStatus(o);
             const dot = st === 'danger' ? '🔴' : st === 'warn' ? '🟡' : '🟢';
-            const dateParts = OPERATOR_CHECK_FIELDS.filter(cf => o[cf.field]).map(cf => `${cf.label}: ${formatDate(o[cf.field])}`);
+            const craneLine = o.craneLicenseExpiry
+              ? `<strong style="color:var(--blue)">🏗️ רישיון מנוף: ${formatDate(o.craneLicenseExpiry)}</strong>`
+              : `<span>🏗️ רישיון מנוף: לא רשום</span>`;
+            const otherParts = OPERATOR_CHECK_FIELDS.filter(cf => cf.field !== 'craneLicenseExpiry' && o[cf.field]).map(cf => `${cf.label}: ${formatDate(o[cf.field])}`);
             return `<div class="eq-item" onclick="viewOperator(${o.id})">
               <div class="eq-item-info">
                 <div class="eq-item-name">${dot} ${o.name||'—'}</div>
                 <div class="eq-item-id">ת.ז: ${o.idNumber||'—'} · רישיון: ${o.licenseNumber||'—'}</div>
-                <div class="eq-item-dates">${dateParts.join(' · ') || 'אין תאריכים רשומים'}</div>
+                <div class="eq-item-dates">${craneLine}${otherParts.length ? `<br><span style="font-size:11px">${otherParts.join(' · ')}</span>` : ''}</div>
               </div>
               ${statusBadge(st, days)}
             </div>`;
