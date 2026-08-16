@@ -1884,11 +1884,103 @@ function renderSitesNew() {
     return `<div class="site-card">
       <div class="site-card-header">
         <h3>📍 ${site.name}</h3>
-        <span style="color:#94a3b8;font-size:13px">${siteEqs.length} אמצעים</span>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="color:#94a3b8;font-size:13px">${siteEqs.length} אמצעים</span>
+          <button class="btn-icon" onclick="generateSiteWorkPlan(${site.id})" title="הפק תכנית עבודה PDF" style="border-color:rgba(255,255,255,0.2);color:white;background:rgba(255,255,255,0.1)">📄</button>
+        </div>
       </div>
       <div class="site-card-body">${typesHtml}</div>
     </div>`;
   }).join('');
+}
+
+// Opens a printable, RTL-formatted "work plan" document for a single site,
+// listing its equipment ordered from most to least urgent. Uses the browser's
+// native print dialog so the user can "Save as PDF" — this avoids the poor
+// Hebrew/RTL font support of client-side PDF-generation libraries (e.g. jsPDF).
+function generateSiteWorkPlan(siteId) {
+  const site = appData.sites.find(s => s.id == siteId);
+  if (!site) return;
+  const eqs = [...appData.equipment.filter(e => e.siteId == siteId)]
+    .sort((a,b) => getRelevantDays(a) - getRelevantDays(b));
+
+  const dangerCount = eqs.filter(e => getOverallStatus(e) === 'danger').length;
+  const warnCount = eqs.filter(e => getOverallStatus(e) === 'warn').length;
+  const okCount = eqs.length - dangerCount - warnCount;
+
+  const today = new Date();
+  const dateStr = String(today.getDate()).padStart(2,'0') + '/' + String(today.getMonth()+1).padStart(2,'0') + '/' + today.getFullYear();
+
+  const statusInfo = (e) => {
+    const st = getOverallStatus(e);
+    const days = getRelevantDays(e);
+    if (st === 'danger') return { label: days < 0 ? 'פג תוקף!' : 'דחוף', color: '#dc2626' };
+    if (st === 'warn') return { label: 'קרוב לבדיקה', color: '#d97706' };
+    return { label: 'תקין', color: '#16a34a' };
+  };
+
+  const rows = eqs.map((e, i) => {
+    const s = statusInfo(e);
+    const dateParts = CHECK_FIELDS.filter(cf => e[cf.field]).map(cf => `${cf.label}: ${formatDate(e[cf.field])}`);
+    return `<tr>
+      <td>${i+1}</td>
+      <td><strong>${e.serialNumber||'—'}</strong></td>
+      <td>${e.name||'—'}</td>
+      <td>${e.eqId||'—'}</td>
+      <td>${e.type||'—'}</td>
+      <td>${dateParts.join('<br>') || '—'}</td>
+      <td><span style="color:${s.color};font-weight:700">${s.label}</span></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:24px">אין אמצעים רשומים באתר זה</td></tr>';
+
+  const html = `<!DOCTYPE html>
+<html lang="he" dir="rtl"><head><meta charset="UTF-8">
+<title>תכנית עבודה — ${site.name}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 28px; color: #0f172a; }
+  .print-bar { margin-bottom: 20px; }
+  .print-bar button { background: #1e4db7; color: white; border: none; border-radius: 6px; padding: 10px 22px; font-size: 14px; cursor: pointer; font-family: inherit; font-weight: 600; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #1e4db7; padding-bottom: 14px; margin-bottom: 22px; }
+  .header h1 { font-size: 22px; margin: 0 0 4px; color: #0a1628; }
+  .header p { margin: 0; font-size: 13px; color: #64748b; }
+  .meta { text-align: left; font-size: 12px; color: #64748b; white-space: nowrap; }
+  .summary { display: flex; gap: 12px; margin-bottom: 22px; }
+  .summary > div { flex: 1; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; text-align: center; }
+  .summary .num { font-size: 24px; font-weight: 700; line-height: 1.2; }
+  .summary .lbl { font-size: 12px; color: #64748b; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: #1e4db7; color: white; padding: 9px 10px; text-align: right; font-size: 12px; }
+  td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  .footer { margin-top: 26px; font-size: 11px; color: #94a3b8; text-align: center; }
+  @media print { .print-bar { display: none; } body { padding: 0; } }
+</style></head>
+<body>
+  <div class="print-bar"><button onclick="window.print()">🖨️ הדפס / שמור כ-PDF</button></div>
+  <div class="header">
+    <div>
+      <h1>תכנית עבודה — ${site.name}</h1>
+      <p>מערכת תסקירי הבטיחות — מדור צהר"מ זרוע הים</p>
+    </div>
+    <div class="meta">תאריך הפקה: ${dateStr}<br>סה"כ אמצעים: ${eqs.length}</div>
+  </div>
+  <div class="summary">
+    <div><div class="num" style="color:#dc2626">${dangerCount}</div><div class="lbl">דחוף / פג תוקף</div></div>
+    <div><div class="num" style="color:#d97706">${warnCount}</div><div class="lbl">קרוב לבדיקה</div></div>
+    <div><div class="num" style="color:#16a34a">${okCount}</div><div class="lbl">תקין</div></div>
+  </div>
+  <table>
+    <thead><tr><th>#</th><th>רישוי</th><th>שילדה</th><th>תסקיר</th><th>סוג</th><th>תאריכים</th><th>סטטוס</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="footer">הרשימה ממוינת מהדחוף ביותר לתקין ביותר · הופק אוטומטית ע"י מערכת תסקירי הבטיחות · ${dateStr}</div>
+</body></html>`;
+
+  const win = window.open('', '_blank');
+  if (!win) { alert('הדפדפן חסם את פתיחת החלון. נא לאפשר חלונות קופצים (Popups) עבור האתר ולנסות שוב.'); return; }
+  win.document.write(html);
+  win.document.close();
 }
 
 // Simple management list for Settings — just names + edit/delete, no equipment breakdown
