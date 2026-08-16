@@ -711,6 +711,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
         <div><h2>👷 מנופאים</h2><p>מעקב אחר מנופאים, רישיונות ותוקפים</p></div>
         <button class="btn-add" id="btn-add-op" onclick="openAddOperatorModal()" style="display:none">+ הוסף מנופאי</button>
       </div>
+      <div class="stats-grid" id="op-stats-grid"></div>
       <div class="section-card">
         <div class="section-head">
           <div class="filter-row" style="margin:0">
@@ -2221,6 +2222,41 @@ function populateOperatorSiteFilter() {
   const sites = currentUser.role === 'admin' ? appData.sites : appData.sites.filter(s => String(currentUser.siteId||'').split(',').map(x=>x.trim()).includes(String(s.id)));
   document.getElementById('op-filter-site').innerHTML = '<option value="">כל האתרים</option>' + sites.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
 }
+function renderOperatorStats() {
+  const ops = getUserOperators();
+  const danger = ops.filter(o => getOperatorStatus(o) === 'danger').length;
+  const warn = ops.filter(o => getOperatorStatus(o) === 'warn').length;
+  const ok = ops.length - danger - warn;
+  const stf = document.getElementById('op-filter-status') ? document.getElementById('op-filter-status').value : '';
+  const active = (f) => stf === f ? ' active' : '';
+  document.getElementById('op-stats-grid').innerHTML = `
+    <div class="stat-card${active('')}" onclick="setOperatorFilter('')"><div class="stat-icon blue">👷</div><div class="stat-info"><div class="stat-label">סה"כ מנופאים</div><div class="stat-value blue">${ops.length}</div></div></div>
+    <div class="stat-card${active('danger')}" onclick="setOperatorFilter('danger')"><div class="stat-icon red">🚨</div><div class="stat-info"><div class="stat-label">פג תוקף / דחוף</div><div class="stat-value red">${danger}</div></div></div>
+    <div class="stat-card${active('warn')}" onclick="setOperatorFilter('warn')"><div class="stat-icon amber">⏰</div><div class="stat-info"><div class="stat-label">קרוב לפוג תוקף</div><div class="stat-value amber">${warn}</div></div></div>
+    <div class="stat-card${active('ok')}" onclick="setOperatorFilter('ok')"><div class="stat-icon green">✅</div><div class="stat-info"><div class="stat-label">בתוקף</div><div class="stat-value green">${ok}</div></div></div>`;
+}
+function setOperatorFilter(f) {
+  const sel = document.getElementById('op-filter-status');
+  sel.value = (sel.value === f) ? '' : f;
+  renderOperatorsTable();
+}
+// WhatsApp reminder link for an operator with an expiring/expired license — lists every
+// license field that isn't 'ok' (mirrors waLink()'s pattern for equipment reminders).
+function operatorWaLink(op) {
+  if (getOperatorStatus(op) === 'ok') return '';
+  const rawPhone = String(op.phone == null ? '' : op.phone).replace(/\D/g,'');
+  const p = rawPhone.startsWith('972') ? rawPhone : rawPhone.replace(/^0/,'972');
+  if (!p) return '';
+  const urgent = OPERATOR_CHECK_FIELDS.filter(cf => op[cf.field] && getStatus(op[cf.field]) !== 'ok');
+  if (!urgent.length) return '';
+  const lines = urgent.map(cf => {
+    const days = daysUntil(op[cf.field]);
+    const statusTxt = days < 0 ? `פג תוקף לפני ${Math.abs(days)} ימים` : days === 0 ? 'פג היום!' : `יפוג בעוד ${days} ימים`;
+    return `• ${cf.label}: ${formatDate(op[cf.field])} — ${statusTxt}`;
+  }).join('\n');
+  const msg = encodeURIComponent(`שלום ${op.name||''},\n\nתזכורת בנוגע לרישיונות שלך:\n${lines}\n\nנא לדאוג לחידוש בהקדם האפשרי.\n\nמערכת תסקירי הבטיחות — מדור צהר"מ זרוע הים`);
+  return `<a class="btn-icon" href="https://wa.me/${p}?text=${msg}" target="_blank" title="שלח תזכורת WhatsApp" style="text-decoration:none;color:#16a34a">💬</a>`;
+}
 function renderOperatorsTable() {
   let ops = getUserOperators();
   const sf = document.getElementById('op-filter-site').value;
@@ -2243,11 +2279,13 @@ function renderOperatorsTable() {
       <td><div class="actions-cell">
         <button class="btn-icon" onclick="viewOperator(${o.id})" title="פרטים">👁</button>
         ${o.licenseImageUrl && o.licenseImageUrl.startsWith('http') ? `<a class="btn-icon" href="${o.licenseImageUrl}" target="_blank" title="תמונת רישיון" style="text-decoration:none;color:var(--blue)">🪪</a>` : ''}
+        ${operatorWaLink(o)}
         ${isAdmin ? `<button class="btn-icon" onclick="editOperator(${o.id})" title="עריכה">✏️</button>` : ''}
         ${isAdmin ? `<button class="btn-icon del" onclick="deleteOperator(${o.id})" title="מחיקה">🗑</button>` : ''}
       </div></td>
     </tr>`;
   }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:2rem">לא נמצאו מנופאים</td></tr>';
+  renderOperatorStats();
 }
 
 // ===== SITES =====
