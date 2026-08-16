@@ -1071,6 +1071,8 @@ async function loadData(silent = false) {
       eqId: String(e.eqId||''),
       name: String(e.name||''),
       type: String(e.type||''),
+      serialNumber: String(e.serialNumber||''),
+      manufacturer: String(e.manufacturer||''),
       notes: String(e.notes||''),
       lastCheck: normalizeDate(e.lastCheck),
       nextCheck: normalizeDate(e.nextCheck),
@@ -1576,7 +1578,7 @@ function getFilteredEquipment() {
   if (sf) eqs = eqs.filter(e => e.siteId == sf);
   if (tf) eqs = eqs.filter(e => e.type === tf);
   if (equipmentStatusFilter) eqs = eqs.filter(e => getOverallStatus(e) === equipmentStatusFilter);
-  if (q) eqs = eqs.filter(e => (e.name||'').toLowerCase().includes(q) || (e.eqId||'').toLowerCase().includes(q) || (e.serialNumber||'').toLowerCase().includes(q) || (e.type||'').toLowerCase().includes(q) || (e.manufacturer||'').toLowerCase().includes(q) || getSiteName(e.siteId).toLowerCase().includes(q));
+  if (q) eqs = eqs.filter(e => String(e.name||'').toLowerCase().includes(q) || String(e.eqId||'').toLowerCase().includes(q) || String(e.serialNumber||'').toLowerCase().includes(q) || String(e.type||'').toLowerCase().includes(q) || String(e.manufacturer||'').toLowerCase().includes(q) || String(getSiteName(e.siteId)||'').toLowerCase().includes(q));
   return eqs;
 }
 function renderEquipmentStats() {
@@ -2370,7 +2372,7 @@ function renderOperatorsTable() {
   const stf = document.getElementById('op-filter-status').value;
   const q = document.getElementById('op-filter-search').value.toLowerCase();
   if (stf) ops = ops.filter(o => getOperatorStatus(o) === stf);
-  if (q) ops = ops.filter(o => (o.name||'').toLowerCase().includes(q) || (o.idNumber||'').toLowerCase().includes(q) || (o.personalNum||'').toLowerCase().includes(q) || (o.licenseNumber||'').toLowerCase().includes(q) || getSiteName(o.siteId).toLowerCase().includes(q) || String(o.phone||'').includes(q));
+  if (q) ops = ops.filter(o => String(o.name||'').toLowerCase().includes(q) || String(o.idNumber||'').toLowerCase().includes(q) || String(o.personalNum||'').toLowerCase().includes(q) || String(o.licenseNumber||'').toLowerCase().includes(q) || String(getSiteName(o.siteId)||'').toLowerCase().includes(q) || String(o.phone||'').includes(q));
 
   const allowedSites = currentUser.role === 'admin' ? appData.sites : appData.sites.filter(s => String(currentUser.siteId||'').split(',').map(x=>x.trim()).includes(String(s.id)));
   const sitesToShow = sf ? allowedSites.filter(s => String(s.id) === String(sf)) : allowedSites;
