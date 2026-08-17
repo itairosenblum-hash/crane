@@ -2351,7 +2351,11 @@ function viewOperator(id) {
        style="display:flex;align-items:center;justify-content:center;gap:10px;background:var(--blue);color:white;padding:14px;border-radius:8px;text-decoration:none;font-size:15px;font-weight:600;margin-bottom:8px">
       🪪 פתח תמונת רישיון
     </a>
-    <img src="${o.licenseImageUrl}" style="width:100%;border-radius:8px;border:1px solid var(--border);display:block">
+    <iframe src="${'https://drive.google.com/file/d/' + o.licenseImageUrl.split('id=')[1] + '/preview'}"
+      width="100%" height="300"
+      style="border-radius:8px;border:1px solid var(--border);display:block"
+      allow="autoplay">
+    </iframe>
   </div>` : ''}
     <div>
       ${[
