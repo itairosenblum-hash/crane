@@ -1094,7 +1094,7 @@ async function loadData(silent = false) {
       idNumber: String(o.idNumber||''),
       licenseNumber: String(o.licenseNumber||''),
       profile: String(o.profile||''),
-      tatash: String(o.tatash||''),
+      tatash: normalizeDate(o.tatash),
       civilianLicenseExpiry: normalizeDate(o.civilianLicenseExpiry),
       militaryLicenseExpiry: normalizeDate(o.militaryLicenseExpiry),
       craneLicenseExpiry: normalizeDate(o.craneLicenseExpiry),
@@ -2156,7 +2156,7 @@ const MODAL_OP_TEMPLATE = `<div class="modal-body">
       </div>
       <div class="form-row">
         <div class="form-group"><label>תוקף רישיון מנוף נייד (DD/MM/YYYY)</label><input type="text" id="op-crane-expiry" placeholder="DD/MM/YYYY" autocomplete="off"></div>
-        <div class="form-group"><label>תת"ש</label><input type="text" id="op-tatash" placeholder="תת&quot;ש" autocomplete="off"></div>
+        <div class="form-group"><label>תת"ש (DD/MM/YYYY)</label><input type="text" id="op-tatash" placeholder="DD/MM/YYYY" autocomplete="off"></div>
       </div>
       <div class="form-group"><label>טלפון</label><input type="tel" id="op-phone" placeholder="050-000-0000" oninput="maskPhone(this)" maxlength="12"></div>
     </form>
@@ -2314,7 +2314,7 @@ function viewOperator(id) {
       ['🏗️ תוקף רישיון מנוף נייד', `<strong style="color:var(--blue)">${formatDate(o.craneLicenseExpiry)}</strong>`],
       ['תוקף רישיון אזרחי', formatDate(o.civilianLicenseExpiry)],
       ['תוקף רישיון צבאי', formatDate(o.militaryLicenseExpiry)],
-      ['תת"ש', o.tatash||'—'],
+      ['תת"ש', formatDate(o.tatash)],
       ['טלפון', formatPhone(o.phone)||'—'],
       ['סטטוס', statusBadge(st,days)]
     ].map(r=>`<div class="detail-row"><div class="detail-label">${r[0]}</div><div class="detail-value">${r[1]}</div></div>`).join('')}
