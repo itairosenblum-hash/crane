@@ -2369,13 +2369,51 @@ function operatorWaLink(op) {
   const msg = encodeURIComponent(`שלום ${op.name||''},\n\nתזכורת בנוגע לרישיונות שלך:\n${lines}\n\nנא לדאוג לחידוש בהקדם האפשרי.\n\nמערכת תסקירי הבטיחות — מדור צהר"מ זרוע הים`);
   return `<a class="btn-icon" href="https://wa.me/${p}?text=${msg}" target="_blank" title="שלח תזכורת WhatsApp" style="text-decoration:none;color:#16a34a">💬</a>`;
 }
+// Renders a single operator card. Pass showSite=true when the surrounding list isn't
+// already grouped under a site header (e.g. flat search results), so the site is still visible.
+function operatorItemHtml(o, showSite) {
+  const days = getOperatorRelevantDays(o);
+  const st = getOperatorStatus(o);
+  const dot = st === 'danger' ? '🔴' : st === 'warn' ? '🟡' : '🟢';
+  const craneLine = o.craneLicenseExpiry
+    ? `<strong style="color:var(--blue)">🏗️ רישיון מנוף: ${formatDate(o.craneLicenseExpiry)}</strong>`
+    : `<span>🏗️ רישיון מנוף: לא רשום</span>`;
+  const otherParts = OPERATOR_CHECK_FIELDS.filter(cf => cf.field !== 'craneLicenseExpiry' && o[cf.field]).map(cf => `${cf.label}: ${formatDate(o[cf.field])}`);
+  const idParts = [`ת.ז: ${o.idNumber||'—'}`, `רישיון: ${o.licenseNumber||'—'}`];
+  if (showSite) idParts.push(`📍 ${getSiteName(o.siteId)}`);
+  return `<div class="eq-item" onclick="viewOperator(${o.id})">
+    <div class="eq-item-info">
+      <div class="eq-item-name">${dot} ${o.name||'—'}</div>
+      <div class="eq-item-id">${idParts.join(' · ')}</div>
+      <div class="eq-item-dates">${craneLine}${otherParts.length ? `<br><span style="font-size:11px">${otherParts.join(' · ')}</span>` : ''}</div>
+    </div>
+    ${statusBadge(st, days)}
+  </div>`;
+}
 function renderOperatorsTable() {
   let ops = getUserOperators();
   const sf = document.getElementById('op-filter-site').value;
   const stf = document.getElementById('op-filter-status').value;
   const q = document.getElementById('op-filter-search').value.toLowerCase();
+  if (sf) ops = ops.filter(o => o.siteId == sf);
   if (stf) ops = ops.filter(o => getOperatorStatus(o) === stf);
   if (q) ops = ops.filter(o => String(o.name||'').toLowerCase().includes(q) || String(o.idNumber||'').toLowerCase().includes(q) || String(o.personalNum||'').toLowerCase().includes(q) || String(o.licenseNumber||'').toLowerCase().includes(q) || String(getSiteName(o.siteId)||'').toLowerCase().includes(q) || String(o.phone||'').includes(q));
+
+  // While searching, skip the per-site grouping and show the matching operators as one flat list.
+  if (q) {
+    const itemsHtml = ops.length === 0
+      ? '<div class="site-empty">לא נמצאו מנופאים התואמים את החיפוש</div>'
+      : `<div class="eq-type-items">${ops.map(o => operatorItemHtml(o, true)).join('')}</div>`;
+    document.getElementById('op-tbody').innerHTML = `<div class="site-card">
+      <div class="site-card-header">
+        <h3>🔍 תוצאות חיפוש</h3>
+        <span style="color:#94a3b8;font-size:13px">${ops.length} מנופאים</span>
+      </div>
+      <div class="site-card-body">${itemsHtml}</div>
+    </div>`;
+    renderOperatorStats();
+    return;
+  }
 
   const allowedSites = currentUser.role === 'admin' ? appData.sites : appData.sites.filter(s => String(currentUser.siteId||'').split(',').map(x=>x.trim()).includes(String(s.id)));
   const sitesToShow = sf ? allowedSites.filter(s => String(s.id) === String(sf)) : allowedSites;
@@ -2390,25 +2428,7 @@ function renderOperatorsTable() {
     const siteOps = ops.filter(o => o.siteId == site.id);
     const itemsHtml = siteOps.length === 0
       ? '<div class="site-empty">אין מנופאים רשומים באתר זה</div>'
-      : `<div class="eq-type-items">
-          ${siteOps.map(o => {
-            const days = getOperatorRelevantDays(o);
-            const st = getOperatorStatus(o);
-            const dot = st === 'danger' ? '🔴' : st === 'warn' ? '🟡' : '🟢';
-            const craneLine = o.craneLicenseExpiry
-              ? `<strong style="color:var(--blue)">🏗️ רישיון מנוף: ${formatDate(o.craneLicenseExpiry)}</strong>`
-              : `<span>🏗️ רישיון מנוף: לא רשום</span>`;
-            const otherParts = OPERATOR_CHECK_FIELDS.filter(cf => cf.field !== 'craneLicenseExpiry' && o[cf.field]).map(cf => `${cf.label}: ${formatDate(o[cf.field])}`);
-            return `<div class="eq-item" onclick="viewOperator(${o.id})">
-              <div class="eq-item-info">
-                <div class="eq-item-name">${dot} ${o.name||'—'}</div>
-                <div class="eq-item-id">ת.ז: ${o.idNumber||'—'} · רישיון: ${o.licenseNumber||'—'}</div>
-                <div class="eq-item-dates">${craneLine}${otherParts.length ? `<br><span style="font-size:11px">${otherParts.join(' · ')}</span>` : ''}</div>
-              </div>
-              ${statusBadge(st, days)}
-            </div>`;
-          }).join('')}
-        </div>`;
+      : `<div class="eq-type-items">${siteOps.map(o => operatorItemHtml(o, false)).join('')}</div>`;
     return `<div class="site-card">
       <div class="site-card-header">
         <h3>📍 ${site.name}</h3>
