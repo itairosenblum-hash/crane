@@ -720,7 +720,10 @@ tr:hover td { background: rgba(30,77,183,0.02); }
     <div id="tab-operators" style="display:none">
       <div class="page-header">
         <div><h2>👷 מנופאים</h2><p>מעקב אחר מנופאים, רישיונות ותוקפים</p></div>
-        <button class="btn-add" id="btn-add-op" onclick="openAddOperatorModal()" style="display:none">+ הוסף מנופאי</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn-secondary" onclick="generateOperatorsReport()" style="color:#94a3b8;border-color:rgba(255,255,255,0.2)">📄 דוח מנופאים</button>
+          <button class="btn-add" id="btn-add-op" onclick="openAddOperatorModal()" style="display:none">+ הוסף מנופאי</button>
+        </div>
       </div>
       <div class="stats-grid" id="op-stats-grid"></div>
       <div class="filter-row">
@@ -2415,6 +2418,129 @@ function renderOperatorsTable() {
     </div>`;
   }).join('');
   renderOperatorStats();
+}
+
+// Applies the Operators tab's current site/status/search filters (mirrors getFilteredEquipment()).
+function getFilteredOperators() {
+  let ops = getUserOperators();
+  const sf = document.getElementById('op-filter-site').value;
+  const stf = document.getElementById('op-filter-status').value;
+  const q = document.getElementById('op-filter-search').value.toLowerCase();
+  if (sf) ops = ops.filter(o => o.siteId == sf);
+  if (stf) ops = ops.filter(o => getOperatorStatus(o) === stf);
+  if (q) ops = ops.filter(o => String(o.name||'').toLowerCase().includes(q) || String(o.idNumber||'').toLowerCase().includes(q) || String(o.personalNum||'').toLowerCase().includes(q) || String(o.licenseNumber||'').toLowerCase().includes(q) || String(getSiteName(o.siteId)||'').toLowerCase().includes(q) || String(o.phone||'').includes(q));
+  return ops;
+}
+function operatorReportStatusBadge(st, days) {
+  const L = { ok:'בתוקף', warn:'קרוב לפוג', danger: days < 0 ? 'פג תוקף!' : 'דחוף' };
+  const C = { ok:'b-ok', warn:'b-warn', danger:'b-danger' };
+  return `<span class="badge ${C[st]}">${L[st]}</span>`;
+}
+// Opens a print-ready A4-portrait report of the operators currently matching the tab's
+// filters, sorted alphabetically (Hebrew א'-ב') by name — same "open window, print/save as
+// PDF" pattern as generateEquipmentPageWorkPlan().
+function generateOperatorsReport() {
+  const ops = getFilteredOperators().slice().sort((a,b) => String(a.name||'').localeCompare(String(b.name||''), 'he'));
+
+  const sf = document.getElementById('op-filter-site').value;
+  const stf = document.getElementById('op-filter-status').value;
+  const q = document.getElementById('op-filter-search').value.trim();
+  const statusLabels = { ok: 'בתוקף', warn: 'קרוב לפוג תוקף', danger: 'דחוף / פג תוקף' };
+  const filterParts = [];
+  if (sf) filterParts.push('אתר: ' + getSiteName(sf));
+  if (stf) filterParts.push('סטטוס: ' + (statusLabels[stf] || stf));
+  if (q) filterParts.push(`חיפוש: "${q}"`);
+  const filterSubtitle = filterParts.length ? ' · ' + filterParts.join(' · ') : '';
+
+  const today = new Date();
+  const dateStr = String(today.getDate()).padStart(2,'0') + '/' + String(today.getMonth()+1).padStart(2,'0') + '/' + today.getFullYear();
+
+  const danger = ops.filter(o => getOperatorStatus(o) === 'danger').length;
+  const warn = ops.filter(o => getOperatorStatus(o) === 'warn').length;
+  const ok = ops.length - danger - warn;
+
+  const rowsHtml = ops.map((o, i) => {
+    const days = getOperatorRelevantDays(o);
+    const st = getOperatorStatus(o);
+    const idLine = [o.idNumber ? 'ת.ז: '+o.idNumber : '', o.personalNum ? 'מ.א: '+o.personalNum : ''].filter(Boolean).join(' · ');
+    const licenseLines = [
+      `אזרחי: ${formatDate(o.civilianLicenseExpiry)}`,
+      `צבאי: ${formatDate(o.militaryLicenseExpiry)}`,
+      `<strong style="color:#1e4db7">מנוף: ${formatDate(o.craneLicenseExpiry)}</strong>`
+    ].join('<br>');
+    return `<tr>
+      <td class="num">${i+1}</td>
+      <td><strong>${o.name||'—'}</strong>${idLine ? `<br><span class="sub">${idLine}</span>` : ''}</td>
+      <td>${getSiteName(o.siteId)}</td>
+      <td class="licenses">${licenseLines}</td>
+      <td dir="ltr" style="text-align:center">${formatPhone(o.phone)||'—'}</td>
+      <td>${operatorReportStatusBadge(st, days)}</td>
+    </tr>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="he" dir="rtl"><head><meta charset="UTF-8">
+<title>דוח מנופאים — מדור צהר"מ זרוע הים</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; color: #0f172a; }
+  @page { size: A4 portrait; margin: 14mm; }
+  .print-bar { margin-bottom: 16px; }
+  .print-bar button { background: #1e4db7; color: white; border: none; border-radius: 6px; padding: 10px 22px; font-size: 14px; cursor: pointer; font-family: inherit; font-weight: 600; }
+  .cover-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #1e4db7; padding-bottom: 12px; margin-bottom: 16px; }
+  .cover-header h1 { font-size: 19px; margin: 0 0 4px; color: #0a1628; }
+  .cover-header p { margin: 0; font-size: 12px; color: #64748b; }
+  .meta { text-align: left; font-size: 11px; color: #64748b; white-space: nowrap; }
+  .summary { display: flex; gap: 10px; margin-bottom: 14px; font-size: 11px; }
+  .summary span { padding: 4px 10px; border-radius: 20px; font-weight: 600; }
+  .s-total { background: #eff6ff; color: #1e4db7; border: 1px solid #bfdbfe; }
+  .s-danger { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+  .s-warn { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+  .s-ok { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+  table { width: 100%; border-collapse: collapse; font-size: 10.5px; }
+  th { background: #0a1628; color: white; text-align: right; padding: 7px 8px; font-size: 10px; font-weight: 700; }
+  td { padding: 7px 8px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+  td.num { color: #94a3b8; font-weight: 700; width: 24px; }
+  .sub { color: #64748b; font-size: 9.5px; }
+  .licenses { font-size: 9.5px; line-height: 1.5; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  .badge { display: inline-block; padding: 3px 9px; border-radius: 12px; font-size: 9.5px; font-weight: 700; white-space: nowrap; }
+  .b-ok { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+  .b-warn { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+  .b-danger { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+  tr { page-break-inside: avoid; }
+  thead { display: table-header-group; }
+  .footer { margin-top: 16px; font-size: 10px; color: #94a3b8; text-align: center; }
+  @media print { .print-bar { display: none; } body { padding: 0; } }
+</style></head>
+<body>
+  <div class="print-bar"><button onclick="window.print()">🖨️ הדפס / שמור כ-PDF</button></div>
+  <div class="cover-header">
+    <div>
+      <h1>👷 דוח מנופאים</h1>
+      <p>מערכת תסקירי הבטיחות — מדור צהר"מ זרוע הים${filterSubtitle}</p>
+    </div>
+    <div class="meta">תאריך הפקה: ${dateStr}<br>סה"כ מנופאים: ${ops.length}<br>מסודר לפי סדר א'-ב'</div>
+  </div>
+  <div class="summary">
+    <span class="s-total">סה"כ: ${ops.length}</span>
+    <span class="s-danger">דחוף/פג תוקף: ${danger}</span>
+    <span class="s-warn">קרוב: ${warn}</span>
+    <span class="s-ok">בתוקף: ${ok}</span>
+  </div>
+  <table>
+    <thead><tr>
+      <th></th><th>שם המנופאי</th><th>אתר</th><th>תוקף רישיונות</th><th>טלפון</th><th>סטטוס</th>
+    </tr></thead>
+    <tbody>${rowsHtml || '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:2rem">לא נמצאו מנופאים</td></tr>'}</tbody>
+  </table>
+  <div class="footer">הופק אוטומטית ע"י מערכת תסקירי הבטיחות · ${dateStr}</div>
+</body></html>`;
+
+  const win = window.open('', '_blank');
+  if (!win) { alert('הדפדפן חסם את פתיחת החלון. נא לאפשר חלונות קופצים (Popups) עבור האתר ולנסות שוב.'); return; }
+  win.document.write(html);
+  win.document.close();
 }
 
 // ===== SITES =====
