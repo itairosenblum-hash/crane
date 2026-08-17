@@ -2120,13 +2120,14 @@ const MODAL_OP_TEMPLATE = `<div class="modal-body">
       <form autocomplete="off" style="display:contents">
       <input type="file" id="op-file-input-camera" accept="image/*" capture="environment" style="display:none">
       <input type="file" id="op-file-input-gallery" accept="image/*" style="display:none">
+      <input type="file" id="op-file-input-pdf" accept="application/pdf,image/*" style="display:none">
       <div id="op-upload-zone"
            ondragover="event.preventDefault();this.classList.add('drag')"
            ondragleave="this.classList.remove('drag')"
            ondrop="handleOperatorDrop(event)"
            style="border:2px dashed #cbd5e1;border-radius:var(--radius-sm);padding:1.25rem;margin-bottom:1rem;background:var(--bg)">
         <div style="text-align:center;font-size:13px;color:var(--text-muted);margin-bottom:12px">🪪 העלה תמונת רישיון נהיגה (לא חובה)</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
           <button type="button" onclick="document.getElementById('op-file-input-camera').click()"
             style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 8px;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-family:inherit;font-size:13px;color:var(--text);font-weight:500">
             <span style="font-size:26px">📷</span>מצלמה
@@ -2135,8 +2136,13 @@ const MODAL_OP_TEMPLATE = `<div class="modal-body">
             style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 8px;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-family:inherit;font-size:13px;color:var(--text);font-weight:500">
             <span style="font-size:26px">🖼️</span>גלריה
           </button>
+          <button type="button" onclick="document.getElementById('op-file-input-pdf').click()"
+            style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 8px;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-family:inherit;font-size:13px;color:var(--text);font-weight:500">
+            <span style="font-size:26px">📄</span>PDF
+          </button>
         </div>
       </div>
+      <div id="op-pdf-loading" style="display:none"><div class="loading"><div class="spinner"></div>ממיר PDF לתמונה...</div></div>
       <img id="op-img-preview" class="img-preview">
       <div class="form-row">
         <div class="form-group"><label>שם המנופאי *</label><input type="text" id="op-name" placeholder="שם מלא" autocomplete="off"></div>
@@ -2165,7 +2171,7 @@ const MODAL_OP_TEMPLATE = `<div class="modal-body">
 function rebuildOperatorModalBody() {
   const container = document.getElementById('modal-op-body');
   container.innerHTML = MODAL_OP_TEMPLATE;
-  ['op-file-input-camera','op-file-input-gallery'].forEach(id => {
+  ['op-file-input-camera','op-file-input-gallery','op-file-input-pdf'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.onchange = function() { handleOperatorFile(this.files[0]); };
   });
@@ -2223,17 +2229,61 @@ function handleOperatorDrop(e) {
   e.preventDefault();
   document.getElementById('op-upload-zone').classList.remove('drag');
   const f = e.dataTransfer.files[0];
-  if (f && f.type.startsWith('image/')) handleOperatorFile(f);
+  if (f && (f.type.startsWith('image/') || f.type === 'application/pdf')) handleOperatorFile(f);
 }
-function handleOperatorFile(file) {
+async function handleOperatorFile(file) {
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = ev => {
-    const img = document.getElementById('op-img-preview');
-    img.src = ev.target.result;
-    img.style.display = 'block';
-  };
-  reader.readAsDataURL(file);
+  const isPDF = file.type === 'application/pdf';
+
+  if (isPDF) {
+    // Convert PDF to image using PDF.js (same approach as the equipment upload flow),
+    // since licenseImageUrl always stores an image — not a raw PDF.
+    const loadingEl = document.getElementById('op-pdf-loading');
+    if (loadingEl) loadingEl.style.display = 'flex';
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdfData = new Uint8Array(arrayBuffer);
+
+      if (!window.pdfjsLib) {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      }
+
+      const pdf = await window.pdfjsLib.getDocument({ data: pdfData }).promise;
+      const page = await pdf.getPage(1); // First page
+      const scale = 2.0; // High quality
+      const viewport = page.getViewport({ scale });
+
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext('2d');
+      await page.render({ canvasContext: ctx, viewport }).promise;
+
+      const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+      const img = document.getElementById('op-img-preview');
+      img.src = imageDataUrl;
+      img.style.display = 'block';
+    } catch(err) {
+      alert('שגיאה בקריאת PDF: ' + err.message);
+    } finally {
+      if (loadingEl) loadingEl.style.display = 'none';
+    }
+  } else {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const img = document.getElementById('op-img-preview');
+      img.src = ev.target.result;
+      img.style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+  }
 }
 async function saveOperator() {
   const name = document.getElementById('op-name').value.trim();
@@ -3287,6 +3337,8 @@ function closeModal(id) {
     document.getElementById('modal-op-title').textContent = 'הוספת מנופאי חדש';
     const img = document.getElementById('op-img-preview');
     if (img) { img.style.display = 'none'; img.src = ''; }
+    const pdfLoading = document.getElementById('op-pdf-loading');
+    if (pdfLoading) pdfLoading.style.display = 'none';
   }
 }
 document.querySelectorAll('.modal-overlay').forEach(m => { m.addEventListener('click', function(e) { if (e.target === this) closeModal(this.id); }); });
