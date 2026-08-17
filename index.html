@@ -2456,6 +2456,16 @@ function operatorReportStatusBadge(st, days) {
   const C = { ok:'b-ok', warn:'b-warn', danger:'b-danger' };
   return `<span class="badge ${C[st]}">${L[st]}</span>`;
 }
+// Colors an individual license date for the PDF report: red if it already passed,
+// an exclamation-mark icon if it's within the 30-day warning window but hasn't passed yet.
+function operatorReportDateHtml(dateVal) {
+  if (!dateVal) return '—';
+  const days = daysUntil(dateVal);
+  const formatted = formatDate(dateVal);
+  if (days < 0) return `<span style="color:#dc2626;font-weight:700">${formatted}</span>`;
+  if (days <= 30) return `<span style="color:#b45309;font-weight:700">⚠️ ${formatted}</span>`;
+  return formatted;
+}
 // Opens a print-ready A4-portrait report of the operators currently matching the tab's
 // filters, sorted alphabetically (Hebrew א'-ב') by name — same "open window, print/save as
 // PDF" pattern as generateEquipmentPageWorkPlan().
@@ -2484,9 +2494,9 @@ function generateOperatorsReport() {
     const st = getOperatorStatus(o);
     const idLine = [o.idNumber ? 'ת.ז: '+o.idNumber : '', o.personalNum ? 'מ.א: '+o.personalNum : ''].filter(Boolean).join(' · ');
     const licenseLines = [
-      `אזרחי: ${formatDate(o.civilianLicenseExpiry)}`,
-      `צבאי: ${formatDate(o.militaryLicenseExpiry)}`,
-      `<strong style="color:#1e4db7">מנוף: ${formatDate(o.craneLicenseExpiry)}</strong>`
+      `אזרחי: ${operatorReportDateHtml(o.civilianLicenseExpiry)}`,
+      `צבאי: ${operatorReportDateHtml(o.militaryLicenseExpiry)}`,
+      `<strong style="color:#1e4db7">מנוף:</strong> ${operatorReportDateHtml(o.craneLicenseExpiry)}`
     ].join('<br>');
     return `<tr>
       <td class="num">${i+1}</td>
