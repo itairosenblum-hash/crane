@@ -198,7 +198,9 @@ nav {
   display: flex; align-items: center; gap: 12px;
   padding: 12px 16px; border-radius: var(--radius-sm);
   margin-bottom: 8px; border: 1px solid;
+  cursor: pointer; transition: box-shadow 0.15s, transform 0.1s;
 }
+.alert-item:hover { box-shadow: 0 3px 10px rgba(0,0,0,0.08); transform: translateY(-1px); }
 .alert-item.red { background: var(--danger-light); border-color: #fecaca; }
 .alert-item.amber { background: var(--accent-light); border-color: #fde68a; }
 .alert-item.green { background: var(--success-light); border-color: #bbf7d0; }
@@ -1487,7 +1489,7 @@ function waLink(phone, name, siteId, date, kind) {
   const cf = CHECK_FIELDS.find(c => c.kind === kind);
   const action = cf ? cf.waAction : 'לבדיקה';
   const msg = encodeURIComponent(`שלום, תזכורת: האמצעי "${name}" באתר "${getSiteName(siteId)}" מיועד ${action} בתאריך ${formatDate(date)}. נא לתאם בדיקה.`);
-  return `<a class="btn-wa" href="https://wa.me/${p}?text=${msg}" target="_blank">
+  return `<a class="btn-wa" href="https://wa.me/${p}?text=${msg}" target="_blank" onclick="event.stopPropagation()">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.523 5.847L0 24l6.356-1.492A11.934 11.934 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.894a9.866 9.866 0 01-5.031-1.381l-.361-.214-3.741.878.936-3.619-.235-.372A9.855 9.855 0 012.106 12C2.106 6.58 6.58 2.106 12 2.106S21.894 6.58 21.894 12 17.42 21.894 12 21.894z"/></svg>
     WhatsApp
   </a>`;
@@ -1556,7 +1558,7 @@ function renderDashboard() {
       const cls = days <= 14 ? 'red' : days <= 30 ? 'amber' : 'green';
       const daysTxt = !d.date ? 'אין תאריך' : days < 0 ? `פג לפני ${Math.abs(days)} ימים` : days === 0 ? 'היום!' : `${days} ימים`;
       const metaLine = d.date ? `${d.label}: ${formatDate(d.date)}${o.phone ? ' · 📞 '+formatPhone(o.phone) : ''}` : `אין תאריך רישיון רשום${o.phone ? ' · 📞 '+formatPhone(o.phone) : ''}`;
-      return `<div class="alert-item ${cls}">
+      return `<div class="alert-item ${cls}" onclick="viewOperator(${o.id})">
         <div class="alert-dot ${cls}"></div>
         <div class="alert-info">
           <div class="alert-name">👷 ${getSiteName(o.siteId)} · ${o.name||'—'} · ת.ז ${o.idNumber||'—'}</div>
@@ -1572,7 +1574,7 @@ function renderDashboard() {
     const daysTxt = !d.date ? 'אין תאריך' : days < 0 ? `פג לפני ${Math.abs(days)} ימים` : days === 0 ? 'היום!' : `${days} ימים`;
     const kindTag = (d.kind && d.kind !== 'check') ? `<span class="badge badge-warn" style="font-size:10px;margin-right:6px">${d.label}</span>` : '';
     const metaLine = d.date ? `שילדה: ${e.name||'—'} · 📅 ${d.label}: ${formatDate(d.date)}` : `שילדה: ${e.name||'—'} · אין תאריך בדיקה רשום`;
-    return `<div class="alert-item ${cls}">
+    return `<div class="alert-item ${cls}" onclick="viewEquipment(${e.id})">
       <div class="alert-dot ${cls}"></div>
       <div class="alert-info">
         <div class="alert-name">${kindTag}🏗️ ${getSiteName(e.siteId)} · ${e.serialNumber||'—'} · ${e.type||'—'}</div>
@@ -2445,7 +2447,7 @@ function operatorWaLink(op) {
     return `• ${cf.label}: ${formatDate(op[cf.field])} — ${statusTxt}`;
   }).join('\n');
   const msg = encodeURIComponent(`שלום ${op.name||''},\n\nתזכורת בנוגע לרישיונות שלך:\n${lines}\n\nנא לדאוג לחידוש בהקדם האפשרי.\n\nמערכת תסקירי הבטיחות — מדור צהר"מ זרוע הים`);
-  return `<a class="btn-icon" href="https://wa.me/${p}?text=${msg}" target="_blank" title="שלח תזכורת WhatsApp" style="text-decoration:none;color:#16a34a">💬</a>`;
+  return `<a class="btn-icon" href="https://wa.me/${p}?text=${msg}" target="_blank" title="שלח תזכורת WhatsApp" style="text-decoration:none;color:#16a34a" onclick="event.stopPropagation()">💬</a>`;
 }
 // Renders a single operator card. Pass showSite=true when the surrounding list isn't
 // already grouped under a site header (e.g. flat search results), so the site is still visible.
