@@ -184,6 +184,12 @@ nav {
 /* SECTION */
 .section-card { background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 1.5rem; overflow: hidden; }
 .section-head { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.op-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: var(--text-muted); font-weight: 600; user-select: none; }
+.op-toggle input { display: none; }
+.op-toggle-slider { width: 38px; height: 22px; background: #cbd5e1; border-radius: 20px; position: relative; transition: background 0.2s; flex-shrink: 0; }
+.op-toggle-slider::before { content: ''; position: absolute; width: 16px; height: 16px; border-radius: 50%; background: white; top: 3px; right: 3px; transition: right 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+.op-toggle input:checked + .op-toggle-slider { background: var(--blue); }
+.op-toggle input:checked + .op-toggle-slider::before { right: 19px; }
 .section-head h3 { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
 .section-body { padding: 1rem 1.5rem; }
 
@@ -683,6 +689,11 @@ tr:hover td { background: rgba(30,77,183,0.02); }
       <div class="section-card">
         <div class="section-head">
           <h3 id="alerts-title">⚠️ התראות קרובות</h3>
+          <label class="op-toggle" id="op-toggle-wrap" style="display:none">
+            <span class="op-toggle-label">👷 מנופאים</span>
+            <input type="checkbox" id="op-toggle-checkbox" onchange="toggleOperatorAlerts()">
+            <span class="op-toggle-slider"></span>
+          </label>
         </div>
         <div class="section-body" id="alerts-list"></div>
       </div>
@@ -1195,6 +1206,12 @@ function togglePass() {
 function showPage(id) { document.querySelectorAll('.page').forEach(p => p.classList.remove('active')); document.getElementById(id).classList.add('active'); if (id === 'page-setup') document.getElementById('script-url-input').value = getScriptUrl(); }
 let currentTab = 'dashboard';
 let dashboardFilter = 'all'; // 'all' | 'danger' | 'warn' | 'ok' — set by clicking a dashboard stat card
+let showOperatorAlerts = localStorage.getItem('dashboard_show_operators') !== '0'; // toggle: include מנופאים license alerts on the dashboard (default on)
+function toggleOperatorAlerts() {
+  showOperatorAlerts = document.getElementById('op-toggle-checkbox').checked;
+  localStorage.setItem('dashboard_show_operators', showOperatorAlerts ? '1' : '0');
+  renderDashboard();
+}
 function showTab(tab, btn) {
   currentTab = tab;
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -1495,10 +1512,17 @@ function renderDashboard() {
   document.getElementById('alerts-title').innerHTML = titleMap[dashboardFilter] + clearBtn;
 
   const isAdmin = currentUser.role === 'admin';
+  const opToggleWrap = document.getElementById('op-toggle-wrap');
+  if (opToggleWrap) {
+    opToggleWrap.style.display = isAdmin ? 'flex' : 'none';
+    const opCheckbox = document.getElementById('op-toggle-checkbox');
+    if (opCheckbox) opCheckbox.checked = showOperatorAlerts;
+  }
+  const includeOperators = isAdmin && showOperatorAlerts;
   let items;
   if (dashboardFilter === 'all') {
     items = getDueChecks(eqs, 30).map(d => ({ entityType: 'equipment', ...d }));
-    if (isAdmin) {
+    if (includeOperators) {
       items = items.concat(getDueOperatorChecks(getUserOperators(), 30).map(d => ({ entityType: 'operator', ...d })));
     }
     items.sort((a,b) => a.days - b.days);
@@ -1509,7 +1533,7 @@ function renderDashboard() {
       const nc = getNextRelevantCheck(e);
       return nc ? { entityType: 'equipment', eq: e, kind: nc.kind, label: nc.label, date: nc.date, days: nc.days } : { entityType: 'equipment', eq: e, kind: 'check', label: '', date: '', days: 9999 };
     });
-    if (isAdmin) {
+    if (includeOperators) {
       const opItems = getUserOperators().filter(o => getOperatorStatus(o) === dashboardFilter).map(o => {
         const nc = getNextOperatorCheck(o);
         return nc ? { entityType: 'operator', op: o, label: nc.label, date: nc.date, days: nc.days } : { entityType: 'operator', op: o, label: '', date: '', days: 9999 };
