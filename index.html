@@ -3132,24 +3132,34 @@ async function saveUser() {
   const username = document.getElementById('new-username').value.trim();
   const password = document.getElementById('new-password').value;
   if (!username) { alert('נא למלא שם משתמש'); return; }
+  const siteIds = getSelectedSites().split(',').filter(Boolean);
+  const fullname = document.getElementById('new-fullname').value || username;
+  const phone = document.getElementById('new-user-phone').value.replace(/\D/g,'');
+
   if (!editingUsername) {
-    // יצירת פרטי התחברות חדשים (Firebase Authentication) חייבת עבור הרשאות מנהל ולא ניתנת
-    // מהדפדפן מטעמי אבטחה — יש לבקש מ-Claude להריץ סקריפט קטן, או ליצור ידנית ב-Firebase Console
-    alert('יצירת משתמש חדש עם פרטי כניסה חייבת לעבור דרך Firebase Console או בקשה ל-Claude — לא ניתן ליצור כניסה חדשה ישירות מכאן מטעמי אבטחה.');
+    // יצירת משתמש חדש: Apps Script מאמת מול Identity Toolkit שהמבקש אכן מנהל מחובר
+    // (idToken תקף עם role=admin ב-Firestore) לפני שהוא יוצר את חשבון הכניסה בפועל
+    const pw = password || 'Aa123456';
+    if (pw.length < 6) { alert('הסיסמה חייבת להכיל לפחות 6 תווים'); return; }
+    try {
+      showToast('יוצר משתמש...');
+      const idToken = await fbAuth.currentUser.getIdToken(true);
+      const res = await apiPost({ action: 'createUser', data: { idToken, username, password: pw, fullname, phone, siteIds } });
+      if (!res || res.ok === false) { alert('שגיאה ביצירת משתמש: ' + (res && res.msg || 'לא ידוע')); return; }
+      showToast('משתמש נוסף ✓');
+      document.querySelector('#modal-add-user .modal-header h3').textContent = 'הוספת משתמש';
+      closeModal('modal-add-user'); loadData(true).then(() => renderUsersTable());
+    } catch(e) { alert('שגיאה: '+e.message); }
     return;
   }
+
   const existingUser = appData.users.find(u => u.username === editingUsername);
   if (!existingUser) { alert('משתמש לא נמצא'); return; }
   if (password) {
     alert('שינוי סיסמה למשתמש אחר לא זמין מכאן מטעמי אבטחה — יש לאפס דרך Firebase Console ← Authentication ← Users. שאר הפרטים יישמרו כרגיל.');
   }
-  const siteIds = getSelectedSites().split(',').filter(Boolean);
   try {
-    await db.collection('users').doc(existingUser.id).update({
-      fullname: document.getElementById('new-fullname').value || username,
-      phone: document.getElementById('new-user-phone').value.replace(/\D/g,''),
-      siteIds
-    });
+    await db.collection('users').doc(existingUser.id).update({ fullname, phone, siteIds });
     showToast('משתמש עודכן ✓');
     editingUsername = null;
     document.getElementById('new-username').disabled = false;
