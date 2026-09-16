@@ -499,6 +499,9 @@ tr:hover td { background: rgba(30,77,183,0.02); }
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="צהר\"מ זרוע הים">
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
 
@@ -1036,7 +1039,23 @@ tr:hover td { background: rgba(30,77,183,0.02); }
 <div class="toast" id="toast"></div>
 
 <script>
+// ===== FIREBASE INIT =====
+const firebaseConfig = {
+  apiKey: "AIzaSyDDDPT3cjlyTzhU0iFe-A7y2YlZW-iTdIk",
+  authDomain: "cranes-a0759.firebaseapp.com",
+  projectId: "cranes-a0759",
+  storageBucket: "cranes-a0759.firebasestorage.app",
+  messagingSenderId: "832258069678",
+  appId: "1:832258069678:web:480d3c72f423725677c93f"
+};
+firebase.initializeApp(firebaseConfig);
+const fbAuth = firebase.auth();
+const db = firebase.firestore();
+const AUTH_EMAIL_DOMAIN = 'crane.internal';
+
 const GEMINI_KEY_STORE = 'safety_or_key';
+// Apps Script נשאר בשימוש רק להעלאה/מחיקה של תמונות ב-Drive (saveImage/deleteImage) —
+// כל שאר הנתונים (אתרים/אמצעים/מנופאים/משתמשים/סוגי ציוד) חיים כעת ב-Firestore
 const SCRIPT_URL_STORE = 'safety_script_url';
 const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw3kpsA7h1e_5Rg-vs1ndNULRTH-Vjkz7thKquEE-LDhvVbsaflrmwrsXMHYiJ5Lv1PKw/exec';
 
@@ -1053,19 +1072,8 @@ function getApiKey() {
   return d.join('');
 }
 
-// ===== API =====
-async function apiGet(params) {
-  const qs = new URLSearchParams(params).toString();
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 15000);
-  try {
-    const resp = await fetch(getScriptUrl() + '?' + qs, { signal: ctrl.signal });
-    clearTimeout(t);
-    return resp.json();
-  } catch(e) { clearTimeout(t); throw e.name === 'AbortError' ? new Error('timeout') : e; }
-}
+// ===== IMAGE API (Apps Script → Drive בלבד) =====
 async function apiPost(body) {
-  // Apps Script requires no-cors or form data for cross-origin POST
   const resp = await fetch(getScriptUrl(), {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },
@@ -1074,13 +1082,28 @@ async function apiPost(body) {
   return resp.json();
 }
 
+// ===== FIRESTORE HELPERS =====
+function nextId(list) {
+  const ids = list.map(x => parseInt(x.id)).filter(n => !isNaN(n));
+  return ids.length ? Math.max(...ids) + 1 : 1;
+}
+async function fsGetAll(collectionName) {
+  const snap = await db.collection(collectionName).get();
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
 // ===== DATA =====
 async function loadData(silent = false) {
   if (!silent) setSyncStatus('ing', '● טוען...');
   try {
-    const data = await apiGet({ action: 'getAll' });
-    appData.sites = (data.sites || []).map(s => ({ ...s, id: parseInt(s.id), phone: String(s.phone||''), manager: String(s.manager||''), name: String(s.name||''), location: String(s.location||'') }));
-    appData.equipment = (data.equipment || []).map(e => ({
+    const [sitesRaw, equipmentRaw, operatorsRaw, typesDoc] = await Promise.all([
+      fsGetAll('sites'),
+      fsGetAll('equipment'),
+      fsGetAll('operators'),
+      db.collection('meta').doc('equipmentTypes').get()
+    ]);
+    appData.sites = sitesRaw.map(s => ({ ...s, id: parseInt(s.id), phone: String(s.phone||''), manager: String(s.manager||''), name: String(s.name||''), location: String(s.location||'') }));
+    appData.equipment = equipmentRaw.map(e => ({
       ...e,
       id: parseInt(e.id),
       siteId: parseInt(e.siteId),
@@ -1096,9 +1119,8 @@ async function loadData(silent = false) {
       imageUrl: (e.imageUrl && String(e.imageUrl) !== 'null' && String(e.imageUrl) !== 'undefined' && String(e.imageUrl).startsWith('http')) ? String(e.imageUrl) : ''
     }));
     console.log('Equipment with images:', appData.equipment.filter(e=>e.imageUrl).map(e=>({id:e.id,url:e.imageUrl})));
-    appData.users = data.users || [];
-    appData.equipmentTypes = (data.equipmentTypes || []).map(t => String(t||'').trim()).filter(Boolean);
-    appData.operators = (data.operators || []).map(o => ({
+    appData.equipmentTypes = (typesDoc.exists ? (typesDoc.data().types||[]) : []).map(t => String(t||'').trim()).filter(Boolean);
+    appData.operators = operatorsRaw.map(o => ({
       ...o,
       id: parseInt(o.id),
       siteId: parseInt(o.siteId),
@@ -1113,10 +1135,17 @@ async function loadData(silent = false) {
       craneLicenseExpiry: normalizeDate(o.craneLicenseExpiry),
       licenseImageUrl: (o.licenseImageUrl && String(o.licenseImageUrl) !== 'null' && String(o.licenseImageUrl) !== 'undefined' && String(o.licenseImageUrl).startsWith('http')) ? String(o.licenseImageUrl) : ''
     }));
+    // רשימת המשתמשים המלאה נגישה רק למנהל (גם ב-Security Rules וגם כאן) — משתמש רגיל לא רואה את לשונית הניהול ממילא
+    if (currentUser && currentUser.role === 'admin') {
+      const usersRaw = await fsGetAll('users');
+      appData.users = usersRaw.map(u => ({ ...u, siteId: (u.siteIds||[]).join(',') }));
+    } else {
+      appData.users = [];
+    }
     setSyncStatus('ok', '● מחובר');
     refreshCurrentTab();
     updateNavBadges();
-  } catch(e) { setSyncStatus('err', '● שגיאה'); }
+  } catch(e) { console.error('loadData error:', e); setSyncStatus('err', '● שגיאה'); }
 }
 
 // Manual refresh from the nav bar — reloads data from Sheets without reloading the page
@@ -1161,24 +1190,35 @@ async function doLogin() {
   if (!username || !password) { alert('נא למלא שם משתמש וסיסמה'); return; }
   setSyncStatus('ing', '● מתחבר...');
   try {
-    const res = await apiGet({ action: 'login', username, password });
-    if (!res.ok) { alert(res.msg || 'שגיאה'); setSyncStatus('err', '● שגיאה'); return; }
-    currentUser = res.user;
-    document.getElementById('nav-user-name').textContent = currentUser.fullname + (currentUser.role === 'admin' ? ' 👑' : '');
-    document.getElementById('main-nav').style.display = 'flex';
-    if (currentUser.role !== 'admin') {
-      document.getElementById('tab-sites-btn').style.display = 'none';
-      document.getElementById('tab-settings-btn').style.display = 'none';
-      document.getElementById('tab-wa-btn').style.display = 'none';
-      document.getElementById('tab-operators-btn').style.display = 'none';
-    } else {
-      document.getElementById('btn-add-eq').style.display = '';
-      document.getElementById('btn-add-op').style.display = '';
-    }
-    showPage('page-app');
-    await loadData();
-    showTab('dashboard', document.querySelector('.tab-btn'));
-  } catch(e) { alert('שגיאת חיבור: ' + e.message); setSyncStatus('err', '● שגיאה'); }
+    // ההתחברות עצמה מול Firebase Auth; onAuthStateChanged (בסוף הקובץ) מטפל בהצגת האפליקציה וטעינת הנתונים
+    await fbAuth.signInWithEmailAndPassword(username + '@' + AUTH_EMAIL_DOMAIN, password);
+  } catch(e) {
+    console.error('Login error:', e);
+    alert('שם משתמש או סיסמה שגויים');
+    setSyncStatus('err', '● שגיאה');
+  }
+}
+// מפעיל את מסך האפליקציה על בסיס פרופיל המשתמש ב-Firestore — קרוי גם מ-onAuthStateChanged
+// (כניסה חדשה) וגם אוטומטית בטעינת עמוד כשיש כבר session פעיל
+async function enterAppForUser(uid) {
+  const profileSnap = await db.collection('users').doc(uid).get();
+  if (!profileSnap.exists) { await fbAuth.signOut(); alert('לא נמצא פרופיל משתמש במערכת'); showPage('page-login'); return; }
+  const profile = profileSnap.data();
+  currentUser = { uid, username: profile.username, fullname: profile.fullname, role: profile.role, phone: profile.phone, siteId: (profile.siteIds||[]).join(',') };
+  document.getElementById('nav-user-name').textContent = currentUser.fullname + (currentUser.role === 'admin' ? ' 👑' : '');
+  document.getElementById('main-nav').style.display = 'flex';
+  if (currentUser.role !== 'admin') {
+    document.getElementById('tab-sites-btn').style.display = 'none';
+    document.getElementById('tab-settings-btn').style.display = 'none';
+    document.getElementById('tab-wa-btn').style.display = 'none';
+    document.getElementById('tab-operators-btn').style.display = 'none';
+  } else {
+    document.getElementById('btn-add-eq').style.display = '';
+    document.getElementById('btn-add-op').style.display = '';
+  }
+  showPage('page-app');
+  await loadData();
+  showTab('dashboard', document.querySelector('.tab-btn'));
 }
 function toggleSettingsPanel() {
   const panel = document.getElementById('settings-panel');
@@ -1191,7 +1231,7 @@ function toggleSettingsPanel() {
     document.getElementById('api-key-input').value = getApiKey() ? '••••••••••••••••' : '';
   }
 }
-function logout() { currentUser = null; document.getElementById('main-nav').style.display = 'none'; showPage('page-login'); }
+function logout() { fbAuth.signOut(); currentUser = null; document.getElementById('main-nav').style.display = 'none'; showPage('page-login'); }
 function togglePass() {
   const inp = document.getElementById('login-pass');
   const icon = document.getElementById('eye-icon');
@@ -1712,10 +1752,14 @@ function viewEquipment(id) {
 }
 async function deleteEquipment(id) {
   if (!confirm('האם למחוק אמצעי זה?')) return;
+  const eq = appData.equipment.find(x => x.id === id);
   // Optimistic update
   removeLocalEquipment(id);
   showToast('אמצעי נמחק');
-  try { await apiPost({ action: 'deleteEquipment', data: { id } }); } 
+  try {
+    await db.collection('equipment').doc(String(id)).delete();
+    if (eq && eq.imageUrl) apiPost({ action: 'deleteImage', data: { imageUrl: eq.imageUrl } }).catch(()=>{});
+  }
   catch(e) { alert('שגיאה: '+e.message); await loadData(); }
 }
 function editEquipment(id) {
@@ -1896,7 +1940,7 @@ async function handleTypeSelectChange(selectEl) {
     }
     if (!appData.equipmentTypes.includes(val)) {
       appData.equipmentTypes.push(val);
-      try { await apiPost({ action: 'addEquipmentType', data: { type: val } }); }
+      try { await db.collection('meta').doc('equipmentTypes').set({ types: firebase.firestore.FieldValue.arrayUnion(val) }, { merge: true }); }
       catch(e) { console.error('Failed to persist new equipment type:', e); }
     }
   } else {
@@ -1940,15 +1984,16 @@ async function saveEquipment() {
     imageData = await compressImage(imgEl.src);
     console.log('Image size:', Math.round(imageData.length/1024), 'KB');
   }
-  const imageUrl = !hasNewImage && editingEqId ? (appData.equipment.find(e=>e.id===editingEqId)||{}).imageUrl||'' : '';
+  let imageUrl = !hasNewImage && editingEqId ? (appData.equipment.find(e=>e.id===editingEqId)||{}).imageUrl||'' : '';
   const gv = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+  const id = editingEqId || nextId(appData.equipment);
   const data = {
-    id: editingEqId, eqId, name,
+    eqId, name,
     serialNumber: gv('eq-serial'),
     type: gv('eq-type'),
     manufacturer: gv('eq-manufacturer'),
     manufacturingYear: gv('eq-year'),
-    siteId: parseInt(document.getElementById('eq-site').value),
+    siteId: String(parseInt(document.getElementById('eq-site').value)),
     lastCheck: gv('eq-last'),
     nextCheck: gv('eq-next'),
     btNext: gv('eq-bt-next'),
@@ -1958,50 +2003,27 @@ async function saveEquipment() {
     height: gv('eq-height'),
     inspectionType: gv('eq-inspection-type'),
     inspectorName: gv('eq-inspector'),
-    notes: gv('eq-notes'),
-    imageData: imageData||'',
-    imageUrl: imageUrl||''
+    notes: gv('eq-notes')
   };
   try {
     showToast('שומר...');
-    // Step 1: Save equipment data (without image)
-    const saveData = {...data, imageData: '', imageUrl: imageUrl};
-    console.log('DEBUG - Script URL:', getScriptUrl());
-    console.log('DEBUG - Action:', editingEqId ? 'updateEquipment' : 'addEquipment');
-    console.log('DEBUG - imageData size:', imageData ? Math.round(imageData.length/1024)+'KB' : 'none');
-    const res = await apiPost({ action: editingEqId ? 'updateEquipment' : 'addEquipment', data: saveData });
-    console.log('DEBUG - Save response:', JSON.stringify(res));
-    if (!res) { alert('שגיאה: אין תגובה מהשרת'); return; }
-    if (res.ok === false) { alert('שגיאה משרת: ' + (res.msg||'לא ידוע')); return; }
-    
-    const savedId = editingEqId || (res && res.id);
-    console.log('DEBUG - savedId:', savedId, 'hasImage:', !!imageData);
-    
-    // Step 2: Upload image separately if we have one
-    if (imageData && savedId) {
+    if (imageData) {
       showToast('מעלה תמונה ל-Drive...');
-      console.log('DEBUG - Starting image upload, size:', Math.round(imageData.length/1024), 'KB');
-      try {
-        const imgRes = await apiPost({ 
-          action: 'uploadImage', 
-          data: { id: savedId, eqId: data.eqId, imageData: imageData }
-        });
-        console.log('DEBUG - Image upload response:', JSON.stringify(imgRes));
-        if (imgRes && imgRes.ok && imgRes.imageUrl) {
-          showToast('אמצעי נשמר + תמונה הועלתה ל-Drive ✓');
-        } else {
-          alert('שגיאה בהעלאת תמונה: ' + (imgRes ? JSON.stringify(imgRes) : 'אין תגובה'));
-        }
-      } catch(imgErr) {
-        console.error('Image upload error:', imgErr);
-        alert('שגיאת רשת בהעלאת תמונה: ' + imgErr.message);
+      const imgRes = await apiPost({
+        action: 'saveImage',
+        data: { imageData, filename: 'eq_' + id + '_' + String(eqId).replace(/[^a-zA-Z0-9]/g,'_') }
+      });
+      if (imgRes && imgRes.ok && imgRes.imageUrl) {
+        imageUrl = imgRes.imageUrl;
+      } else {
+        alert('שגיאה בהעלאת תמונה: ' + (imgRes ? JSON.stringify(imgRes) : 'אין תגובה'));
+        return;
       }
-    } else {
-      showToast(editingEqId ? 'אמצעי עודכן ✓' : 'אמצעי נוסף ✓');
     }
-    
+    data.imageUrl = imageUrl || '';
+    await db.collection('equipment').doc(String(id)).set(data);
+    showToast(editingEqId ? 'אמצעי עודכן ✓' : 'אמצעי נוסף ✓');
     closeModal('modal-add-eq');
-    // Reload in background silently
     loadData(true);
   } catch(e) { console.error('Save error:', e); alert('שגיאה כללית: ' + e.message); }
 }
@@ -2318,12 +2340,12 @@ async function saveOperator() {
   const hasNewImage = imgEl.style.display !== 'none' && imgEl.src.startsWith('data:');
   let imageData = '';
   if (hasNewImage) imageData = await compressImage(imgEl.src);
-  const existingImageUrl = !hasNewImage && editingOperatorId ? (appData.operators.find(o=>o.id===editingOperatorId)||{}).licenseImageUrl||'' : '';
+  let licenseImageUrl = !hasNewImage && editingOperatorId ? (appData.operators.find(o=>o.id===editingOperatorId)||{}).licenseImageUrl||'' : '';
   const gv = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+  const id = editingOperatorId || nextId(appData.operators);
   const data = {
-    id: editingOperatorId,
     name,
-    siteId: parseInt(document.getElementById('op-site').value),
+    siteId: String(parseInt(document.getElementById('op-site').value)),
     personalNum: gv('op-personal-num'),
     idNumber: gv('op-id-number'),
     licenseNumber: gv('op-license-number'),
@@ -2332,37 +2354,39 @@ async function saveOperator() {
     militaryLicenseExpiry: gv('op-military-expiry'),
     craneLicenseExpiry: gv('op-crane-expiry'),
     tatash: gv('op-tatash'),
-    phone: gv('op-phone').replace(/\D/g,''),
-    licenseImageUrl: existingImageUrl
+    phone: gv('op-phone').replace(/\D/g,'')
   };
   try {
     showToast('שומר...');
-    const res = await apiPost({ action: editingOperatorId ? 'updateOperator' : 'addOperator', data });
-    if (!res) { alert('שגיאה: אין תגובה מהשרת'); return; }
-    if (res.ok === false) { alert('שגיאה משרת: ' + (res.msg||'לא ידוע')); return; }
-    const savedId = editingOperatorId || (res && res.id);
-    if (imageData && savedId) {
+    if (imageData) {
       showToast('מעלה תמונה...');
-      try {
-        const imgRes = await apiPost({ action: 'uploadOperatorImage', data: { id: savedId, name, imageData } });
-        if (imgRes && imgRes.ok && imgRes.licenseImageUrl) showToast('מנופאי נשמר + תמונה הועלתה ✓');
-        else alert('שגיאה בהעלאת תמונה: ' + (imgRes ? JSON.stringify(imgRes) : 'אין תגובה'));
-      } catch(imgErr) { alert('שגיאת רשת בהעלאת תמונה: ' + imgErr.message); }
-    } else {
-      showToast(editingOperatorId ? 'מנופאי עודכן ✓' : 'מנופאי נוסף ✓');
+      const imgRes = await apiPost({
+        action: 'saveImage',
+        data: { imageData, filename: 'op_' + id + '_' + String(name).replace(/[^a-zA-Z0-9\u0590-\u05FF]/g,'_') }
+      });
+      if (imgRes && imgRes.ok && imgRes.imageUrl) {
+        licenseImageUrl = imgRes.imageUrl;
+      } else {
+        alert('שגיאה בהעלאת תמונה: ' + (imgRes ? JSON.stringify(imgRes) : 'אין תגובה'));
+        return;
+      }
     }
+    data.licenseImageUrl = licenseImageUrl || '';
+    await db.collection('operators').doc(String(id)).set(data);
+    showToast(editingOperatorId ? 'מנופאי עודכן ✓' : 'מנופאי נוסף ✓');
     closeModal('modal-add-operator');
     loadData(true);
   } catch(e) { alert('שגיאה כללית: ' + e.message); }
 }
 async function deleteOperator(id) {
   if (!confirm('האם למחוק מנופאי זה?')) return;
+  const op = appData.operators.find(o => o.id === id);
   appData.operators = appData.operators.filter(o => o.id !== id);
   renderOperatorsTable();
   showToast('מנופאי נמחק');
   try {
-    const res = await apiPost({ action: 'deleteOperator', data: { id } });
-    if (!res || res.ok === false) { alert('שגיאה במחיקה: ' + (res && res.msg || '')); await loadData(); }
+    await db.collection('operators').doc(String(id)).delete();
+    if (op && op.licenseImageUrl) apiPost({ action: 'deleteImage', data: { imageUrl: op.licenseImageUrl } }).catch(()=>{});
   } catch(e) { alert('שגיאה: '+e.message); await loadData(); }
 }
 function viewOperator(id) {
@@ -2980,8 +3004,7 @@ async function addNewEquipmentType() {
   renderEquipmentTypesSettings();
   input.value = '';
   try {
-    const res = await apiPost({ action: 'addEquipmentType', data: { type: val } });
-    if (!res || res.ok === false) { alert('שגיאה בשמירת הסוג בשרת: ' + (res && res.msg || '')); return; }
+    await db.collection('meta').doc('equipmentTypes').set({ types: firebase.firestore.FieldValue.arrayUnion(val) }, { merge: true });
     showToast('סוג אמצעי נוסף ✓');
   } catch(e) { alert('שגיאת רשת בשמירת הסוג: ' + e.message); }
 }
@@ -2990,8 +3013,7 @@ async function deleteEquipmentTypeUI(type) {
   appData.equipmentTypes = appData.equipmentTypes.filter(t => t !== type);
   renderEquipmentTypesSettings();
   try {
-    const res = await apiPost({ action: 'deleteEquipmentType', data: { type } });
-    if (!res || res.ok === false) { alert('שגיאה במחיקת הסוג בשרת: ' + (res && res.msg || '')); await loadData(true); return; }
+    await db.collection('meta').doc('equipmentTypes').update({ types: firebase.firestore.FieldValue.arrayRemove(type) });
     showToast('סוג אמצעי הוסר');
   } catch(e) { alert('שגיאת רשת במחיקת הסוג: ' + e.message); await loadData(true); }
 }
@@ -3032,9 +3054,10 @@ function openSiteModal() {
 async function saveSite() {
   const name = document.getElementById('site-name').value.trim();
   if (!name) { alert('נא להזין שם אתר'); return; }
-  const data = { id: editingSiteId, name, location: name, manager: '', phone: '' };
+  const id = editingSiteId || nextId(appData.sites);
+  const data = { name, location: name, manager: '', phone: '' };
   try {
-    await apiPost({ action: editingSiteId ? 'updateSite' : 'addSite', data });
+    await db.collection('sites').doc(String(id)).set(data);
     showToast(editingSiteId ? 'אתר עודכן ✓' : 'אתר נוסף ✓');
     editingSiteId = null;
     closeModal('modal-add-site');
@@ -3045,7 +3068,7 @@ async function deleteSite(id) {
   if (!confirm('למחוק אתר זה?')) return;
   removeLocalSite(id);
   showToast('אתר נמחק');
-  try { await apiPost({ action: 'deleteSite', data: { id } }); }
+  try { await db.collection('sites').doc(String(id)).delete(); }
   catch(e) { alert('שגיאה: '+e.message); await loadData(); }
 }
 
@@ -3109,15 +3132,25 @@ async function saveUser() {
   const username = document.getElementById('new-username').value.trim();
   const password = document.getElementById('new-password').value;
   if (!username) { alert('נא למלא שם משתמש'); return; }
-  // Password is optional - defaults to Aa123456 for new users
-  const siteIds = getSelectedSites();
-  const data = { username, fullname: document.getElementById('new-fullname').value||username, role:'user', phone: document.getElementById('new-user-phone').value.replace(/\D/g,''), siteId: siteIds };
-  data.password = password || (editingUsername ? undefined : 'Aa123456');
-  if (!data.password) delete data.password;
+  if (!editingUsername) {
+    // יצירת פרטי התחברות חדשים (Firebase Authentication) חייבת עבור הרשאות מנהל ולא ניתנת
+    // מהדפדפן מטעמי אבטחה — יש לבקש מ-Claude להריץ סקריפט קטן, או ליצור ידנית ב-Firebase Console
+    alert('יצירת משתמש חדש עם פרטי כניסה חייבת לעבור דרך Firebase Console או בקשה ל-Claude — לא ניתן ליצור כניסה חדשה ישירות מכאן מטעמי אבטחה.');
+    return;
+  }
+  const existingUser = appData.users.find(u => u.username === editingUsername);
+  if (!existingUser) { alert('משתמש לא נמצא'); return; }
+  if (password) {
+    alert('שינוי סיסמה למשתמש אחר לא זמין מכאן מטעמי אבטחה — יש לאפס דרך Firebase Console ← Authentication ← Users. שאר הפרטים יישמרו כרגיל.');
+  }
+  const siteIds = getSelectedSites().split(',').filter(Boolean);
   try {
-    const res = await apiPost({ action: editingUsername ? 'updateUser' : 'addUser', data });
-    if (!res.ok) { alert(res.msg); return; }
-    showToast(editingUsername ? 'משתמש עודכן ✓' : 'משתמש נוסף ✓');
+    await db.collection('users').doc(existingUser.id).update({
+      fullname: document.getElementById('new-fullname').value || username,
+      phone: document.getElementById('new-user-phone').value.replace(/\D/g,''),
+      siteIds
+    });
+    showToast('משתמש עודכן ✓');
     editingUsername = null;
     document.getElementById('new-username').disabled = false;
     document.querySelector('#modal-add-user .modal-header h3').textContent = 'הוספת משתמש';
@@ -3125,15 +3158,14 @@ async function saveUser() {
   } catch(e) { alert('שגיאה: '+e.message); }
 }
 async function deleteUser(username) {
-  if (!confirm(`למחוק משתמש ${username}?`)) return;
+  if (!confirm(`להסיר את הגישה של ${username} למערכת?`)) return;
+  const u = appData.users.find(x => x.username === username);
+  if (!u) { alert('משתמש לא נמצא'); return; }
   try {
-    const res = await apiPost({ action:'deleteUser', data:{username} });
-    if (!res || res.ok === false) {
-      alert('שגיאה במחיקת משתמש: ' + (res && res.msg ? res.msg : 'לא ידוע'));
-      await loadData(true); renderUsersTable();
-      return;
-    }
-    showToast('משתמש הוסר');
+    // מוחק את פרופיל ההרשאות ב-Firestore — המשתמש מאבד גישה לאפליקציה מיידית,
+    // גם אם חשבון ההתחברות עצמו ב-Firebase Auth עדיין קיים (ניקוי מלא: Firebase Console)
+    await db.collection('users').doc(u.id).delete();
+    showToast('הגישה של המשתמש הוסרה');
     await loadData(true); renderUsersTable();
   } catch(e) { alert('שגיאה: '+e.message); }
 }
@@ -3374,9 +3406,22 @@ function closeModal(id) {
 document.querySelectorAll('.modal-overlay').forEach(m => { m.addEventListener('click', function(e) { if (e.target === this) closeModal(this.id); }); });
 
 // ===== INIT =====
-// Always use latest URL
+// Always use latest URL (Apps Script now used only for image upload/delete)
 localStorage.setItem(SCRIPT_URL_STORE, DEFAULT_SCRIPT_URL);
 if (!getScriptUrl()) document.getElementById('no-script-warning').style.display = 'block';
+
+// Firebase Auth session persists automatically across reloads — אם המשתמש כבר מחובר
+// (session קודם), נכנסים ישר לאפליקציה בלי להציג שוב את מסך הכניסה
+fbAuth.onAuthStateChanged(function(user) {
+  if (user) {
+    enterAppForUser(user.uid).catch(function(e) {
+      console.error('Auto-login error:', e);
+      showPage('page-login');
+    });
+  } else {
+    showPage('page-login');
+  }
+});
 </script>
 <script>
 if ('serviceWorker' in navigator) {
