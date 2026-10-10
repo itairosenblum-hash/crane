@@ -310,6 +310,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
 .spinner { width: 20px; height: 20px; border: 2px solid rgba(30,77,183,0.2); border-top-color: var(--blue); border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
 #nav-refresh-btn.spinning { animation: spin 0.7s linear infinite; pointer-events: none; opacity: 0.7; }
+.ai-low { border-color: #f59e0b !important; background: #fffbeb !important; }
 .img-preview { max-width: 100%; max-height: 180px; border-radius: var(--radius-sm); margin-bottom: 1rem; display: none; object-fit: cover; border: 1px solid var(--border); }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
@@ -557,11 +558,6 @@ tr:hover td { background: rgba(30,77,183,0.02); }
     <button class="btn-primary-sm" onclick="saveScriptUrlFromSettings();toggleSettingsPanel()" style="font-size:13px">שמור URL</button>
     <button class="btn-secondary" onclick="testConnection()" style="font-size:13px">בדוק חיבור</button>
   </div>
-  <div class="form-group">
-    <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase">OpenRouter API Key (AI)</label>
-    <input type="password" id="api-key-input" placeholder="sk-or-...">
-  </div>
-  <button class="btn-primary-sm" onclick="saveApiKey();showToast('נשמר ✓')" style="font-size:13px">שמור מפתח AI</button>
 </div>
 <div id="settings-overlay" onclick="toggleSettingsPanel()" style="display:none;position:fixed;inset:0;z-index:149"></div>
 
@@ -1053,7 +1049,6 @@ const fbAuth = firebase.auth();
 const db = firebase.firestore();
 const AUTH_EMAIL_DOMAIN = 'crane.internal';
 
-const GEMINI_KEY_STORE = 'safety_or_key';
 // Apps Script נשאר בשימוש רק להעלאה/מחיקה של תמונות ב-Drive (saveImage/deleteImage) —
 // כל שאר הנתונים (אתרים/אמצעים/מנופאים/משתמשים/סוגי ציוד) חיים כעת ב-Firestore
 const SCRIPT_URL_STORE = 'safety_script_url';
@@ -1064,13 +1059,6 @@ let currentUser = null;
 let editingEqId = null;
 
 function getScriptUrl() { return localStorage.getItem(SCRIPT_URL_STORE) || DEFAULT_SCRIPT_URL; }
-function getApiKey() { 
-  const stored = localStorage.getItem(GEMINI_KEY_STORE);
-  if (stored && stored.length > 10) return stored;
-  // Default key - can be overridden in settings
-  const d = ['sk-or-v1-129eb364','1d2d82fa5e0729e7cc76d9a487e9f0d6cf7bdc9449447210ab00a02d'];
-  return d.join('');
-}
 
 // ===== IMAGE API (Apps Script → Drive בלבד) =====
 async function apiPost(body) {
@@ -1228,7 +1216,6 @@ function toggleSettingsPanel() {
   overlay.style.display = isOpen ? 'none' : 'block';
   if (!isOpen) {
     document.getElementById('script-url-settings').value = getScriptUrl();
-    document.getElementById('api-key-input').value = getApiKey() ? '••••••••••••••••' : '';
   }
 }
 function logout() { fbAuth.signOut(); currentUser = null; document.getElementById('main-nav').style.display = 'none'; showPage('page-login'); }
@@ -2029,110 +2016,97 @@ async function saveEquipment() {
 }
 
 // ===== IMAGE / AI =====
-function handleDrop(e) { e.preventDefault(); document.getElementById('upload-zone').classList.remove('drag'); const f = e.dataTransfer.files[0]; if (f && f.type.startsWith('image/')) handleFile(f); }
+function handleDrop(e) { e.preventDefault(); document.getElementById('upload-zone').classList.remove('drag'); const f = e.dataTransfer.files[0]; if (f && (f.type.startsWith('image/') || f.type === 'application/pdf')) handleFile(f); }
+function setAiLoading(text) {
+  const box = document.getElementById('ai-loading');
+  if (!box) return;
+  if (!text) { box.style.display = 'none'; return; }
+  box.innerHTML = '<div class="loading"><div class="spinner"></div><span></span></div>';
+  box.querySelector('span').textContent = text;
+  box.style.display = 'flex';
+}
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(file);
+  });
+}
+async function loadPdfJs() {
+  if (window.pdfjsLib) return window.pdfjsLib;
+  await new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  return window.pdfjsLib;
+}
+// מצייר את העמוד הראשון של PDF כתמונה — לתצוגה ולשמירה ב-Drive בלבד. ה-AI מקבל את ה-PDF המקורי המלא.
+async function pdfFirstPageImage(file) {
+  const lib = await loadPdfJs();
+  const pdf = await lib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+  const page = await pdf.getPage(1);
+  const viewport = page.getViewport({ scale: 2.0 });
+  const canvas = document.createElement('canvas');
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+  return canvas.toDataURL('image/jpeg', 0.9);
+}
+let scanSeq = 0;
 async function handleFile(file) {
   if (!file) return;
+  if (file.size > 15 * 1024 * 1024) { alert('הקובץ גדול מדי (עד 15MB)'); return; }
   const isPDF = file.type === 'application/pdf';
-  
-  if (isPDF) {
-    // Convert PDF to image using PDF.js
-    document.getElementById('ai-loading').style.display = 'flex';
-    document.getElementById('ai-loading').querySelector('div:last-child').textContent = 'ממיר PDF לתמונה...';
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdfData = new Uint8Array(arrayBuffer);
-      
-      // Load PDF.js dynamically
-      if (!window.pdfjsLib) {
-        await new Promise((resolve, reject) => {
-          const script = document.createElement('script');
-          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-          script.onload = resolve;
-          script.onerror = reject;
-          document.head.appendChild(script);
-        });
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-      }
-      
-      const pdf = await window.pdfjsLib.getDocument({ data: pdfData }).promise;
-      const page = await pdf.getPage(1); // First page
-      const scale = 2.0; // High quality
-      const viewport = page.getViewport({ scale });
-      
-      const canvas = document.createElement('canvas');
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      const ctx = canvas.getContext('2d');
-      await page.render({ canvasContext: ctx, viewport }).promise;
-      
-      const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
-      
-      const img = document.getElementById('img-preview');
-      img.src = imageDataUrl;
+  const img = document.getElementById('img-preview');
+  try {
+    let scanData, scanType;
+    if (isPDF) {
+      setAiLoading('מכין תצוגה מקדימה...');
+      img.src = await pdfFirstPageImage(file);
       img.style.display = 'block';
-      document.getElementById('ai-loading').style.display = 'none';
-      
-      analyzeImage(imageDataUrl, 'image/jpeg');
-    } catch(err) {
-      document.getElementById('ai-loading').style.display = 'none';
-      alert('שגיאה בקריאת PDF: ' + err.message);
+      scanData = await fileToDataUrl(file);
+      scanType = 'application/pdf';
+    } else {
+      const dataUrl = await fileToDataUrl(file);
+      img.src = dataUrl;
+      img.style.display = 'block';
+      // תמונות מצלמה גדולות מוקטנות לפני השליחה — מספיק לקריאה ומהיר יותר בנייד
+      scanData = await compressImage(dataUrl, 2200, 0.85);
+      scanType = 'image/jpeg';
     }
-  } else {
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const img = document.getElementById('img-preview');
-      img.src = ev.target.result;
-      img.style.display = 'block';
-      analyzeImage(ev.target.result, file.type);
-    };
-    reader.readAsDataURL(file);
+    await analyzeDocument(scanData, scanType);
+  } catch (err) {
+    setAiLoading(null);
+    alert('שגיאה בקריאת הקובץ: ' + err.message);
   }
 }
-async function analyzeImage(dataUrl, fileType) {
-  const apiKey = getApiKey();
-  if (!apiKey) { alert('נא להזין OpenRouter API Key בהגדרות'); return; }
-  document.getElementById('ai-loading').style.display = 'flex';
+async function analyzeDocument(dataUrl, mimeType) {
+  const seq = ++scanSeq;
+  setAiLoading('AI קורא את התסקיר...');
   document.getElementById('ai-result-box').style.display = 'none';
-  const base64 = dataUrl.split(',')[1];
-  const mediaType = fileType || dataUrl.split(';')[0].split(':')[1];
-  const isPDF = mediaType === 'application/pdf';
+  document.querySelectorAll('#modal-eq-body .ai-low').forEach(el => { el.classList.remove('ai-low'); el.removeAttribute('title'); });
   try {
-    const PROMPT = `You are analyzing a Hebrew safety inspection certificate ("תסקיר בדיקה וניסוי מכונות-הרמה") for lifting equipment in Israel.
-Study section 2 ("תיאור המתקן") carefully - it contains TWO different id-like values that look similar but must NOT be confused with each other:
-- "מספר רישוי" (sometimes written as "צ'" or with a צ' prefix like צ'10242) = the LICENSE/REGISTRATION number - this goes into serialNumber ONLY.
-- "מס' שילדה" = the CHASSIS number (e.g. 8FBCU25-88599) - this goes into chassisNumber ONLY. Do NOT put this value into serialNumber, and do NOT confuse it with any model code that may appear in the "יצרן, דגם, מספר סידורי" row.
-Extract these fields and return ONLY a valid JSON object, no markdown:
-{"inspectionNumber":"מספר תסקיר from top-left box","serialNumber":"ONLY the value explicitly labeled מספר רישוי (license/registration number, possibly prefixed with צ'). If no field is explicitly labeled מספר רישוי anywhere in the document, return null - never substitute מס' שילדה","chassisNumber":"ONLY the value explicitly labeled מס' שילדה (chassis number). If no field is explicitly labeled מס' שילדה anywhere in the document, return null - never substitute מספר רישוי","manufacturingYear":"שנת יצור","type":"equipment type in Hebrew e.g. מלגזה","manufacturer":"manufacturer name, from the 'יצרן, דגם, מספר סידורי' row","lastCheck":"תאריך בדיקה מוכחת as DD/MM/YYYY","nextCheck":"תאריך בדיקה הבאה as DD/MM/YYYY","safeWorkLoad":"עומס עבודה בטוח numeric only","maxLoad":"עומס מקסימלי numeric only","testLoad":"עומס מבחן numeric only","height":"רדיוס/גובה numeric only","inspectionType":"סוג בדיקה","notes":"section 4 הערות"}
-Rules: dates as DD/MM/YYYY, null for missing, JSON only.`;
-
-    // Always send as image (PDF converted to image in handleFile)
-    const userContent = [
-      { type: 'image_url', image_url: { url: 'data:' + mediaType + ';base64,' + base64 } },
-      { type: 'text', text: PROMPT }
-    ];
-
-    const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey, 'HTTP-Referer': 'https://itairosenblum-hash.github.io/crane/', 'X-Title': 'Safety Inspector' },
-      body: JSON.stringify({
-        model: 'anthropic/claude-sonnet-4-5',
-        messages: [
-          { role: 'system', content: 'You are a safety document parser. Respond with valid JSON only.' },
-          { role: 'user', content: userContent }
-        ],
-        temperature: 0.1, max_tokens: 800
-      })
-    });
-    const data = await resp.json();
-    if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
-    const rawText = data.choices[0].message.content.trim();
-    let parsed = {};
-    try { parsed = JSON.parse(rawText); } catch { try { const m = rawText.match(/\{[\s\S]*\}/); if (m) parsed = JSON.parse(m[0]); } catch(e2) { console.error('Parse failed:', rawText); } }
-    document.getElementById('ai-loading').style.display = 'none';
+    if (!fbAuth.currentUser) throw new Error('נדרשת התחברות מחדש');
+    const idToken = await fbAuth.currentUser.getIdToken();
+    const res = await apiPost({ action: 'scanDocument', data: { idToken, mimeType, fileData: dataUrl.split(',')[1] } });
+    if (seq !== scanSeq) return;
+    if (!res || res.ok !== true) {
+      const msg = (res && res.msg) || 'אין תגובה מהשרת';
+      throw new Error(/פעולה לא ידועה/.test(msg) ? 'סריקת התסקירים עוד לא הותקנה ב-Apps Script' : msg);
+    }
+    const p = res.fields || {};
+    const conf = res.confidence || {};
+    setAiLoading(null);
     document.getElementById('ai-result-box').style.display = 'block';
-    const setF = (id, val) => {
+    const setF = (id, val, key) => {
       const el = document.getElementById(id);
-      if (!el || !val || String(val) === 'null' || String(val).trim() === '') return;
+      if (!el || val === null || val === undefined || String(val).trim() === '') return;
+      val = String(val);
       if (el.tagName === 'SELECT' && !Array.from(el.options).some(o => o.value === val)) {
         const customOpt = el.querySelector('option[value="__custom__"]');
         const opt = document.createElement('option');
@@ -2140,26 +2114,30 @@ Rules: dates as DD/MM/YYYY, null for missing, JSON only.`;
         if (customOpt) el.insertBefore(opt, customOpt); else el.appendChild(opt);
       }
       el.value = val;
+      // שדה שה-AI לא בטוח בו מסומן לבדיקה
+      if (typeof conf[key] === 'number' && conf[key] < 0.7) { el.classList.add('ai-low'); el.title = 'ה-AI לא בטוח בערך הזה — כדאי לבדוק'; }
     };
-    setF('eq-id', parsed.inspectionNumber);
-    setF('eq-serial', parsed.serialNumber);
-    setF('eq-type', parsed.type);
-    setF('eq-manufacturer', parsed.manufacturer);
-    setF('eq-name', parsed.chassisNumber);
-    setF('eq-year', parsed.manufacturingYear);
-    setF('eq-last', parsed.lastCheck);
-    setF('eq-next', parsed.nextCheck);
-    setF('eq-swl', parsed.safeWorkLoad);
-    setF('eq-max-load', parsed.maxLoad);
-    setF('eq-test-load', parsed.testLoad);
-    setF('eq-height', parsed.height);
-    setF('eq-inspection-type', parsed.inspectionType);
-    setF('eq-inspector', parsed.inspectorName);
-    setF('eq-notes', parsed.notes || parsed.description);
-    showToast('Gemini זיהה פרטים ✓');
-  } catch(err) {
-    document.getElementById('ai-loading').style.display = 'none';
-    alert('שגיאה: ' + err.message);
+    setF('eq-id', p.inspectionNumber, 'inspectionNumber');
+    setF('eq-serial', p.serialNumber, 'serialNumber');
+    setF('eq-type', p.type, 'type');
+    setF('eq-manufacturer', p.manufacturer, 'manufacturer');
+    setF('eq-name', p.chassisNumber, 'chassisNumber');
+    setF('eq-year', p.manufacturingYear, 'manufacturingYear');
+    setF('eq-last', p.lastCheck, 'lastCheck');
+    setF('eq-next', p.nextCheck, 'nextCheck');
+    setF('eq-swl', p.safeWorkLoad, 'safeWorkLoad');
+    setF('eq-max-load', p.maxLoad, 'maxLoad');
+    setF('eq-test-load', p.testLoad, 'testLoad');
+    setF('eq-height', p.height, 'height');
+    setF('eq-inspection-type', p.inspectionType, 'inspectionType');
+    setF('eq-inspector', p.inspectorName, 'inspectorName');
+    setF('eq-notes', p.notes, 'notes');
+    const low = document.querySelectorAll('#modal-eq-body .ai-low').length;
+    showToast(low ? `הפרטים מולאו — ${low} שדות מסומנים לבדיקה` : 'הפרטים מולאו אוטומטית ✓');
+  } catch (err) {
+    if (seq !== scanSeq) return;
+    setAiLoading(null);
+    alert('הסריקה נכשלה: ' + err.message + '\nאפשר למלא את הפרטים ידנית.');
   }
 }
 
@@ -2292,16 +2270,7 @@ async function handleOperatorFile(file) {
       const arrayBuffer = await file.arrayBuffer();
       const pdfData = new Uint8Array(arrayBuffer);
 
-      if (!window.pdfjsLib) {
-        await new Promise((resolve, reject) => {
-          const script = document.createElement('script');
-          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-          script.onload = resolve;
-          script.onerror = reject;
-          document.head.appendChild(script);
-        });
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-      }
+      await loadPdfJs();
 
       const pdf = await window.pdfjsLib.getDocument({ data: pdfData }).promise;
       const page = await pdf.getPage(1); // First page
@@ -3073,9 +3042,7 @@ async function deleteSite(id) {
 }
 
 // ===== SETTINGS =====
-function renderSettings() {
-  document.getElementById('api-key-input').value = getApiKey() ? '••••••••••••••••' : '';
-}
+function renderSettings() {}
 function saveScriptUrl() { const val = document.getElementById('script-url-input').value.trim(); if (!val) { alert('נא להזין URL'); return; } localStorage.setItem(SCRIPT_URL_STORE, val); showToast('URL נשמר'); showPage('page-login'); }
 function saveScriptUrlFromSettings() { const val = document.getElementById('script-url-settings').value.trim(); if (!val) return; localStorage.setItem(SCRIPT_URL_STORE, val); showToast('URL עודכן'); }
 async function testConnection() {
@@ -3084,7 +3051,6 @@ async function testConnection() {
   if (res) res.innerHTML = '<span style="color:var(--accent)">בודק...</span>';
   try { const r = await fetch(url + '?action=getAll'); const d = await r.json(); const msg = d.sites !== undefined ? `✅ חיבור תקין! ${(d.sites||[]).length} אתרים` : '⚠️ תשובה לא צפויה'; if (res) res.innerHTML = `<span style="color:var(--success)">${msg}</span>`; else alert(msg); } catch(e) { const msg = '❌ שגיאה: ' + e.message; if (res) res.innerHTML = `<span style="color:var(--danger)">${msg}</span>`; else alert(msg); }
 }
-function saveApiKey() { const val = document.getElementById('api-key-input').value.trim(); if (!val || val.startsWith('•')) { alert('נא להזין מפתח חדש'); return; } localStorage.setItem(GEMINI_KEY_STORE, val); showToast('מפתח נשמר ✓'); }
 function openUserModal() {
   editingUsername = null;
   document.getElementById('new-username').disabled = false;
@@ -3418,6 +3384,7 @@ document.querySelectorAll('.modal-overlay').forEach(m => { m.addEventListener('c
 // ===== INIT =====
 // Always use latest URL (Apps Script now used only for image upload/delete)
 localStorage.setItem(SCRIPT_URL_STORE, DEFAULT_SCRIPT_URL);
+try { localStorage.removeItem('safety_or_key'); } catch(e) {}
 if (!getScriptUrl()) document.getElementById('no-script-warning').style.display = 'block';
 
 // Firebase Auth session persists automatically across reloads — אם המשתמש כבר מחובר
