@@ -21,3 +21,8 @@ jobs:
           echo "::error title=scancertificate logs::$(cut -c1-900 logs.txt | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')"
           gcloud services list --enabled --project cranes-a0759 --format='value(config.name)' | grep -i generative > apis.txt 2>&1 || echo "generativelanguage NOT enabled" > apis.txt
           echo "::error title=apis::$(cat apis.txt)"
+      - name: Apps Script ping
+        run: |
+          URL="https://script.google.com/macros/s/AKfycbxy4zpcAzN8S32WmrXOkjcHIWbtb7gZHR6tuv-9w4jmTuzTEOvlmRGk10i-d-MsPeOiaw/exec"
+          curl -sSL -m 60 -o ping.txt -w '%{http_code} %{content_type} %{url_effective}' -H 'Content-Type: text/plain' -d '{"action":"ping","data":{}}' "$URL" > meta.txt 2>&1 || true
+          echo "::error title=apps script POST::$(cat meta.txt) | $(head -c 600 ping.txt | tr '\n' ' ' | sed 's/%/%25/g')"
