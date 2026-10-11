@@ -53,12 +53,18 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
+          report() { echo "::error title=$1::$(tail -20 "$2" | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')"; }
+          # Secret Manager חייב להיות פעיל בפרויקט כדי לשמור את המפתח
+          gcloud services enable secretmanager.googleapis.com cloudfunctions.googleapis.com cloudbuild.googleapis.com \
+            artifactregistry.googleapis.com run.googleapis.com eventarc.googleapis.com --project "$PROJECT" > enable.log 2>&1 \
+            || { report "enable APIs failed" enable.log; exit 1; }
           value="$(printf '%s' "$GEMINI_API_KEY" | tr -d '[:space:]')"
           current="$(firebase functions:secrets:access GEMINI_API_KEY --project "$PROJECT" 2>/dev/null || true)"
           if [ "$current" != "$value" ]; then
             echo "Updating GEMINI_API_KEY"
-            printf '%s' "$value" | firebase functions:secrets:set GEMINI_API_KEY --data-file=- --project "$PROJECT" --non-interactive --force
+            printf '%s' "$value" | firebase functions:secrets:set GEMINI_API_KEY --data-file=- --project "$PROJECT" --non-interactive --force > secret.log 2>&1 \
+              || { report "secret set failed" secret.log; [ -f firebase-debug.log ] && report "firebase debug" firebase-debug.log; exit 1; }
           else
             echo "GEMINI_API_KEY unchanged"
           fi
