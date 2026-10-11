@@ -313,11 +313,16 @@ tr:hover td { background: rgba(30,77,183,0.02); }
 .ai-ok { border: 2px solid #16a34a !important; background: #f0fdf4 !important; }
 .ai-low { border: 2px solid #f59e0b !important; background: #fffbeb !important; }
 .ai-missing { border: 2px solid #dc2626 !important; background: #fef2f2 !important; }
+/* מסגרת לבנה: ערך שהושלם מהרשומה הקיימת (לא מופיע בתסקיר החדש) */
+.ai-old { border: 3px solid #ffffff !important; box-shadow: 0 0 0 2px #94a3b8 !important; background: #f1f5f9 !important; }
 .ai-legend { display:flex; gap:12px; flex-wrap:wrap; font-size:12px; color:var(--text-muted); margin:-0.5rem 0 1rem; }
 .ai-legend span::before { content:''; display:inline-block; width:10px; height:10px; border-radius:3px; margin-inline-end:5px; vertical-align:-1px; }
 .ai-legend .ok::before { border:2px solid #16a34a; background:#f0fdf4; }
 .ai-legend .low::before { border:2px solid #f59e0b; background:#fffbeb; }
 .ai-legend .missing::before { border:2px solid #dc2626; background:#fef2f2; }
+.ai-legend .old::before { border:2px solid #fff; box-shadow:0 0 0 1.5px #94a3b8; background:#f1f5f9; }
+.ai-legend .old { display:none; }
+.ai-legend.has-old .old { display:inline; }
 .site-pick { background:var(--bg); border:1.5px solid var(--border); border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:1rem; }
 .site-chips { display:flex; flex-wrap:wrap; gap:8px; }
 .site-chip { padding:9px 14px; border:1.5px solid var(--border); border-radius:999px; background:var(--card); color:var(--text); font-family:inherit; font-size:14px; font-weight:500; cursor:pointer; min-height:40px; }
@@ -1874,7 +1879,7 @@ const MODAL_EQ_TEMPLATE = `<div class="modal-body">
       <div id="ai-loading" style="display:none"><div class="loading"><div class="spinner"></div>AI מנתח את התמונה...</div></div>
       <div id="ai-result-box" style="display:none">
         <div class="ai-result"><span class="ai-badge">AI</span>פרטים שזוהו — ניתן לערוך</div>
-        <div class="ai-legend"><span class="ok">ירוק — קריאה בטוחה</span><span class="low">כתום — כדאי לבדוק</span><span class="missing">אדום — לא מופיע במסמך, להשלים ידנית</span></div>
+        <div class="ai-legend"><span class="ok">ירוק — קריאה בטוחה</span><span class="low">כתום — כדאי לבדוק</span><span class="missing">אדום — לא מופיע במסמך, להשלים ידנית</span><span class="old">לבן — הושלם מהנתונים הקיימים במערכת</span></div>
       </div>
       <div id="dup-warning"></div>
       <div class="form-row">
@@ -1932,6 +1937,7 @@ function rebuildModalBody() {
   });
   populateEqSites();
   populateEqTypes();
+  prefilledFrom = null;
   const serialEl = document.getElementById('eq-serial');
   if (serialEl) serialEl.addEventListener('input', checkSerialDup);
 }
@@ -2036,11 +2042,62 @@ function findSerialDup(serial, excludeId) {
   return appData.equipment.find(e => e.id !== excludeId && normSerial(e.serialNumber) === n) || null;
 }
 // מתריע בטופס מיד כשהצ' כבר קיים (אחרי סריקה או הקלדה)
+// שדות של האמצעי עצמו (לא של תסקיר מסוים) שאפשר להשלים מהרשומה הקיימת כשהם חסרים בתסקיר החדש.
+// מספר תסקיר, תאריכי בדיקה, סוג בדיקה, בודק והערות שייכים לתסקיר — לא מועתקים.
+const PREFILL_FROM_EXISTING = [
+  ['eq-type', 'type'], ['eq-manufacturer', 'manufacturer'], ['eq-name', 'name'], ['eq-year', 'manufacturingYear'],
+  ['eq-swl', 'safeWorkLoad'], ['eq-max-load', 'maxLoad'], ['eq-test-load', 'testLoad'], ['eq-height', 'height'],
+  ['eq-bt-next', 'btNext']
+];
+let prefilledFrom = null; // id של הרשומה שממנה הושלמו ערכים
+function clearPrefill() {
+  document.querySelectorAll('#modal-eq-body .ai-old').forEach(el => {
+    if (el.dataset.oldVal !== undefined && el.value === el.dataset.oldVal) el.value = '';
+    el.classList.remove('ai-old'); el.removeAttribute('title'); delete el.dataset.oldVal;
+  });
+  prefilledFrom = null;
+  const lg = document.querySelector('#modal-eq-body .ai-legend'); if (lg) lg.classList.remove('has-old');
+}
+function prefillFromExisting(dup) {
+  if (prefilledFrom === dup.id) return 0;
+  clearPrefill();
+  let n = 0;
+  PREFILL_FROM_EXISTING.forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    const oldVal = String(dup[key] ?? '').trim();
+    if (!el || !oldVal || String(el.value || '').trim()) return;
+    if (el.tagName === 'SELECT' && !Array.from(el.options).some(o => o.value === oldVal)) {
+      const customOpt = el.querySelector('option[value="__custom__"]');
+      const opt = document.createElement('option'); opt.value = oldVal; opt.textContent = oldVal;
+      if (customOpt) el.insertBefore(opt, customOpt); else el.appendChild(opt);
+    }
+    el.value = oldVal;
+    el.dataset.oldVal = oldVal;
+    el.classList.remove('ai-missing', 'ai-low', 'ai-ok');
+    el.classList.add('ai-old');
+    el.title = 'לא מופיע בתסקיר החדש — הושלם מהנתונים הקיימים במערכת';
+    const clear = () => { el.classList.remove('ai-old'); el.removeAttribute('title'); delete el.dataset.oldVal; };
+    el.addEventListener('input', clear, { once: true });
+    el.addEventListener('change', clear, { once: true });
+    n++;
+  });
+  // אתר: אם עוד לא נבחר, לוקחים את האתר של האמצעי הקיים
+  const siteSel = document.getElementById('eq-site');
+  if (siteSel && !siteSel.value && dup.siteId != null) { siteSel.value = String(dup.siteId); syncSiteChips(); }
+  prefilledFrom = dup.id;
+  if (n) {
+    const box = document.getElementById('ai-result-box'); if (box) box.style.display = 'block';
+    const lg = document.querySelector('#modal-eq-body .ai-legend'); if (lg) lg.classList.add('has-old');
+  }
+  return n;
+}
 function checkSerialDup() {
   const box = document.getElementById('dup-warning');
   const el = document.getElementById('eq-serial');
   if (!box || !el) return;
   const dup = findSerialDup(el.value, editingEqId);
+  // השלמה מהרשומה הקיימת רק בהוספה (לא בעריכת אמצעי קיים)
+  if (!editingEqId) { if (dup) prefillFromExisting(dup); else if (prefilledFrom != null) clearPrefill(); }
   box.innerHTML = dup ? `<div class="dup-warn">⚠️ צ' <b>${escHtml(el.value.trim())}</b> כבר קיים במערכת: ${escHtml(dup.type || '')} ${escHtml(dup.name || '')} · ${escHtml(getSiteName(dup.siteId))} · תסקיר ${escHtml(dup.eqId || '—')} · בדיקה הבאה ${escHtml(dup.nextCheck || '—')}.<br>בשמירה תישאל אם להחליף את התסקיר הקיים.</div>` : '';
 }
 // חלון בחירה עם כמה כפתורים; מחזיר את הערך של הכפתור שנלחץ
@@ -2328,21 +2385,22 @@ function scanErrMsg(err) {
   return err && err.code === 'functions/not-found' ? 'שירות הסריקה עוד לא הותקן' : (err && err.message) || 'שגיאה לא ידועה';
 }
 function clearAiMarks() {
-  document.querySelectorAll('#modal-eq-body .ai-low, #modal-eq-body .ai-ok, #modal-eq-body .ai-missing').forEach(el => {
-    el.classList.remove('ai-low', 'ai-ok', 'ai-missing'); el.removeAttribute('title');
+  document.querySelectorAll('#modal-eq-body .ai-low, #modal-eq-body .ai-ok, #modal-eq-body .ai-missing, #modal-eq-body .ai-old').forEach(el => {
+    el.classList.remove('ai-low', 'ai-ok', 'ai-missing', 'ai-old'); el.removeAttribute('title');
   });
 }
 // ממלא את הטופס: ירוק = קריאה בטוחה, כתום = כדאי לבדוק. עריכה ידנית של שדה מסירה את הסימון.
 function applyScanResult(res) {
   const p = (res && res.fields) || {};
   const conf = (res && res.confidence) || {};
+  clearPrefill();
   clearAiMarks();
   let ok = 0, low = 0, missing = 0;
   SCAN_FIELD_MAP.forEach(([id, key]) => {
     const el = document.getElementById(id);
     if (!el) return;
     let val = p[key];
-    const clear = () => { el.classList.remove('ai-ok', 'ai-low', 'ai-missing'); el.removeAttribute('title'); };
+    const clear = () => { el.classList.remove('ai-ok', 'ai-low', 'ai-missing', 'ai-old'); el.removeAttribute('title'); };
     if (val === null || val === undefined || String(val).trim() === '') {
       // לא מופיע במסמך — אדום, להשלמה ידנית (אלא אם כבר יש ערך בשדה)
       if (String(el.value || '').trim()) return;
@@ -2370,7 +2428,9 @@ function applyScanResult(res) {
   });
   document.getElementById('ai-result-box').style.display = 'block';
   checkSerialDup();
-  return { ok, low, missing };
+  const old = document.querySelectorAll('#modal-eq-body .ai-old').length;
+  missing = document.querySelectorAll('#modal-eq-body .ai-missing').length;
+  return { ok, low, missing, old };
 }
 function showPreview(dataUrl) {
   const img = document.getElementById('img-preview');
@@ -2396,8 +2456,8 @@ async function handleFile(file) {
     jobCreep(15, 92, 20000);
     const res = await callScan(prep.scanData, prep.scanType);
     if (seq !== scanSeq) return;
-    const { low, missing } = applyScanResult(res);
-    const notes = [low && `${low} בכתום לבדיקה`, missing && `${missing} באדום להשלמה`].filter(Boolean);
+    const { low, missing, old } = applyScanResult(res);
+    const notes = [low && `${low} בכתום לבדיקה`, missing && `${missing} באדום להשלמה`, old && `${old} הושלמו מהקיים`].filter(Boolean);
     jobDone(notes.length ? 'הפרטים מולאו — ' + notes.join(', ') : 'הפרטים מולאו ✓');
   } catch (err) {
     if (seq !== scanSeq) return;
