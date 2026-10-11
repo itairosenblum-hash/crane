@@ -14,6 +14,8 @@ setGlobalOptions({ region: "europe-west1", maxInstances: 5 });
 
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 const GEMINI_MODEL = defineString("GEMINI_MODEL", { default: "gemini-3.8-flash" });
+// מודל גיבוי כשהמודל הראשי עמוס (שגיאת 503)
+const GEMINI_FALLBACK_MODEL = defineString("GEMINI_FALLBACK_MODEL", { default: "gemini-flash-latest" });
 
 const MAX_BYTES = 15 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
@@ -91,33 +93,53 @@ export const scanCertificate = onCall({ secrets: [GEMINI_API_KEY], timeoutSecond
   if (buffer.length < 100) throw new HttpsError("invalid-argument", "הקובץ ריק");
   if (buffer.length > MAX_BYTES) throw new HttpsError("invalid-argument", "הקובץ גדול מדי (עד 15MB)");
 
-  const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY.value(), httpOptions: { timeout: 150000 } });
-  let r;
-  try {
-    const res = await ai.models.generateContent({
-      model: GEMINI_MODEL.value(),
-      contents: [{ role: "user", parts: [
-        { inlineData: { mimeType, data: buffer.toString("base64") } },
-        { text: "Extract the certificate fields." }
-      ] }],
-      config: {
-        systemInstruction: INSTRUCTIONS,
-        responseMimeType: "application/json",
-        responseSchema: SCHEMA,
-        temperature: 0,
-        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
-      }
-    });
-    r = JSON.parse(res.text);
-  } catch (e) {
-    logger.error("gemini certificate scan failed", e?.message || e);
-    const timedOut = /timeout|aborted/i.test(String(e?.message || e?.cause?.message || ""));
-    throw new HttpsError("internal", timedOut ? "הסריקה לקחה יותר מדי זמן. נסו שוב או מלאו ידנית." : "הסריקה נכשלה. אפשר למלא את הפרטים ידנית.");
+  const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY.value(), httpOptions: { timeout: 120000 } });
+  const request_ = (model) => ai.models.generateContent({
+    model,
+    contents: [{ role: "user", parts: [
+      { inlineData: { mimeType, data: buffer.toString("base64") } },
+      { text: "Extract the certificate fields." }
+    ] }],
+    config: {
+      systemInstruction: INSTRUCTIONS,
+      responseMimeType: "application/json",
+      responseSchema: SCHEMA,
+      temperature: 0,
+      thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
+    }
+  });
+  // עומס זמני אצל Gemini (503/429) — מנסים שוב, ואז עוברים למודל הגיבוי
+  const busy = (e) => /\b(503|429)\b|UNAVAILABLE|RESOURCE_EXHAUSTED|overloaded|high demand/i.test(String(e?.status || "") + " " + String(e?.message || ""));
+  const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+  const primary = GEMINI_MODEL.value();
+  const fallback = GEMINI_FALLBACK_MODEL.value();
+  const plan = [[primary, 0], [primary, 2000], [primary, 5000], [fallback, 0], [fallback, 4000]];
+  let r, usedModel, lastErr;
+  for (let i = 0; i < plan.length; i++) {
+    const [model, wait] = plan[i];
+    if (wait) await sleep(wait);
+    try {
+      r = JSON.parse((await request_(model)).text);
+      usedModel = model;
+      break;
+    } catch (e) {
+      lastErr = e;
+      logger.warn("gemini attempt failed", { model, message: String(e?.message || e).slice(0, 300) });
+      // שגיאה שאינה עומס: אין טעם לחזור על המודל הראשי — קופצים ישר לגיבוי
+      if (!busy(e) && model === primary) i = plan.findIndex(([m]) => m === fallback) - 1;
+    }
+  }
+  if (!r) {
+    logger.error("gemini certificate scan failed", lastErr?.message || lastErr);
+    const msg = String(lastErr?.message || lastErr?.cause?.message || "");
+    throw new HttpsError("unavailable", busy(lastErr)
+      ? "שירות ה-AI עמוס כרגע. נסו שוב בעוד דקה או מלאו ידנית."
+      : /timeout|aborted/i.test(msg) ? "הסריקה לקחה יותר מדי זמן. נסו שוב או מלאו ידנית." : "הסריקה נכשלה. אפשר למלא את הפרטים ידנית.");
   }
 
   const year = cleanStr(r.manufacturingYear, 4);
   return {
-    model: GEMINI_MODEL.value(),
+    model: usedModel,
     fields: {
       inspectionNumber: cleanStr(r.inspectionNumber, 40),
       serialNumber: cleanStr(r.serialNumber, 40),
