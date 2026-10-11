@@ -330,6 +330,14 @@ tr:hover td { background: rgba(30,77,183,0.02); }
 .bulk-bar button { font-family:inherit; font-size:13px; padding:6px 12px; border-radius:8px; border:1.5px solid var(--border); background:var(--card); cursor:pointer; }
 .bulk-wait { display:flex; align-items:center; gap:10px; color:var(--blue); font-size:14px; padding:0.5rem 0 1rem; }
 .bulk-err { background:#fef2f2; border:1.5px solid #fecaca; color:#b91c1c; border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:1rem; font-size:13px; }
+.dup-warn { background:#fff7ed; border:1.5px solid #fdba74; color:#9a3412; border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:1rem; font-size:13px; line-height:1.5; }
+.choice-overlay { position:fixed; inset:0; background:rgba(10,22,40,0.55); z-index:1100; display:flex; align-items:center; justify-content:center; padding:16px; }
+.choice-box { background:var(--card); border-radius:14px; max-width:440px; width:100%; padding:18px; box-shadow:0 20px 40px rgba(0,0,0,0.3); direction:rtl; }
+.choice-box h4 { font-size:16px; margin:0 0 8px; }
+.choice-box .choice-body { font-size:14px; color:var(--text); line-height:1.6; margin-bottom:14px; }
+.choice-box .choice-btns { display:flex; flex-direction:column; gap:8px; }
+.choice-box .choice-btns button { font-family:inherit; font-size:15px; padding:12px; border-radius:10px; border:1.5px solid var(--border); background:var(--card); cursor:pointer; font-weight:600; }
+.choice-box .choice-btns button.primary { background:var(--blue); border-color:var(--blue); color:#fff; }
 #job-panel { position:fixed; top:12px; left:50%; transform:translateX(-50%); z-index:1000; width:min(420px, calc(100% - 32px)); background:var(--card); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.25); padding:12px 14px; display:none; direction:rtl; border:1px solid var(--border); }
 #job-panel.show { display:block; }
 #job-panel .jp-head { display:flex; align-items:center; gap:8px; font-weight:700; font-size:14px; color:var(--text); }
@@ -1091,7 +1099,7 @@ const AUTH_EMAIL_DOMAIN = 'crane.internal';
 // Apps Script נשאר בשימוש רק להעלאה/מחיקה של תמונות ב-Drive (saveImage/deleteImage) —
 // כל שאר הנתונים (אתרים/אמצעים/מנופאים/משתמשים/סוגי ציוד) חיים כעת ב-Firestore
 const SCRIPT_URL_STORE = 'safety_script_url';
-const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxy4zpcAzN8S32WmrXOkjcHIWbtb7gZHR6tuv-9w4jmTuzTEOvlmRGk10i-d-MsPeOiaw/exec';
+const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz0FuIobwUvXXlO3TujvE6YNUsO7TJF_ZSJbP8UybiP1Kc5m80-OKt67oSX6KAKT2vqPg/exec';
 
 let appData = { sites: [], equipment: [], users: [], equipmentTypes: [], operators: [] };
 let currentUser = null;
@@ -1867,6 +1875,7 @@ const MODAL_EQ_TEMPLATE = `<div class="modal-body">
         <div class="ai-result"><span class="ai-badge">AI</span>פרטים שזוהו — ניתן לערוך</div>
         <div class="ai-legend"><span class="ok">ירוק — קריאה בטוחה</span><span class="low">כתום — כדאי לבדוק</span><span class="missing">אדום — לא מופיע במסמך, להשלים ידנית</span></div>
       </div>
+      <div id="dup-warning"></div>
       <div class="form-row">
         <div class="form-group"><label>מספר תסקיר *</label><input type="text" id="eq-id" placeholder="הזן מספר תסקיר" autocomplete="off"></div>
         <div class="form-group"><label>מספר רישוי / צ' (רישוי צבאי)</label><input type="text" id="eq-serial" placeholder="הזן מספר רישוי / צ'" autocomplete="off"></div>
@@ -1922,6 +1931,8 @@ function rebuildModalBody() {
   });
   populateEqSites();
   populateEqTypes();
+  const serialEl = document.getElementById('eq-serial');
+  if (serialEl) serialEl.addEventListener('input', checkSerialDup);
 }
 
 function openAddModal() {
@@ -2016,6 +2027,40 @@ async function compressImage(dataUrl, maxWidth=1200, quality=0.75) {
   });
 }
 
+// השוואת צ' בלי רווחים, גרש/גרשיים ומקפים (צ'10242 = צ׳ 10242 = 10242)
+function normSerial(v) { return String(v || '').replace(/[\s'"׳״`\-]/g, '').replace(/^צ/, '').toLowerCase(); }
+function findSerialDup(serial, excludeId) {
+  const n = normSerial(serial);
+  if (!n) return null;
+  return appData.equipment.find(e => e.id !== excludeId && normSerial(e.serialNumber) === n) || null;
+}
+// מתריע בטופס מיד כשהצ' כבר קיים (אחרי סריקה או הקלדה)
+function checkSerialDup() {
+  const box = document.getElementById('dup-warning');
+  const el = document.getElementById('eq-serial');
+  if (!box || !el) return;
+  const dup = findSerialDup(el.value, editingEqId);
+  box.innerHTML = dup ? `<div class="dup-warn">⚠️ צ' <b>${escHtml(el.value.trim())}</b> כבר קיים במערכת: ${escHtml(dup.type || '')} ${escHtml(dup.name || '')} · ${escHtml(getSiteName(dup.siteId))} · תסקיר ${escHtml(dup.eqId || '—')} · בדיקה הבאה ${escHtml(dup.nextCheck || '—')}.<br>בשמירה תישאל אם להחליף את התסקיר הקיים.</div>` : '';
+}
+// חלון בחירה עם כמה כפתורים; מחזיר את הערך של הכפתור שנלחץ
+function choiceDialog(title, bodyHtml, buttons) {
+  return new Promise(resolve => {
+    const ov = document.createElement('div');
+    ov.className = 'choice-overlay';
+    ov.innerHTML = `<div class="choice-box" role="dialog" aria-modal="true"><h4></h4><div class="choice-body"></div><div class="choice-btns"></div></div>`;
+    ov.querySelector('h4').textContent = title;
+    ov.querySelector('.choice-body').innerHTML = bodyHtml;
+    const wrap = ov.querySelector('.choice-btns');
+    buttons.forEach(b => {
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.textContent = b.label;
+      if (b.primary) btn.className = 'primary';
+      btn.onclick = () => { ov.remove(); resolve(b.value); };
+      wrap.appendChild(btn);
+    });
+    document.body.appendChild(ov);
+  });
+}
 async function saveEquipment() {
   const eqId = document.getElementById('eq-id').value.trim();
   const name = document.getElementById('eq-name').value.trim();
@@ -2027,20 +2072,31 @@ async function saveEquipment() {
     alert('נא לבחור אתר');
     return;
   }
-  // Duplicate detection: warn if this מספר תסקיר or מספר רישוי/צ' already exists on another equipment record
+  // צ' שכבר קיים: מציעים להחליף את התסקיר של האמצעי הקיים בנתונים החדשים
   const serialNumberVal = document.getElementById('eq-serial').value.trim();
-  const dupEqId = appData.equipment.find(e => e.id !== editingEqId && String(e.eqId||'').trim() === eqId);
-  const dupSerial = serialNumberVal ? appData.equipment.find(e => e.id !== editingEqId && String(e.serialNumber||'').trim() === serialNumberVal) : null;
-  if (dupEqId || dupSerial) {
-    const msgs = [];
-    if (dupEqId) msgs.push(`⚠️ מספר תסקיר "${eqId}" כבר קיים במערכת עבור: ${dupEqId.name} (${getSiteName(dupEqId.siteId)})`);
-    if (dupSerial) msgs.push(`⚠️ מספר רישוי / צ' "${serialNumberVal}" כבר קיים במערכת עבור: ${dupSerial.name} (${getSiteName(dupSerial.siteId)})`);
-    const proceed = confirm(msgs.join('\n') + '\n\nהאם להמשיך בכל זאת ולשמור?');
+  let replaceTarget = null;
+  const dupSerial = findSerialDup(serialNumberVal, editingEqId);
+  if (dupSerial) {
+    const choice = await choiceDialog('הצ\' הזה כבר קיים במערכת',
+      `צ' <b>${escHtml(serialNumberVal)}</b> שייך לאמצעי קיים:<br>
+       ${escHtml(dupSerial.type || '')} ${escHtml(dupSerial.name || '')} · ${escHtml(getSiteName(dupSerial.siteId))}<br>
+       תסקיר ${escHtml(dupSerial.eqId || '—')} · בדיקה אחרונה ${escHtml(dupSerial.lastCheck || '—')} · בדיקה הבאה ${escHtml(dupSerial.nextCheck || '—')}<br><br>
+       להחליף את התסקיר הקיים בתסקיר החדש? הנתונים של האמצעי יעודכנו לפי התסקיר החדש.`,
+      [{ value: 'replace', label: 'כן, להחליף את התסקיר הקיים', primary: true },
+       { value: 'new', label: 'לא, לשמור כאמצעי נפרד' },
+       { value: 'cancel', label: 'ביטול' }]);
+    if (choice === 'cancel') return;
+    if (choice === 'replace') replaceTarget = dupSerial;
+  }
+  const targetId = replaceTarget ? replaceTarget.id : editingEqId;
+  const dupEqId = appData.equipment.find(e => e.id !== targetId && String(e.eqId||'').trim() === eqId);
+  if (dupEqId) {
+    const proceed = confirm(`⚠️ מספר תסקיר "${eqId}" כבר קיים במערכת עבור: ${dupEqId.name} (${getSiteName(dupEqId.siteId)})\n\nהאם להמשיך בכל זאת ולשמור?`);
     if (!proceed) return;
   }
   if (saving) return;
   saving = true;
-  const wasEditing = !!editingEqId;
+  const wasEditing = !!targetId;
   // בזמן שסריקה מרובה רצה ברקע, החלונית מראה את הסריקה — השמירה מדווחת בהודעה קצרה
   const J = (bulk && bulk.scanning)
     ? { start(){}, update(){}, creep(){}, done: t => showToast(t), fail: t => showToast(t) }
@@ -2054,9 +2110,10 @@ async function saveEquipment() {
     J.update(12, 'מכווץ את תמונת התסקיר...');
     imageData = await compressImage(imgEl.src);
   }
-  let imageUrl = !hasNewImage && editingEqId ? (appData.equipment.find(e=>e.id===editingEqId)||{}).imageUrl||'' : '';
+  const existingRec = targetId ? (appData.equipment.find(e => e.id === targetId) || {}) : {};
+  let imageUrl = !hasNewImage && targetId ? existingRec.imageUrl || '' : '';
   const gv = id => { const el = document.getElementById(id); return el ? el.value : ''; };
-  const id = editingEqId || nextId(appData.equipment);
+  const id = targetId || nextId(appData.equipment);
   const data = {
     eqId, name,
     serialNumber: gv('eq-serial'),
@@ -2093,7 +2150,19 @@ async function saveEquipment() {
     }
     J.update(85, 'שומר במערכת...');
     data.imageUrl = imageUrl || '';
-    await db.collection('equipment').doc(String(id)).set(data);
+    if (targetId) {
+      // עדכון: ב.ת שלא מולא בטופס נשמר מהרשומה הקיימת; שדות אחרים שלא בטופס לא נמחקים (merge)
+      if (!String(data.btNext || '').trim() && existingRec.btNext) delete data.btNext;
+      // החלפת תסקיר: שדה שלא מופיע בתסקיר החדש (ריק) שומר את הערך הקיים — חוץ מהערות, ששייכות לתסקיר עצמו
+      if (replaceTarget) Object.keys(data).forEach(k => {
+        if (k !== 'notes' && !String(data[k] ?? '').trim() && String(existingRec[k] ?? '').trim()) delete data[k];
+      });
+      await db.collection('equipment').doc(String(id)).set(data, { merge: true });
+      // תמונת התסקיר הישן נמחקת מ-Drive רק אחרי שהחדשה נשמרה
+      if (hasNewImage && existingRec.imageUrl && existingRec.imageUrl !== imageUrl) apiPost({ action: 'deleteImage', data: { imageUrl: existingRec.imageUrl } }).catch(() => {});
+    } else {
+      await db.collection('equipment').doc(String(id)).set(data);
+    }
     // עדכון מקומי מיידי כדי שהמספר הבא שיוקצה (בטעינה מרובה) לא יתנגש
     const local = { ...data, id: parseInt(id), siteId: parseInt(data.siteId) };
     const idx = appData.equipment.findIndex(e => e.id === local.id);
@@ -2101,10 +2170,10 @@ async function saveEquipment() {
     if (bulk) {
       bulk.items[bulk.index].status = 'saved';
       bulk.saved++;
-      J.done(`נשמר ${bulk.saved} מתוך ${bulk.items.length}`);
+      J.done((replaceTarget ? 'הוחלף · ' : '') + `נשמר ${bulk.saved} מתוך ${bulk.items.length}`);
       bulkNext();
     } else {
-      J.done(wasEditing ? 'האמצעי עודכן ✓' : 'האמצעי נוסף ✓');
+      J.done(replaceTarget ? 'התסקיר הוחלף והאמצעי עודכן ✓' : wasEditing ? 'האמצעי עודכן ✓' : 'האמצעי נוסף ✓');
       closeModal('modal-add-eq');
     }
     loadData(true);
@@ -2299,6 +2368,7 @@ function applyScanResult(res) {
     el.addEventListener('change', clear, { once: true });
   });
   document.getElementById('ai-result-box').style.display = 'block';
+  checkSerialDup();
   return { ok, low, missing };
 }
 function showPreview(dataUrl) {
@@ -3687,6 +3757,7 @@ function closeModal(id) {
     const zone = document.getElementById('upload-zone'); if (zone) zone.style.display = '';
     const bar = document.getElementById('bulk-bar'); if (bar) { bar.style.display = 'none'; bar.innerHTML = ''; }
     const bs = document.getElementById('bulk-status'); if (bs) bs.innerHTML = '';
+    const dw = document.getElementById('dup-warning'); if (dw) dw.innerHTML = '';
     clearAiMarks();
   }
   // If closing the operator modal, reset it fully
