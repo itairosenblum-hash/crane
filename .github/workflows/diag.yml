@@ -23,7 +23,7 @@ jobs:
           echo "::error title=apis::$(cat apis.txt)"
       - name: Apps Script ping
         run: |
-          URL="https://script.google.com/macros/s/AKfycbxy4zpcAzN8S32WmrXOkjcHIWbtb7gZHR6tuv-9w4jmTuzTEOvlmRGk10i-d-MsPeOiaw/exec"
+          URL="https://script.google.com/macros/s/AKfycbz0FuIobwUvXXlO3TujvE6YNUsO7TJF_ZSJbP8UybiP1Kc5m80-OKt67oSX6KAKT2vqPg/exec"
           curl -sSL -m 60 -o ping.txt -w '%{http_code} %{content_type} %{url_effective}' -H 'Content-Type: text/plain' -d '{"action":"ping","data":{}}' "$URL" > meta.txt 2>&1 || true
           echo "::error title=apps script POST::$(cat meta.txt) | $(grep -oE '<title>[^<]*</title>' ping.txt | head -1) | $(sed -e 's/<[^>]*>/ /g' ping.txt | tr -s ' \n' ' ' | grep -oE '[^{};]{0,0}(Authorization|authorization|Sign in|הרשאה|כניסה|Error|error|שגיאה|not found|לא נמצא)[^{};<]{0,200}' | head -5 | tr '\n' ' ' | sed 's/%/%25/g')"
           python3 - <<'PY'
