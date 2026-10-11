@@ -1,4 +1,4 @@
-// Cloud Functions של מערכת תסקירי הבטיחות
+// Cloud Functions של מערכת תסקירי הבטיחות (פריסה אוטומטית דרך GitHub Actions)
 // scanCertificate: קריאת תסקיר (PDF או תמונה) עם Gemini והחזרת השדות לטופס האמצעי.
 // הפונקציה רק קוראת את הקובץ ומחזירה טקסט — היא לא כותבת ל-Firestore ולא שומרת קבצים.
 import { initializeApp } from "firebase-admin/app";
