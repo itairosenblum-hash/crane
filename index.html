@@ -310,7 +310,34 @@ tr:hover td { background: rgba(30,77,183,0.02); }
 .spinner { width: 20px; height: 20px; border: 2px solid rgba(30,77,183,0.2); border-top-color: var(--blue); border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
 #nav-refresh-btn.spinning { animation: spin 0.7s linear infinite; pointer-events: none; opacity: 0.7; }
-.ai-low { border-color: #f59e0b !important; background: #fffbeb !important; }
+.ai-ok { border: 2px solid #16a34a !important; background: #f0fdf4 !important; }
+.ai-low { border: 2px solid #f59e0b !important; background: #fffbeb !important; }
+.ai-legend { display:flex; gap:12px; flex-wrap:wrap; font-size:12px; color:var(--text-muted); margin:-0.5rem 0 1rem; }
+.ai-legend span::before { content:''; display:inline-block; width:10px; height:10px; border-radius:3px; margin-inline-end:5px; vertical-align:-1px; }
+.ai-legend .ok::before { border:2px solid #16a34a; background:#f0fdf4; }
+.ai-legend .low::before { border:2px solid #f59e0b; background:#fffbeb; }
+.site-chips { display:flex; flex-wrap:wrap; gap:8px; }
+.site-chip { padding:9px 14px; border:1.5px solid var(--border); border-radius:999px; background:var(--card); color:var(--text); font-family:inherit; font-size:14px; font-weight:500; cursor:pointer; min-height:40px; }
+.site-chip:hover { border-color: var(--blue); }
+.site-chip.active { background: var(--blue); border-color: var(--blue); color:#fff; font-weight:700; }
+.site-chips.invalid .site-chip { border-color:#dc2626; }
+.bulk-bar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:rgba(30,77,183,0.06); border:1.5px solid rgba(30,77,183,0.25); border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:1rem; font-size:14px; }
+.bulk-bar b { color: var(--blue); }
+.bulk-bar .bulk-file { color:var(--text-muted); font-size:12px; flex:1; min-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.bulk-bar button { font-family:inherit; font-size:13px; padding:6px 12px; border-radius:8px; border:1.5px solid var(--border); background:var(--card); cursor:pointer; }
+.bulk-wait { display:flex; align-items:center; gap:10px; color:var(--blue); font-size:14px; padding:0.5rem 0 1rem; }
+.bulk-err { background:#fef2f2; border:1.5px solid #fecaca; color:#b91c1c; border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:1rem; font-size:13px; }
+#job-panel { position:fixed; top:12px; left:50%; transform:translateX(-50%); z-index:1000; width:min(420px, calc(100% - 32px)); background:var(--card); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.25); padding:12px 14px; display:none; direction:rtl; border:1px solid var(--border); }
+#job-panel.show { display:block; }
+#job-panel .jp-head { display:flex; align-items:center; gap:8px; font-weight:700; font-size:14px; color:var(--text); }
+#job-panel .jp-pct { margin-inline-start:auto; color:var(--blue); font-variant-numeric:tabular-nums; }
+#job-panel .jp-close { background:none; border:none; font-size:18px; cursor:pointer; color:var(--text-muted); padding:0 2px; line-height:1; }
+#job-panel .jp-text { font-size:13px; color:var(--text-muted); margin:6px 0 8px; }
+#job-panel .jp-track { height:8px; background:rgba(30,77,183,0.12); border-radius:99px; overflow:hidden; }
+#job-panel .jp-bar { height:100%; width:0; background:var(--blue); border-radius:99px; transition:width .4s ease; }
+#job-panel.done .jp-bar { background:var(--success); }
+#job-panel.error .jp-bar { background:#dc2626; }
+#job-panel .jp-wake { font-size:11px; color:var(--text-muted); margin-top:6px; }
 .img-preview { max-width: 100%; max-height: 180px; border-radius: var(--radius-sm); margin-bottom: 1rem; display: none; object-fit: cover; border: 1px solid var(--border); }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
@@ -921,6 +948,13 @@ tr:hover td { background: rgba(30,77,183,0.02); }
     </div>
 
   </div>
+</div>
+
+<div id="job-panel" role="status" aria-live="polite">
+  <div class="jp-head"><div class="spinner" id="jp-spinner" style="width:16px;height:16px"></div><span id="jp-title"></span><span class="jp-pct" id="jp-pct">0%</span><button class="jp-close" id="jp-close" onclick="jobHide()" aria-label="סגירה" hidden>×</button></div>
+  <div class="jp-text" id="jp-text"></div>
+  <div class="jp-track"><div class="jp-bar" id="jp-bar"></div></div>
+  <div class="jp-wake" id="jp-wake" hidden>🔆 המסך נשאר דולק עד סיום התהליך</div>
 </div>
 
 <!-- ===== MODALS ===== -->
@@ -1765,6 +1799,7 @@ function editEquipment(id) {
   sv('eq-name', e.name); sv('eq-year', e.manufacturingYear);
   const siteEl = document.getElementById('eq-site');
   if (siteEl) siteEl.value = e.siteId;
+  syncSiteChips();
   sv('eq-last', e.lastCheck); sv('eq-next', e.nextCheck); sv('eq-bt-next', e.btNext);
   sv('eq-swl', e.safeWorkLoad); sv('eq-max-load', e.maxLoad);
   sv('eq-test-load', e.testLoad); sv('eq-height', e.height);
@@ -1790,8 +1825,10 @@ const MODAL_EQ_TEMPLATE = `<div class="modal-body">
       <form autocomplete="off" style="display:contents">
       <!-- Hidden inputs -->
       <input type="file" id="file-input-camera" accept="image/*" capture="environment" style="display:none">
-      <input type="file" id="file-input-gallery" accept="image/*" style="display:none">
-      <input type="file" id="file-input-pdf" accept="application/pdf,image/*" style="display:none">
+      <input type="file" id="file-input-gallery" accept="image/*" multiple style="display:none">
+      <input type="file" id="file-input-pdf" accept="application/pdf,image/*" multiple style="display:none">
+      <div id="bulk-bar" class="bulk-bar" style="display:none"></div>
+      <div id="bulk-status"></div>
       <div id="upload-zone"
            ondragover="event.preventDefault();this.classList.add('drag')"
            ondragleave="this.classList.remove('drag')"
@@ -1804,7 +1841,7 @@ const MODAL_EQ_TEMPLATE = `<div class="modal-body">
           <circle cx="38" cy="33" r="4" fill="none" stroke="#f59e0b" stroke-width="2.5"/>
           <rect x="5" y="8" width="10" height="5" rx="1" fill="#f59e0b"/>
         </svg>
-        <div style="text-align:center;font-size:13px;color:var(--text-muted);margin-bottom:12px">בחר כיצד להעלות תסקיר</div>
+        <div style="text-align:center;font-size:13px;color:var(--text-muted);margin-bottom:12px">בחר כיצד להעלות תסקיר<br><span style="font-size:12px">אפשר לבחור כמה תסקירים יחד מהגלריה או מ-PDF</span></div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
           <button type="button" onclick="document.getElementById('file-input-camera').click()"
             style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 8px;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-family:inherit;font-size:13px;color:var(--text);font-weight:500">
@@ -1824,6 +1861,7 @@ const MODAL_EQ_TEMPLATE = `<div class="modal-body">
       <div id="ai-loading" style="display:none"><div class="loading"><div class="spinner"></div>AI מנתח את התמונה...</div></div>
       <div id="ai-result-box" style="display:none">
         <div class="ai-result"><span class="ai-badge">AI</span>פרטים שזוהו — ניתן לערוך</div>
+        <div class="ai-legend"><span class="ok">ירוק — קריאה בטוחה</span><span class="low">כתום — כדאי לבדוק</span></div>
       </div>
       <div class="form-row">
         <div class="form-group"><label>מספר תסקיר *</label><input type="text" id="eq-id" placeholder="הזן מספר תסקיר" autocomplete="off"></div>
@@ -1837,7 +1875,7 @@ const MODAL_EQ_TEMPLATE = `<div class="modal-body">
         <div class="form-group"><label>מס' שילדה *</label><input type="text" id="eq-name" placeholder="הזן מספר שילדה" autocomplete="off"></div>
         <div class="form-group"><label>שנת יצור</label><input type="text" id="eq-year" placeholder="שנת יצור" autocomplete="off"></div>
       </div>
-      <div class="form-group"><label>אתר *</label><select id="eq-site"></select></div>
+      <div class="form-group"><label>אתר *</label><div class="site-chips" id="eq-site-chips"></div><select id="eq-site" style="display:none"></select></div>
       <div class="form-row">
         ${dateFieldHtml('eq-last', 'בדיקה אחרונה (DD/MM/YYYY)')}
         ${dateFieldHtml('eq-next', 'בדיקה הבאה (DD/MM/YYYY)')}
@@ -1865,7 +1903,7 @@ function rebuildModalBody() {
   // Re-attach file input handlers
   ['file-input-camera','file-input-gallery','file-input-pdf'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.onchange = function() { handleFile(this.files[0]); };
+    if (el) el.onchange = function() { handlePickedFiles(this.files); this.value = ''; };
   });
   // Re-attach drop zone events
   const zone = document.getElementById('upload-zone');
@@ -1884,15 +1922,39 @@ function rebuildModalBody() {
 }
 
 function openAddModal() {
+  if (bulk) { bulk.cancelled = true; bulk = null; wakeRelease(); }
   editingEqId = null;
   document.getElementById('modal-eq-title').textContent = 'הוספת אמצעי חדש';
   rebuildModalBody();
   openModal('modal-add-eq');
 }
-function populateEqSites() {
-  document.getElementById('eq-site').innerHTML = appData.sites.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-  if (currentUser.siteId) document.getElementById('eq-site').value = currentUser.siteId;
+function populateEqSites(preselect) {
+  const sel = document.getElementById('eq-site');
+  sel.innerHTML = '<option value=""></option>' + appData.sites.map(s => `<option value="${s.id}">${escHtml(s.name)}</option>`).join('');
+  const userSites = String(currentUser.siteId || '').split(',').map(x => x.trim()).filter(Boolean);
+  if (preselect) sel.value = String(preselect);
+  else if (userSites.length === 1) sel.value = userSites[0];
+  else sel.value = '';
+  const box = document.getElementById('eq-site-chips');
+  box.innerHTML = appData.sites
+    .slice().sort((a, b) => String(a.name).localeCompare(String(b.name), 'he'))
+    .map(s => `<button type="button" class="site-chip" data-site="${s.id}">${escHtml(s.name)}</button>`).join('')
+    || '<span style="font-size:13px;color:var(--text-muted)">אין אתרים — יש להוסיף אתר בהגדרות</span>';
+  box.querySelectorAll('.site-chip').forEach(btn => btn.onclick = () => {
+    sel.value = btn.dataset.site;
+    if (bulk) bulk.site = btn.dataset.site;
+    box.classList.remove('invalid');
+    syncSiteChips();
+  });
+  syncSiteChips();
 }
+function syncSiteChips() {
+  const sel = document.getElementById('eq-site');
+  const box = document.getElementById('eq-site-chips');
+  if (!sel || !box) return;
+  box.querySelectorAll('.site-chip').forEach(b => b.classList.toggle('active', String(b.dataset.site) === String(sel.value)));
+}
+function escHtml(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c])); }
 // Populates the equipment-type dropdown from the managed "EquipmentTypes" list on the sheet.
 // Falls back to aggregating distinct types already used on equipment records if that list
 // is empty (e.g. the Apps Script hasn't been updated/redeployed with the new sheet yet).
@@ -1955,6 +2017,13 @@ async function saveEquipment() {
   const eqId = document.getElementById('eq-id').value.trim();
   const name = document.getElementById('eq-name').value.trim();
   if (!eqId || !name) { alert('נא למלא מספר תסקיר ומספר שילדה'); return; }
+  const siteVal = document.getElementById('eq-site').value;
+  if (!siteVal) {
+    const box = document.getElementById('eq-site-chips');
+    if (box) { box.classList.add('invalid'); box.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    alert('נא לבחור אתר');
+    return;
+  }
   // Duplicate detection: warn if this מספר תסקיר or מספר רישוי/צ' already exists on another equipment record
   const serialNumberVal = document.getElementById('eq-serial').value.trim();
   const dupEqId = appData.equipment.find(e => e.id !== editingEqId && String(e.eqId||'').trim() === eqId);
@@ -1966,12 +2035,21 @@ async function saveEquipment() {
     const proceed = confirm(msgs.join('\n') + '\n\nהאם להמשיך בכל זאת ולשמור?');
     if (!proceed) return;
   }
+  if (saving) return;
+  saving = true;
+  const wasEditing = !!editingEqId;
+  // בזמן שסריקה מרובה רצה ברקע, החלונית מראה את הסריקה — השמירה מדווחת בהודעה קצרה
+  const J = (bulk && bulk.scanning)
+    ? { start(){}, update(){}, creep(){}, done: t => showToast(t), fail: t => showToast(t) }
+    : { start: jobStart, update: jobUpdate, creep: jobCreep, done: jobDone, fail: jobFail };
+  J.start(wasEditing ? 'מעדכן אמצעי' : 'שומר אמצעי', 'מכין את הנתונים...', 5);
+  if (bulk && bulk.scanning) showToast('שומר...');
   const imgEl = document.getElementById('img-preview');
   const hasNewImage = imgEl.style.display !== 'none' && imgEl.src.startsWith('data:');
   let imageData = '';
   if (hasNewImage) {
+    J.update(12, 'מכווץ את תמונת התסקיר...');
     imageData = await compressImage(imgEl.src);
-    console.log('Image size:', Math.round(imageData.length/1024), 'KB');
   }
   let imageUrl = !hasNewImage && editingEqId ? (appData.equipment.find(e=>e.id===editingEqId)||{}).imageUrl||'' : '';
   const gv = id => { const el = document.getElementById(id); return el ? el.value : ''; };
@@ -1982,7 +2060,7 @@ async function saveEquipment() {
     type: gv('eq-type'),
     manufacturer: gv('eq-manufacturer'),
     manufacturingYear: gv('eq-year'),
-    siteId: String(parseInt(document.getElementById('eq-site').value)),
+    siteId: String(parseInt(siteVal)),
     lastCheck: gv('eq-last'),
     nextCheck: gv('eq-next'),
     btNext: gv('eq-bt-next'),
@@ -1995,9 +2073,9 @@ async function saveEquipment() {
     notes: gv('eq-notes')
   };
   try {
-    showToast('שומר...');
     if (imageData) {
-      showToast('מעלה תמונה ל-Drive...');
+      J.update(20, 'מעלה את תמונת התסקיר ל-Drive...');
+      J.creep(20, 75, 12000);
       const imgRes = await apiPost({
         action: 'saveImage',
         data: { imageData, filename: 'eq_' + id + '_' + String(eqId).replace(/[^a-zA-Z0-9]/g,'_') }
@@ -2005,27 +2083,45 @@ async function saveEquipment() {
       if (imgRes && imgRes.ok && imgRes.imageUrl) {
         imageUrl = imgRes.imageUrl;
       } else {
+        J.fail('העלאת התמונה נכשלה');
         alert('שגיאה בהעלאת תמונה: ' + (imgRes ? JSON.stringify(imgRes) : 'אין תגובה'));
         return;
       }
     }
+    J.update(85, 'שומר במערכת...');
     data.imageUrl = imageUrl || '';
     await db.collection('equipment').doc(String(id)).set(data);
-    showToast(editingEqId ? 'אמצעי עודכן ✓' : 'אמצעי נוסף ✓');
-    closeModal('modal-add-eq');
+    // עדכון מקומי מיידי כדי שהמספר הבא שיוקצה (בטעינה מרובה) לא יתנגש
+    const local = { ...data, id: parseInt(id), siteId: parseInt(data.siteId) };
+    const idx = appData.equipment.findIndex(e => e.id === local.id);
+    if (idx >= 0) appData.equipment[idx] = { ...appData.equipment[idx], ...local }; else appData.equipment.push(local);
+    if (bulk) {
+      bulk.items[bulk.index].status = 'saved';
+      bulk.saved++;
+      J.done(`נשמר ${bulk.saved} מתוך ${bulk.items.length}`);
+      bulkNext();
+    } else {
+      J.done(wasEditing ? 'האמצעי עודכן ✓' : 'האמצעי נוסף ✓');
+      closeModal('modal-add-eq');
+    }
     loadData(true);
-  } catch(e) { console.error('Save error:', e); alert('שגיאה כללית: ' + e.message); }
+  } catch(e) { console.error('Save error:', e); J.fail('השמירה נכשלה'); alert('שגיאה כללית: ' + e.message); }
+  finally { saving = false; }
 }
 
 // ===== IMAGE / AI =====
-function handleDrop(e) { e.preventDefault(); document.getElementById('upload-zone').classList.remove('drag'); const f = e.dataTransfer.files[0]; if (f && (f.type.startsWith('image/') || f.type === 'application/pdf')) handleFile(f); }
+function handleDrop(e) { e.preventDefault(); document.getElementById('upload-zone').classList.remove('drag'); handlePickedFiles(e.dataTransfer.files); }
+function handlePickedFiles(fileList) {
+  const files = Array.from(fileList || []).filter(f => f.type.startsWith('image/') || f.type === 'application/pdf');
+  if (!files.length) return;
+  if (files.length === 1 && !bulk) { handleFile(files[0]); return; }
+  if (editingEqId) { alert('טעינה של כמה תסקירים אפשרית רק בהוספת אמצעים חדשים'); return; }
+  startBulk(files);
+}
 function setAiLoading(text) {
+  // מחוון הטעינה עבר לחלונית ההתקדמות (jobPanel); נשאר כדי לנקות מצב ישן
   const box = document.getElementById('ai-loading');
-  if (!box) return;
-  if (!text) { box.style.display = 'none'; return; }
-  box.innerHTML = '<div class="loading"><div class="spinner"></div><span></span></div>';
-  box.querySelector('span').textContent = text;
-  box.style.display = 'flex';
+  if (box) box.style.display = 'none';
 }
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -2035,6 +2131,77 @@ function fileToDataUrl(file) {
     r.readAsDataURL(file);
   });
 }
+
+// ===== חלונית התקדמות + השארת המסך דולק =====
+let jobCreepTimer = null, jobHideTimer = null, wakeLock = null, wakeWanted = 0;
+async function wakeAcquire() {
+  wakeWanted++;
+  try {
+    if ('wakeLock' in navigator && !wakeLock) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+      document.getElementById('jp-wake').hidden = false;
+    }
+  } catch (e) { console.warn('wake lock', e); }
+}
+function wakeRelease() {
+  wakeWanted = Math.max(0, wakeWanted - 1);
+  if (wakeWanted === 0 && wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+  if (wakeWanted === 0) document.getElementById('jp-wake').hidden = true;
+}
+// מסך שנעל/החליף אפליקציה משחרר את הנעילה — מבקשים שוב כשחוזרים
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'visible' && wakeWanted > 0 && !wakeLock && 'wakeLock' in navigator) {
+    try { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); } catch (e) {}
+  }
+});
+let jobActive = false;
+function jobStart(title, text, pct) {
+  clearTimeout(jobHideTimer); clearInterval(jobCreepTimer);
+  const p = document.getElementById('job-panel');
+  p.classList.remove('done', 'error');
+  p.classList.add('show');
+  document.getElementById('jp-spinner').hidden = false;
+  document.getElementById('jp-close').hidden = true;
+  document.getElementById('jp-title').textContent = title;
+  if (!jobActive) { jobActive = true; wakeAcquire(); }
+  jobUpdate(pct || 0, text || '');
+}
+function jobUpdate(pct, text) {
+  if (pct != null) {
+    const v = Math.max(0, Math.min(100, Math.round(pct)));
+    document.getElementById('jp-bar').style.width = v + '%';
+    document.getElementById('jp-pct').textContent = v + '%';
+    document.getElementById('job-panel').dataset.pct = v;
+  }
+  if (text != null) document.getElementById('jp-text').textContent = text;
+}
+// מתקדם בהדרגה בזמן שמחכים לשרת (שאין לו דיווח התקדמות משלו)
+function jobCreep(from, to, expectedMs) {
+  clearInterval(jobCreepTimer);
+  const t0 = Date.now();
+  jobCreepTimer = setInterval(() => {
+    const frac = 1 - Math.exp(-(Date.now() - t0) / (expectedMs / 2.5));
+    jobUpdate(from + (to - from) * frac);
+  }, 300);
+}
+function jobEnd(cls, text) {
+  clearInterval(jobCreepTimer);
+  const p = document.getElementById('job-panel');
+  p.classList.add(cls);
+  document.getElementById('jp-spinner').hidden = true;
+  document.getElementById('jp-close').hidden = false;
+  if (cls === 'done') jobUpdate(100, text); else jobUpdate(null, text);
+  if (jobActive) { jobActive = false; wakeRelease(); }
+  jobHideTimer = setTimeout(jobHide, cls === 'done' ? 2500 : 6000);
+}
+function jobDone(text) { jobEnd('done', text); }
+function jobFail(text) { jobEnd('error', text); }
+function jobHide() {
+  if (jobActive) return;
+  document.getElementById('job-panel').classList.remove('show');
+}
+
 async function loadPdfJs() {
   if (window.pdfjsLib) return window.pdfjsLib;
   await new Promise((resolve, reject) => {
@@ -2060,85 +2227,213 @@ async function pdfFirstPageImage(file) {
   return canvas.toDataURL('image/jpeg', 0.9);
 }
 let scanSeq = 0;
+let saving = false;
+const SCAN_FIELD_MAP = [
+  ['eq-id', 'inspectionNumber'], ['eq-serial', 'serialNumber'], ['eq-type', 'type'], ['eq-manufacturer', 'manufacturer'],
+  ['eq-name', 'chassisNumber'], ['eq-year', 'manufacturingYear'], ['eq-last', 'lastCheck'], ['eq-next', 'nextCheck'],
+  ['eq-swl', 'safeWorkLoad'], ['eq-max-load', 'maxLoad'], ['eq-test-load', 'testLoad'], ['eq-height', 'height'],
+  ['eq-inspection-type', 'inspectionType'], ['eq-inspector', 'inspectorName'], ['eq-notes', 'notes']
+];
+const CONF_OK = 0.8;
+
+// מכין קובץ לסריקה: תמונה לתצוגה/שמירה + הנתונים שנשלחים ל-AI (PDF מלא, או תמונה מוקטנת)
+async function prepareScanFile(file) {
+  if (file.size > 15 * 1024 * 1024) throw new Error('הקובץ גדול מדי (עד 15MB)');
+  if (file.type === 'application/pdf') {
+    return { preview: await pdfFirstPageImage(file), scanData: await fileToDataUrl(file), scanType: 'application/pdf' };
+  }
+  const dataUrl = await fileToDataUrl(file);
+  return { preview: dataUrl, scanData: await compressImage(dataUrl, 2200, 0.85), scanType: 'image/jpeg' };
+}
+async function callScan(scanData, scanType) {
+  if (!fbAuth.currentUser) throw new Error('נדרשת התחברות מחדש');
+  // הסריקה רצה ב-Cloud Function (Gemini) — המפתח שמור בשרת בלבד
+  const scan = fbFunctions.httpsCallable('scanCertificate', { timeout: 200000 });
+  return (await scan({ mimeType: scanType, fileData: scanData.split(',')[1] })).data;
+}
+function scanErrMsg(err) {
+  return err && err.code === 'functions/not-found' ? 'שירות הסריקה עוד לא הותקן' : (err && err.message) || 'שגיאה לא ידועה';
+}
+function clearAiMarks() {
+  document.querySelectorAll('#modal-eq-body .ai-low, #modal-eq-body .ai-ok').forEach(el => {
+    el.classList.remove('ai-low', 'ai-ok'); el.removeAttribute('title');
+  });
+}
+// ממלא את הטופס: ירוק = קריאה בטוחה, כתום = כדאי לבדוק. עריכה ידנית של שדה מסירה את הסימון.
+function applyScanResult(res) {
+  const p = (res && res.fields) || {};
+  const conf = (res && res.confidence) || {};
+  clearAiMarks();
+  let ok = 0, low = 0;
+  SCAN_FIELD_MAP.forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    let val = p[key];
+    if (!el || val === null || val === undefined || String(val).trim() === '') return;
+    val = String(val);
+    if (el.tagName === 'SELECT' && !Array.from(el.options).some(o => o.value === val)) {
+      const customOpt = el.querySelector('option[value="__custom__"]');
+      const opt = document.createElement('option');
+      opt.value = val; opt.textContent = val;
+      if (customOpt) el.insertBefore(opt, customOpt); else el.appendChild(opt);
+    }
+    el.value = val;
+    const sure = typeof conf[key] === 'number' ? conf[key] >= CONF_OK : false;
+    el.classList.add(sure ? 'ai-ok' : 'ai-low');
+    el.title = sure ? 'ה-AI בטוח בקריאה' : 'כדאי לבדוק את הערך הזה מול התסקיר';
+    if (sure) ok++; else low++;
+    const clear = () => { el.classList.remove('ai-ok', 'ai-low'); el.removeAttribute('title'); };
+    el.addEventListener('input', clear, { once: true });
+    el.addEventListener('change', clear, { once: true });
+  });
+  document.getElementById('ai-result-box').style.display = 'block';
+  return { ok, low };
+}
+function showPreview(dataUrl) {
+  const img = document.getElementById('img-preview');
+  if (!img) return;
+  if (dataUrl) { img.src = dataUrl; img.style.display = 'block'; } else { img.src = ''; img.style.display = 'none'; }
+}
+
+// ----- תסקיר בודד -----
 async function handleFile(file) {
   if (!file) return;
-  if (file.size > 15 * 1024 * 1024) { alert('הקובץ גדול מדי (עד 15MB)'); return; }
-  const isPDF = file.type === 'application/pdf';
-  const img = document.getElementById('img-preview');
+  const seq = ++scanSeq;
+  clearAiMarks();
+  document.getElementById('ai-result-box').style.display = 'none';
+  jobStart('סורק תסקיר', 'מכין את הקובץ...', 5);
   try {
-    let scanData, scanType;
-    if (isPDF) {
-      setAiLoading('מכין תצוגה מקדימה...');
-      img.src = await pdfFirstPageImage(file);
-      img.style.display = 'block';
-      scanData = await fileToDataUrl(file);
-      scanType = 'application/pdf';
-    } else {
-      const dataUrl = await fileToDataUrl(file);
-      img.src = dataUrl;
-      img.style.display = 'block';
-      // תמונות מצלמה גדולות מוקטנות לפני השליחה — מספיק לקריאה ומהיר יותר בנייד
-      scanData = await compressImage(dataUrl, 2200, 0.85);
-      scanType = 'image/jpeg';
-    }
-    await analyzeDocument(scanData, scanType);
+    const prep = await prepareScanFile(file);
+    if (seq !== scanSeq) return;
+    showPreview(prep.preview);
+    jobUpdate(15, 'ה-AI קורא את התסקיר...');
+    jobCreep(15, 92, 20000);
+    const res = await callScan(prep.scanData, prep.scanType);
+    if (seq !== scanSeq) return;
+    const { low } = applyScanResult(res);
+    jobDone(low ? `הפרטים מולאו — ${low} שדות בכתום לבדיקה` : 'הפרטים מולאו ✓');
   } catch (err) {
-    setAiLoading(null);
-    alert('שגיאה בקריאת הקובץ: ' + err.message);
+    if (seq !== scanSeq) return;
+    jobFail('הסריקה נכשלה');
+    alert('הסריקה נכשלה: ' + scanErrMsg(err) + '\nאפשר למלא את הפרטים ידנית.');
   }
 }
+// נשמר לתאימות
 async function analyzeDocument(dataUrl, mimeType) {
-  const seq = ++scanSeq;
-  setAiLoading('AI קורא את התסקיר...');
-  document.getElementById('ai-result-box').style.display = 'none';
-  document.querySelectorAll('#modal-eq-body .ai-low').forEach(el => { el.classList.remove('ai-low'); el.removeAttribute('title'); });
-  try {
-    if (!fbAuth.currentUser) throw new Error('נדרשת התחברות מחדש');
-    // הסריקה רצה ב-Cloud Function (Gemini) — המפתח שמור בשרת בלבד
-    const scan = fbFunctions.httpsCallable('scanCertificate', { timeout: 200000 });
-    const res = (await scan({ mimeType, fileData: dataUrl.split(',')[1] })).data;
-    if (seq !== scanSeq) return;
-    const p = res.fields || {};
-    const conf = res.confidence || {};
-    setAiLoading(null);
-    document.getElementById('ai-result-box').style.display = 'block';
-    const setF = (id, val, key) => {
-      const el = document.getElementById(id);
-      if (!el || val === null || val === undefined || String(val).trim() === '') return;
-      val = String(val);
-      if (el.tagName === 'SELECT' && !Array.from(el.options).some(o => o.value === val)) {
-        const customOpt = el.querySelector('option[value="__custom__"]');
-        const opt = document.createElement('option');
-        opt.value = val; opt.textContent = val;
-        if (customOpt) el.insertBefore(opt, customOpt); else el.appendChild(opt);
+  const res = await callScan(dataUrl, mimeType);
+  applyScanResult(res);
+}
+
+// ----- כמה תסקירים יחד -----
+// כל קובץ = אמצעי נפרד. הסריקות רצות ברקע (2 במקביל), ובינתיים בודקים ושומרים אחד-אחד.
+let bulk = null;
+function bulkProgressPct() {
+  if (!bulk) return 0;
+  const sum = bulk.items.reduce((a, it) => a + (it.status === 'pending' ? 0 : it.status === 'scanning' ? (it.prog || 0.1) : 1), 0);
+  return (sum / bulk.items.length) * 100;
+}
+function bulkJobRefresh() {
+  if (!bulk) return;
+  const done = bulk.items.filter(it => !['pending', 'scanning'].includes(it.status)).length;
+  const n = bulk.items.length;
+  if (done < n) jobUpdate(bulkProgressPct(), `נסרקו ${done} מתוך ${n} · נשמרו ${bulk.saved}`);
+}
+async function startBulk(files) {
+  if (files.length > 30) { alert('אפשר לטעון עד 30 תסקירים בכל פעם'); files = files.slice(0, 30); }
+  editingEqId = null;
+  bulk = { items: files.map(f => ({ file: f, name: f.name, status: 'pending' })), index: 0, saved: 0, site: document.getElementById('eq-site') && document.getElementById('eq-site').value || '', cancelled: false, scanning: true };
+  const myBulk = bulk;
+  wakeAcquire();
+  jobStart(`סורק ${files.length} תסקירים`, 'מתחיל...', 1);
+  showBulkItem(0);
+  const ticker = setInterval(() => {
+    if (bulk !== myBulk) return clearInterval(ticker);
+    myBulk.items.forEach(it => { if (it.status === 'scanning') it.prog = Math.min(0.92, (it.prog || 0.1) + 0.02); });
+    bulkJobRefresh();
+  }, 500);
+  let next = 0;
+  const worker = async () => {
+    while (!myBulk.cancelled && next < myBulk.items.length) {
+      const i = next++;
+      const it = myBulk.items[i];
+      it.status = 'scanning'; it.prog = 0.05;
+      try {
+        const prep = await prepareScanFile(it.file);
+        it.preview = prep.preview; it.prog = 0.15;
+        if (bulk === myBulk && myBulk.index === i) showPreview(prep.preview);
+        it.result = await callScan(prep.scanData, prep.scanType);
+        it.status = 'ready';
+      } catch (err) {
+        it.status = 'error'; it.error = scanErrMsg(err);
       }
-      el.value = val;
-      // שדה שה-AI לא בטוח בו מסומן לבדיקה
-      if (typeof conf[key] === 'number' && conf[key] < 0.7) { el.classList.add('ai-low'); el.title = 'ה-AI לא בטוח בערך הזה — כדאי לבדוק'; }
-    };
-    setF('eq-id', p.inspectionNumber, 'inspectionNumber');
-    setF('eq-serial', p.serialNumber, 'serialNumber');
-    setF('eq-type', p.type, 'type');
-    setF('eq-manufacturer', p.manufacturer, 'manufacturer');
-    setF('eq-name', p.chassisNumber, 'chassisNumber');
-    setF('eq-year', p.manufacturingYear, 'manufacturingYear');
-    setF('eq-last', p.lastCheck, 'lastCheck');
-    setF('eq-next', p.nextCheck, 'nextCheck');
-    setF('eq-swl', p.safeWorkLoad, 'safeWorkLoad');
-    setF('eq-max-load', p.maxLoad, 'maxLoad');
-    setF('eq-test-load', p.testLoad, 'testLoad');
-    setF('eq-height', p.height, 'height');
-    setF('eq-inspection-type', p.inspectionType, 'inspectionType');
-    setF('eq-inspector', p.inspectorName, 'inspectorName');
-    setF('eq-notes', p.notes, 'notes');
-    const low = document.querySelectorAll('#modal-eq-body .ai-low').length;
-    showToast(low ? `הפרטים מולאו — ${low} שדות מסומנים לבדיקה` : 'הפרטים מולאו אוטומטית ✓');
-  } catch (err) {
-    if (seq !== scanSeq) return;
-    setAiLoading(null);
-    const msg = err.code === 'functions/not-found' ? 'שירות הסריקה עוד לא הותקן' : err.message;
-    alert('הסריקה נכשלה: ' + msg + '\nאפשר למלא את הפרטים ידנית.');
+      if (bulk === myBulk && myBulk.index === i && !myBulk.cancelled) showBulkItem(i, true);
+      bulkJobRefresh();
+    }
+  };
+  await Promise.all([worker(), worker()]);
+  clearInterval(ticker);
+  myBulk.scanning = false;
+  if (bulk === myBulk && !myBulk.cancelled) {
+    const errs = myBulk.items.filter(it => it.status === 'error').length;
+    jobDone(errs ? `הסריקה הסתיימה — ${errs} נכשלו (אפשר למלא ידנית)` : `כל ${myBulk.items.length} התסקירים נסרקו ✓`);
   }
+}
+function renderBulkBar() {
+  const bar = document.getElementById('bulk-bar');
+  if (!bar || !bulk) return;
+  const it = bulk.items[bulk.index];
+  bar.style.display = 'flex';
+  bar.innerHTML = `<span>📚 תסקיר <b>${bulk.index + 1}</b> מתוך <b>${bulk.items.length}</b></span>
+    <span class="bulk-file">${escHtml(it.name)}</span>
+    <button type="button" onclick="bulkSkip()">דלג ←</button>`;
+}
+// keepEdits: הגיעה תוצאת סריקה לפריט שכבר מוצג — ממלאים בלי לבנות את הטופס מחדש
+function showBulkItem(i, keepEdits) {
+  if (!bulk) return;
+  bulk.index = i;
+  const it = bulk.items[i];
+  if (!keepEdits) {
+    rebuildModalBody();
+    document.getElementById('modal-eq-title').textContent = 'הוספת אמצעים מתסקירים';
+    document.getElementById('upload-zone').style.display = 'none';
+    populateEqSites(bulk.site);
+    if (!document.getElementById('modal-add-eq').classList.contains('open')) openModal('modal-add-eq');
+    document.querySelector('#modal-add-eq .modal').scrollTop = 0;
+  }
+  renderBulkBar();
+  showPreview(it.preview || '');
+  const status = document.getElementById('bulk-status');
+  if (it.status === 'ready') {
+    status.innerHTML = '';
+    applyScanResult(it.result);
+  } else if (it.status === 'error') {
+    status.innerHTML = `<div class="bulk-err">⚠️ הסריקה של הקובץ הזה נכשלה: ${escHtml(it.error)}. אפשר למלא ידנית או לדלג.</div>`;
+  } else {
+    status.innerHTML = '<div class="bulk-wait"><div class="spinner"></div>ה-AI קורא את התסקיר הזה...</div>';
+  }
+}
+function bulkNext() {
+  if (!bulk) return;
+  const n = bulk.items.length;
+  for (let k = 1; k <= n; k++) {
+    const j = (bulk.index + k) % n;
+    if (!['saved', 'skipped'].includes(bulk.items[j].status)) { showBulkItem(j); return; }
+  }
+  bulkFinish();
+}
+function bulkSkip() {
+  if (!bulk) return;
+  bulk.items[bulk.index].status = bulk.items[bulk.index].status === 'saved' ? 'saved' : 'skipped';
+  bulkNext();
+}
+function bulkFinish() {
+  const b = bulk;
+  if (!b) return;
+  b.cancelled = true;
+  bulk = null;
+  wakeRelease();
+  closeModal('modal-add-eq');
+  const skipped = b.items.filter(it => it.status !== 'saved').length;
+  jobDone(`הסתיים: נשמרו ${b.saved} אמצעים` + (skipped ? `, ${skipped} דולגו` : ''));
 }
 
 // ===== OPERATORS (מנופאים) =====
@@ -3357,6 +3652,12 @@ function openModal(id) {
   document.getElementById(id).classList.add('open');
 }
 function closeModal(id) {
+  if (id === 'modal-add-eq' && bulk) {
+    const left = bulk.items.filter(it => !['saved', 'skipped'].includes(it.status)).length;
+    if (left && !confirm(`נשארו ${left} תסקירים שלא נשמרו. לעצור את הטעינה?`)) return;
+    const b = bulk; bulk = null; b.cancelled = true; wakeRelease();
+    if (jobActive) jobDone(`נעצר: נשמרו ${b.saved} מתוך ${b.items.length}`);
+  }
   document.getElementById(id).classList.remove('open');
   // If closing the equipment modal, reset it fully
   if (id === 'modal-add-eq') {
@@ -3368,6 +3669,11 @@ function closeModal(id) {
     document.getElementById('ai-loading').style.display = 'none';
     ['file-input-camera','file-input-gallery','file-input-pdf'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
     document.getElementById('modal-eq-title').textContent = 'הוספת אמצעי חדש';
+    scanSeq++;
+    const zone = document.getElementById('upload-zone'); if (zone) zone.style.display = '';
+    const bar = document.getElementById('bulk-bar'); if (bar) { bar.style.display = 'none'; bar.innerHTML = ''; }
+    const bs = document.getElementById('bulk-status'); if (bs) bs.innerHTML = '';
+    clearAiMarks();
   }
   // If closing the operator modal, reset it fully
   if (id === 'modal-add-operator') {
