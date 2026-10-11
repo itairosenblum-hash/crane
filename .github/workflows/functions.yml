@@ -61,6 +61,8 @@ jobs:
             || { report "enable APIs failed" enable.log; exit 1; }
           value="$(printf '%s' "$GEMINI_API_KEY" | tr -d '[:space:]')"
           current="$(firebase functions:secrets:access GEMINI_API_KEY --project "$PROJECT" 2>/dev/null || true)"
+          if [ "$current" != "$value" ]; then state=updated; else state=unchanged; fi
+          echo "::warning title=GEMINI key::key ending ...${value: -4} ($state)"
           if [ "$current" != "$value" ]; then
             echo "Updating GEMINI_API_KEY"
             printf '%s' "$value" | firebase functions:secrets:set GEMINI_API_KEY --data-file=- --project "$PROJECT" --non-interactive --force > secret.log 2>&1 \
