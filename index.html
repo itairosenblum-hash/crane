@@ -329,7 +329,8 @@ tr:hover td { background: rgba(30,77,183,0.02); }
 .bulk-bar .bulk-file { color:var(--text-muted); font-size:12px; flex:1; min-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .bulk-bar button { font-family:inherit; font-size:13px; padding:6px 12px; border-radius:8px; border:1.5px solid var(--border); background:var(--card); cursor:pointer; }
 .bulk-wait { display:flex; align-items:center; gap:10px; color:var(--blue); font-size:14px; padding:0.5rem 0 1rem; }
-.bulk-err { background:#fef2f2; border:1.5px solid #fecaca; color:#b91c1c; border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:1rem; font-size:13px; }
+.bulk-err { background:#fef2f2; border:1.5px solid #fecaca; color:#b91c1c; border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:1rem; font-size:13px; line-height:1.5; }
+.retry-btn { display:inline-flex; align-items:center; gap:6px; margin-top:8px; font-family:inherit; font-size:14px; font-weight:700; padding:9px 16px; border-radius:10px; border:none; background:var(--blue); color:#fff; cursor:pointer; }
 .dup-warn { background:#fff7ed; border:1.5px solid #fdba74; color:#9a3412; border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:1rem; font-size:13px; line-height:1.5; }
 .choice-overlay { position:fixed; inset:0; background:rgba(10,22,40,0.55); z-index:1100; display:flex; align-items:center; justify-content:center; padding:16px; }
 .choice-box { background:var(--card); border-radius:14px; max-width:440px; width:100%; padding:18px; box-shadow:0 20px 40px rgba(0,0,0,0.3); direction:rtl; }
@@ -2378,9 +2379,12 @@ function showPreview(dataUrl) {
 }
 
 // ----- תסקיר בודד -----
+let lastScanFile = null;
 async function handleFile(file) {
   if (!file) return;
+  lastScanFile = file;
   const seq = ++scanSeq;
+  const st = document.getElementById('bulk-status'); if (st) st.innerHTML = '';
   clearAiMarks();
   document.getElementById('ai-result-box').style.display = 'none';
   jobStart('סורק תסקיר', 'מכין את הקובץ...', 5);
@@ -2398,8 +2402,18 @@ async function handleFile(file) {
   } catch (err) {
     if (seq !== scanSeq) return;
     jobFail('הסריקה נכשלה');
-    alert('הסריקה נכשלה: ' + scanErrMsg(err) + '\nאפשר למלא את הפרטים ידנית.');
+    const st = document.getElementById('bulk-status');
+    if (st) {
+      st.innerHTML = `<div class="bulk-err">⚠️ הסריקה נכשלה: ${escHtml(scanErrMsg(err))}<br>אפשר לנסות שוב או למלא את הפרטים ידנית.<br><button type="button" class="retry-btn" onclick="retryScan()">🔄 נסה שוב</button></div>`;
+      st.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+      alert('הסריקה נכשלה: ' + scanErrMsg(err) + '\nאפשר למלא את הפרטים ידנית.');
+    }
   }
+}
+function retryScan() {
+  if (bulk) { bulkRetry(bulk.index); return; }
+  if (lastScanFile) handleFile(lastScanFile);
 }
 // נשמר לתאימות
 async function analyzeDocument(dataUrl, mimeType) {
@@ -2437,20 +2451,7 @@ async function startBulk(files) {
   let next = 0;
   const worker = async () => {
     while (!myBulk.cancelled && next < myBulk.items.length) {
-      const i = next++;
-      const it = myBulk.items[i];
-      it.status = 'scanning'; it.prog = 0.05;
-      try {
-        const prep = await prepareScanFile(it.file);
-        it.preview = prep.preview; it.prog = 0.15;
-        if (bulk === myBulk && myBulk.index === i) showPreview(prep.preview);
-        it.result = await callScan(prep.scanData, prep.scanType);
-        it.status = 'ready';
-      } catch (err) {
-        it.status = 'error'; it.error = scanErrMsg(err);
-      }
-      if (bulk === myBulk && myBulk.index === i && !myBulk.cancelled) showBulkItem(i, true);
-      bulkJobRefresh();
+      await scanBulkItem(myBulk, next++);
     }
   };
   await Promise.all([worker(), worker()]);
@@ -2459,6 +2460,34 @@ async function startBulk(files) {
   if (bulk === myBulk && !myBulk.cancelled) {
     const errs = myBulk.items.filter(it => it.status === 'error').length;
     jobDone(errs ? `הסריקה הסתיימה — ${errs} נכשלו (אפשר למלא ידנית)` : `כל ${myBulk.items.length} התסקירים נסרקו ✓`);
+  }
+}
+async function scanBulkItem(myBulk, i) {
+  const it = myBulk.items[i];
+  it.status = 'scanning'; it.prog = 0.05; it.error = null;
+  try {
+    if (!it.prep) it.prep = await prepareScanFile(it.file);
+    it.preview = it.prep.preview; it.prog = 0.15;
+    if (bulk === myBulk && myBulk.index === i) showPreview(it.preview);
+    it.result = await callScan(it.prep.scanData, it.prep.scanType);
+    it.status = 'ready';
+  } catch (err) {
+    it.status = 'error'; it.error = scanErrMsg(err);
+  }
+  if (bulk === myBulk && myBulk.index === i && !myBulk.cancelled) showBulkItem(i, true);
+  bulkJobRefresh();
+}
+// סריקה חוזרת של תסקיר אחד מתוך הטעינה המרובה
+async function bulkRetry(i) {
+  if (!bulk) return;
+  const myBulk = bulk;
+  myBulk.items[i].status = 'scanning';
+  showBulkItem(i, true);
+  const ownPanel = !jobActive;
+  if (ownPanel) { jobStart('סורק שוב', myBulk.items[i].name, 15); jobCreep(15, 92, 20000); }
+  await scanBulkItem(myBulk, i);
+  if (ownPanel) {
+    if (myBulk.items[i].status === 'ready') jobDone('הסריקה הצליחה ✓'); else jobFail('הסריקה נכשלה שוב');
   }
 }
 function renderBulkBar() {
@@ -2490,7 +2519,7 @@ function showBulkItem(i, keepEdits) {
     status.innerHTML = '';
     applyScanResult(it.result);
   } else if (it.status === 'error') {
-    status.innerHTML = `<div class="bulk-err">⚠️ הסריקה של הקובץ הזה נכשלה: ${escHtml(it.error)}. אפשר למלא ידנית או לדלג.</div>`;
+    status.innerHTML = `<div class="bulk-err">⚠️ הסריקה של הקובץ הזה נכשלה: ${escHtml(it.error)}<br>אפשר לנסות שוב, למלא ידנית או לדלג.<br><button type="button" class="retry-btn" onclick="bulkRetry(${i})">🔄 נסה שוב</button></div>`;
   } else {
     status.innerHTML = '<div class="bulk-wait"><div class="spinner"></div>ה-AI קורא את התסקיר הזה...</div>';
   }
