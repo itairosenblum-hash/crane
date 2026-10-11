@@ -167,3 +167,9 @@ function scanDocument_(data) {
     return scanJson_({ ok: false, msg: 'שגיאה בסריקה: ' + e });
   }
 }
+
+// מריצים פעם אחת ידנית מהעורך (בוחרים authorizeScan בתפריט ← הפעלה) כדי לאשר לסקריפט לפנות לשירותים חיצוניים
+function authorizeScan() {
+  UrlFetchApp.fetch('https://www.google.com');
+  Logger.log('הרשאה אושרה ✓');
+}
