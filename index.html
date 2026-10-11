@@ -503,6 +503,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-functions-compat.js"></script>
 </head>
 <body>
 
@@ -1047,6 +1048,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const fbAuth = firebase.auth();
 const db = firebase.firestore();
+const fbFunctions = firebase.app().functions('europe-west1');
 const AUTH_EMAIL_DOMAIN = 'crane.internal';
 
 // Apps Script נשאר בשימוש רק להעלאה/מחיקה של תמונות ב-Drive (saveImage/deleteImage) —
@@ -2092,13 +2094,10 @@ async function analyzeDocument(dataUrl, mimeType) {
   document.querySelectorAll('#modal-eq-body .ai-low').forEach(el => { el.classList.remove('ai-low'); el.removeAttribute('title'); });
   try {
     if (!fbAuth.currentUser) throw new Error('נדרשת התחברות מחדש');
-    const idToken = await fbAuth.currentUser.getIdToken();
-    const res = await apiPost({ action: 'scanDocument', data: { idToken, mimeType, fileData: dataUrl.split(',')[1] } });
+    // הסריקה רצה ב-Cloud Function (Gemini) — המפתח שמור בשרת בלבד
+    const scan = fbFunctions.httpsCallable('scanCertificate', { timeout: 200000 });
+    const res = (await scan({ mimeType, fileData: dataUrl.split(',')[1] })).data;
     if (seq !== scanSeq) return;
-    if (!res || res.ok !== true) {
-      const msg = (res && res.msg) || 'אין תגובה מהשרת';
-      throw new Error(/פעולה לא ידועה/.test(msg) ? 'סריקת התסקירים עוד לא הותקנה ב-Apps Script' : msg);
-    }
     const p = res.fields || {};
     const conf = res.confidence || {};
     setAiLoading(null);
@@ -2137,7 +2136,8 @@ async function analyzeDocument(dataUrl, mimeType) {
   } catch (err) {
     if (seq !== scanSeq) return;
     setAiLoading(null);
-    alert('הסריקה נכשלה: ' + err.message + '\nאפשר למלא את הפרטים ידנית.');
+    const msg = err.code === 'functions/not-found' ? 'שירות הסריקה עוד לא הותקן' : err.message;
+    alert('הסריקה נכשלה: ' + msg + '\nאפשר למלא את הפרטים ידנית.');
   }
 }
 
