@@ -316,6 +316,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
 .ai-legend span::before { content:''; display:inline-block; width:10px; height:10px; border-radius:3px; margin-inline-end:5px; vertical-align:-1px; }
 .ai-legend .ok::before { border:2px solid #16a34a; background:#f0fdf4; }
 .ai-legend .low::before { border:2px solid #f59e0b; background:#fffbeb; }
+.site-pick { background:var(--bg); border:1.5px solid var(--border); border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:1rem; }
 .site-chips { display:flex; flex-wrap:wrap; gap:8px; }
 .site-chip { padding:9px 14px; border:1.5px solid var(--border); border-radius:999px; background:var(--card); color:var(--text); font-family:inherit; font-size:14px; font-weight:500; cursor:pointer; min-height:40px; }
 .site-chip:hover { border-color: var(--blue); }
@@ -1829,6 +1830,7 @@ const MODAL_EQ_TEMPLATE = `<div class="modal-body">
       <input type="file" id="file-input-pdf" accept="application/pdf,image/*" multiple style="display:none">
       <div id="bulk-bar" class="bulk-bar" style="display:none"></div>
       <div id="bulk-status"></div>
+      <div class="form-group site-pick"><label>אתר *</label><div class="site-chips" id="eq-site-chips"></div><select id="eq-site" style="display:none"></select></div>
       <div id="upload-zone"
            ondragover="event.preventDefault();this.classList.add('drag')"
            ondragleave="this.classList.remove('drag')"
@@ -1875,7 +1877,6 @@ const MODAL_EQ_TEMPLATE = `<div class="modal-body">
         <div class="form-group"><label>מס' שילדה *</label><input type="text" id="eq-name" placeholder="הזן מספר שילדה" autocomplete="off"></div>
         <div class="form-group"><label>שנת יצור</label><input type="text" id="eq-year" placeholder="שנת יצור" autocomplete="off"></div>
       </div>
-      <div class="form-group"><label>אתר *</label><div class="site-chips" id="eq-site-chips"></div><select id="eq-site" style="display:none"></select></div>
       <div class="form-row">
         ${dateFieldHtml('eq-last', 'בדיקה אחרונה (DD/MM/YYYY)')}
         ${dateFieldHtml('eq-next', 'בדיקה הבאה (DD/MM/YYYY)')}
