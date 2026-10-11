@@ -25,4 +25,6 @@ jobs:
         run: |
           URL="https://script.google.com/macros/s/AKfycbxy4zpcAzN8S32WmrXOkjcHIWbtb7gZHR6tuv-9w4jmTuzTEOvlmRGk10i-d-MsPeOiaw/exec"
           curl -sSL -m 60 -o ping.txt -w '%{http_code} %{content_type} %{url_effective}' -H 'Content-Type: text/plain' -d '{"action":"ping","data":{}}' "$URL" > meta.txt 2>&1 || true
-          echo "::error title=apps script POST::$(cat meta.txt) | $(head -c 600 ping.txt | tr '\n' ' ' | sed 's/%/%25/g')"
+          echo "::error title=apps script POST::$(cat meta.txt) | $(grep -oE '<title>[^<]*</title>' ping.txt | head -1) | $(sed -e 's/<[^>]*>/ /g' ping.txt | tr -s ' \n' ' ' | grep -oE '[^{};]{0,0}(Authorization|authorization|Sign in|הרשאה|כניסה|Error|error|שגיאה|not found|לא נמצא)[^{};<]{0,200}' | head -5 | tr '\n' ' ' | sed 's/%/%25/g')"
+          curl -sSL -m 60 -o get.txt -w '%{http_code} %{content_type}' "$URL?action=ping" > gmeta.txt 2>&1 || true
+          echo "::error title=apps script GET::$(cat gmeta.txt) | $(grep -oE '<title>[^<]*</title>' get.txt | head -1) | $(head -c 200 get.txt | sed 's/%/%25/g')"
