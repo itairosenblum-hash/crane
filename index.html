@@ -312,10 +312,12 @@ tr:hover td { background: rgba(30,77,183,0.02); }
 #nav-refresh-btn.spinning { animation: spin 0.7s linear infinite; pointer-events: none; opacity: 0.7; }
 .ai-ok { border: 2px solid #16a34a !important; background: #f0fdf4 !important; }
 .ai-low { border: 2px solid #f59e0b !important; background: #fffbeb !important; }
+.ai-missing { border: 2px solid #dc2626 !important; background: #fef2f2 !important; }
 .ai-legend { display:flex; gap:12px; flex-wrap:wrap; font-size:12px; color:var(--text-muted); margin:-0.5rem 0 1rem; }
 .ai-legend span::before { content:''; display:inline-block; width:10px; height:10px; border-radius:3px; margin-inline-end:5px; vertical-align:-1px; }
 .ai-legend .ok::before { border:2px solid #16a34a; background:#f0fdf4; }
 .ai-legend .low::before { border:2px solid #f59e0b; background:#fffbeb; }
+.ai-legend .missing::before { border:2px solid #dc2626; background:#fef2f2; }
 .site-pick { background:var(--bg); border:1.5px solid var(--border); border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:1rem; }
 .site-chips { display:flex; flex-wrap:wrap; gap:8px; }
 .site-chip { padding:9px 14px; border:1.5px solid var(--border); border-radius:999px; background:var(--card); color:var(--text); font-family:inherit; font-size:14px; font-weight:500; cursor:pointer; min-height:40px; }
@@ -1863,7 +1865,7 @@ const MODAL_EQ_TEMPLATE = `<div class="modal-body">
       <div id="ai-loading" style="display:none"><div class="loading"><div class="spinner"></div>AI מנתח את התמונה...</div></div>
       <div id="ai-result-box" style="display:none">
         <div class="ai-result"><span class="ai-badge">AI</span>פרטים שזוהו — ניתן לערוך</div>
-        <div class="ai-legend"><span class="ok">ירוק — קריאה בטוחה</span><span class="low">כתום — כדאי לבדוק</span></div>
+        <div class="ai-legend"><span class="ok">ירוק — קריאה בטוחה</span><span class="low">כתום — כדאי לבדוק</span><span class="missing">אדום — לא מופיע במסמך, להשלים ידנית</span></div>
       </div>
       <div class="form-row">
         <div class="form-group"><label>מספר תסקיר *</label><input type="text" id="eq-id" placeholder="הזן מספר תסקיר" autocomplete="off"></div>
@@ -2256,8 +2258,8 @@ function scanErrMsg(err) {
   return err && err.code === 'functions/not-found' ? 'שירות הסריקה עוד לא הותקן' : (err && err.message) || 'שגיאה לא ידועה';
 }
 function clearAiMarks() {
-  document.querySelectorAll('#modal-eq-body .ai-low, #modal-eq-body .ai-ok').forEach(el => {
-    el.classList.remove('ai-low', 'ai-ok'); el.removeAttribute('title');
+  document.querySelectorAll('#modal-eq-body .ai-low, #modal-eq-body .ai-ok, #modal-eq-body .ai-missing').forEach(el => {
+    el.classList.remove('ai-low', 'ai-ok', 'ai-missing'); el.removeAttribute('title');
   });
 }
 // ממלא את הטופס: ירוק = קריאה בטוחה, כתום = כדאי לבדוק. עריכה ידנית של שדה מסירה את הסימון.
@@ -2265,11 +2267,22 @@ function applyScanResult(res) {
   const p = (res && res.fields) || {};
   const conf = (res && res.confidence) || {};
   clearAiMarks();
-  let ok = 0, low = 0;
+  let ok = 0, low = 0, missing = 0;
   SCAN_FIELD_MAP.forEach(([id, key]) => {
     const el = document.getElementById(id);
+    if (!el) return;
     let val = p[key];
-    if (!el || val === null || val === undefined || String(val).trim() === '') return;
+    const clear = () => { el.classList.remove('ai-ok', 'ai-low', 'ai-missing'); el.removeAttribute('title'); };
+    if (val === null || val === undefined || String(val).trim() === '') {
+      // לא מופיע במסמך — אדום, להשלמה ידנית (אלא אם כבר יש ערך בשדה)
+      if (String(el.value || '').trim()) return;
+      el.classList.add('ai-missing');
+      el.title = 'לא מופיע בתסקיר — יש להשלים ידנית';
+      missing++;
+      el.addEventListener('input', clear, { once: true });
+      el.addEventListener('change', clear, { once: true });
+      return;
+    }
     val = String(val);
     if (el.tagName === 'SELECT' && !Array.from(el.options).some(o => o.value === val)) {
       const customOpt = el.querySelector('option[value="__custom__"]');
@@ -2282,12 +2295,11 @@ function applyScanResult(res) {
     el.classList.add(sure ? 'ai-ok' : 'ai-low');
     el.title = sure ? 'ה-AI בטוח בקריאה' : 'כדאי לבדוק את הערך הזה מול התסקיר';
     if (sure) ok++; else low++;
-    const clear = () => { el.classList.remove('ai-ok', 'ai-low'); el.removeAttribute('title'); };
     el.addEventListener('input', clear, { once: true });
     el.addEventListener('change', clear, { once: true });
   });
   document.getElementById('ai-result-box').style.display = 'block';
-  return { ok, low };
+  return { ok, low, missing };
 }
 function showPreview(dataUrl) {
   const img = document.getElementById('img-preview');
@@ -2310,8 +2322,9 @@ async function handleFile(file) {
     jobCreep(15, 92, 20000);
     const res = await callScan(prep.scanData, prep.scanType);
     if (seq !== scanSeq) return;
-    const { low } = applyScanResult(res);
-    jobDone(low ? `הפרטים מולאו — ${low} שדות בכתום לבדיקה` : 'הפרטים מולאו ✓');
+    const { low, missing } = applyScanResult(res);
+    const notes = [low && `${low} בכתום לבדיקה`, missing && `${missing} באדום להשלמה`].filter(Boolean);
+    jobDone(notes.length ? 'הפרטים מולאו — ' + notes.join(', ') : 'הפרטים מולאו ✓');
   } catch (err) {
     if (seq !== scanSeq) return;
     jobFail('הסריקה נכשלה');
