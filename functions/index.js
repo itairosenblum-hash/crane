@@ -109,7 +109,9 @@ export const scanCertificate = onCall({ secrets: [GEMINI_API_KEY], timeoutSecond
     }
   });
   // עומס זמני אצל Gemini (503/429) — מנסים שוב, ואז עוברים למודל הגיבוי
-  const busy = (e) => /\b(503|429)\b|UNAVAILABLE|RESOURCE_EXHAUSTED|overloaded|high demand/i.test(String(e?.status || "") + " " + String(e?.message || ""));
+  // מכסה שנגמרה (בדרך כלל מפתח בלי חיוב) — אין טעם לנסות שוב
+  const quota = (e) => /exceeded your current quota|billing/i.test(String(e?.message || ""));
+  const busy = (e) => !quota(e) && /\b(503|429)\b|UNAVAILABLE|RESOURCE_EXHAUSTED|overloaded|high demand/i.test(String(e?.status || "") + " " + String(e?.message || ""));
   const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
   const primary = GEMINI_MODEL.value();
   const fallback = GEMINI_FALLBACK_MODEL.value();
@@ -126,12 +128,14 @@ export const scanCertificate = onCall({ secrets: [GEMINI_API_KEY], timeoutSecond
       lastErr = e;
       logger.warn("gemini attempt failed", { model, message: String(e?.message || e).slice(0, 300) });
       // שגיאה שאינה עומס: אין טעם לחזור על המודל הראשי — קופצים ישר לגיבוי
+      if (quota(e)) break;
       if (!busy(e) && model === primary) i = plan.findIndex(([m]) => m === fallback) - 1;
     }
   }
   if (!r) {
     logger.error("gemini certificate scan failed", lastErr?.message || lastErr);
     const msg = String(lastErr?.message || lastErr?.cause?.message || "");
+    if (quota(lastErr)) throw new HttpsError("resource-exhausted", "מכסת השימוש ב-AI נגמרה. יש לבדוק את החיוב של מפתח ה-AI. בינתיים אפשר למלא ידנית.");
     throw new HttpsError("unavailable", busy(lastErr)
       ? "שירות ה-AI עמוס כרגע. נסו שוב בעוד דקה או מלאו ידנית."
       : /timeout|aborted/i.test(msg) ? "הסריקה לקחה יותר מדי זמן. נסו שוב או מלאו ידנית." : "הסריקה נכשלה. אפשר למלא את הפרטים ידנית.");
