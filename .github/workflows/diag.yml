@@ -1,0 +1,23 @@
+name: Function diagnostics
+# מציג שגיאות אחרונות של ה-Cloud Functions כהערות בסיכום הריצה (לא משנה כלום)
+on:
+  push:
+    branches: [main]
+    paths: [".github/diag-trigger"]
+  workflow_dispatch:
+jobs:
+  logs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Recent errors
+        run: |
+          gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="scancertificate" AND severity>=WARNING' \
+            --project cranes-a0759 --freshness=3h --limit=10 \
+            --format='value(timestamp,jsonPayload.message,textPayload)' > logs.txt 2>&1 || true
+          echo "::error title=scancertificate logs::$(cut -c1-900 logs.txt | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')"
+          gcloud services list --enabled --project cranes-a0759 --format='value(config.name)' | grep -i generative > apis.txt 2>&1 || echo "generativelanguage NOT enabled" > apis.txt
+          echo "::error title=apis::$(cat apis.txt)"
