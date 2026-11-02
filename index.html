@@ -536,6 +536,48 @@ tr:hover td { background: rgba(30,77,183,0.02); }
   .stats-grid { grid-template-columns: 1fr 1fr; }
   .stat-value { font-size: 20px; }
 }
+/* DESKTOP — sidebar layout for computers (mobile layout above is untouched) */
+@media (min-width: 1024px) {
+  .app-inner {
+    max-width: 1600px; padding: 1.75rem 2rem;
+    display: grid; grid-template-columns: 236px minmax(0, 1fr);
+    column-gap: 1.75rem; align-items: start;
+  }
+  /* Tabs become a sticky vertical sidebar (right side, RTL) */
+  .tabs-wrap {
+    grid-column: 1; grid-row: 1;
+    flex-direction: column; gap: 4px; padding: 10px;
+    margin: 0; position: sticky; top: calc(64px + 1.75rem);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .tab-btn {
+    flex: none; justify-content: flex-start; gap: 12px;
+    padding: 12px 14px; font-size: 15px; border-radius: var(--radius-sm);
+    border-bottom: none; border-inline-start: 3px solid transparent; text-align: start;
+  }
+  .tab-btn.active { border-bottom: none; border-inline-start-color: var(--blue); background: rgba(30,77,183,0.08); }
+  .tab-icon { font-size: 18px; width: 24px; text-align: center; }
+  /* All tab contents sit in the main column, same row (only one is visible at a time) */
+  .app-inner > div:not(.tabs-wrap) { grid-column: 2; grid-row: 1; min-width: 0; }
+
+  /* Dashboard: wider stat row + alerts in two columns */
+  .stats-grid { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+  #alerts-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 8px; }
+  #alerts-list > .alert-item { margin-bottom: 0; }
+  #alerts-list > div:not(.alert-item) { grid-column: 1 / -1; }
+
+  /* Lists: denser multi-column cards */
+  .eq-type-items { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+  .filter-row select { min-width: 180px; }
+
+  /* Forms & modals: roomier on a big screen */
+  .modal { max-width: 760px; }
+  .settings-subnav { top: 64px; }
+  .settings-subnav-btn { flex: none; }
+}
+@media (min-width: 1440px) {
+  .app-inner { grid-template-columns: 256px minmax(0, 1fr); column-gap: 2rem; }
+}
 </style>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
@@ -3878,6 +3920,12 @@ fbAuth.onAuthStateChanged(function(user) {
   } else {
     showPage('page-login');
   }
+});
+// Desktop: Esc closes view-only modals (forms are left alone so typed data isn't lost)
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  const open = [...document.querySelectorAll('.modal-overlay.open')].filter(m => !m.id.startsWith('modal-add'));
+  if (open.length) closeModal(open[open.length - 1].id);
 });
 </script>
 <script>
