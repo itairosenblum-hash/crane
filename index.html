@@ -1617,7 +1617,6 @@ function getNextRelevantCheck(e) {
 }
 // ===== OPERATORS (מנופאים) status tracking =====
 const OPERATOR_CHECK_FIELDS = [
-  { field: 'civilianLicenseExpiry', label: 'רישיון אזרחי' },
   { field: 'militaryLicenseExpiry', label: 'רישיון צבאי' },
   { field: 'craneLicenseExpiry',    label: 'רישיון מנוף' }
 ];
@@ -2825,11 +2824,10 @@ const MODAL_OP_TEMPLATE = `<div class="modal-body">
         <div class="form-group"><label>פרופיל</label><input type="text" id="op-profile" placeholder="פרופיל" autocomplete="off"></div>
       </div>
       <div class="form-row">
-        ${dateFieldHtml('op-civilian-expiry', 'תוקף רישיון אזרחי (DD/MM/YYYY)')}
         ${dateFieldHtml('op-military-expiry', 'תוקף רישיון צבאי (DD/MM/YYYY)')}
+        ${dateFieldHtml('op-crane-expiry', 'תוקף רישיון מנוף נייד (DD/MM/YYYY)')}
       </div>
       <div class="form-row">
-        ${dateFieldHtml('op-crane-expiry', 'תוקף רישיון מנוף נייד (DD/MM/YYYY)')}
         ${dateFieldHtml('op-tatash', 'תת"ש (DD/MM/YYYY)')}
       </div>
       <div class="form-group"><label>טלפון</label><input type="tel" id="op-phone" placeholder="050-000-0000" oninput="maskPhone(this)" maxlength="12"></div>
@@ -2881,7 +2879,6 @@ function editOperator(id) {
   sv('op-id-number', op.idNumber);
   sv('op-license-number', op.licenseNumber);
   sv('op-profile', op.profile);
-  sv('op-civilian-expiry', op.civilianLicenseExpiry);
   sv('op-military-expiry', op.militaryLicenseExpiry);
   sv('op-crane-expiry', op.craneLicenseExpiry);
   sv('op-tatash', op.tatash);
@@ -2961,7 +2958,8 @@ async function saveOperator() {
     idNumber: gv('op-id-number'),
     licenseNumber: gv('op-license-number'),
     profile: gv('op-profile'),
-    civilianLicenseExpiry: gv('op-civilian-expiry'),
+    // רישיון אזרחי כבר לא מתועד/נעקב — שומרים ערך קיים (אם יש) כדי לא למחוק נתונים
+    civilianLicenseExpiry: (editingOperatorId && (appData.operators.find(o => o.id === editingOperatorId)||{}).civilianLicenseExpiry) || '',
     militaryLicenseExpiry: gv('op-military-expiry'),
     craneLicenseExpiry: gv('op-crane-expiry'),
     tatash: gv('op-tatash'),
@@ -3027,7 +3025,6 @@ function viewOperator(id) {
       ['מספר רישיון נהיגה', o.licenseNumber||'—'],
       ['פרופיל', o.profile||'—'],
       ['🏗️ תוקף רישיון מנוף נייד', `<strong style="color:var(--blue)">${formatDate(o.craneLicenseExpiry)}</strong>`],
-      ['תוקף רישיון אזרחי', formatDate(o.civilianLicenseExpiry)],
       ['תוקף רישיון צבאי', formatDate(o.militaryLicenseExpiry)],
       ['תת"ש', formatDate(o.tatash)],
       ['טלפון', formatPhone(o.phone)||'—'],
@@ -3209,7 +3206,6 @@ function generateOperatorsReport() {
     const st = getOperatorStatus(o);
     const idLine = [o.idNumber ? 'ת.ז: '+o.idNumber : '', o.personalNum ? 'מ.א: '+o.personalNum : ''].filter(Boolean).join(' · ');
     const licenseLines = [
-      `אזרחי: ${operatorReportDateHtml(o.civilianLicenseExpiry)}`,
       `צבאי: ${operatorReportDateHtml(o.militaryLicenseExpiry)}`,
       `<strong style="color:#1e4db7">מנוף:</strong> ${operatorReportDateHtml(o.craneLicenseExpiry)}`
     ].join('<br>');
