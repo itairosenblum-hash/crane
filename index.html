@@ -336,6 +336,10 @@ tr:hover td { background: rgba(30,77,183,0.02); }
 .bulk-wait { display:flex; align-items:center; gap:10px; color:var(--blue); font-size:14px; padding:0.5rem 0 1rem; }
 .bulk-err { background:#fef2f2; border:1.5px solid #fecaca; color:#b91c1c; border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:1rem; font-size:13px; line-height:1.5; }
 .retry-btn { display:inline-flex; align-items:center; gap:6px; margin-top:8px; font-family:inherit; font-size:14px; font-weight:700; padding:9px 16px; border-radius:10px; border:none; background:var(--blue); color:#fff; cursor:pointer; }
+.dup-rec { border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:1rem; font-size:13px; line-height:1.6; border:1.5px solid; }
+.dup-rec.rec-replace { background:#f0fdf4; border-color:#86efac; color:#14532d; }
+.dup-rec.rec-keep { background:#fef2f2; border-color:#fca5a5; color:#7f1d1d; }
+.dup-rec.rec-same { background:#f1f5f9; border-color:#cbd5e1; color:#334155; }
 .expiry-warn { background:#fef2f2; border:1.5px solid #fca5a5; color:#991b1b; border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:1rem; font-size:13px; line-height:1.6; font-weight:500; }
 .dup-warn { background:#fff7ed; border:1.5px solid #fdba74; color:#9a3412; border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:1rem; font-size:13px; line-height:1.5; }
 .choice-overlay { position:fixed; inset:0; background:rgba(10,22,40,0.55); z-index:1100; display:flex; align-items:center; justify-content:center; padding:16px; }
@@ -2278,8 +2282,56 @@ function checkSerialDup() {
   const dup = findSerialDup(el.value, editingEqId);
   // השלמה מהרשומה הקיימת רק בהוספה (לא בעריכת אמצעי קיים)
   if (!editingEqId) { if (dup) prefillFromExisting(dup); else if (prefilledFrom != null) clearPrefill(); }
-  box.innerHTML = dup ? `<div class="dup-warn">⚠️ צ' <b>${escHtml(el.value.trim())}</b> כבר קיים במערכת: ${escHtml(displayType(dup.type))} ${escHtml(dup.name || '')} · ${escHtml(getSiteName(dup.siteId))} · תסקיר ${escHtml(dup.eqId || '—')} · בדיקה הבאה ${escHtml(dup.nextCheck || '—')}.<br>בשמירה תישאל אם להחליף את התסקיר הקיים.</div>` : '';
+  box.innerHTML = dup ? `<div class="dup-warn">⚠️ צ' <b>${escHtml(el.value.trim())}</b> כבר קיים במערכת: ${escHtml(displayType(dup.type))} ${escHtml(dup.name || '')} · ${escHtml(getSiteName(dup.siteId))} · תסקיר ${escHtml(dup.eqId || '—')} · בדיקה הבאה ${escHtml(dup.nextCheck || '—')}.<br>בשמירה תישאל אם להחליף את התסקיר הקיים.</div>${(() => { const r = dupRecommendation(dup); return `<div class="dup-rec rec-${r.action}">${r.html}</div>`; })()}` : '';
   updateExpiryWarning();
+}
+// המלצה כשמעלים תסקיר לצ' שכבר קיים: להחליף / לא להחליף / זהה — לפי התוקף של כל אחד
+// action: 'replace' | 'keep' | 'same'
+function dupRecommendation(dup) {
+  const gv = id => { const el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; };
+  const btEl = document.getElementById('eq-bt-next');
+  const newEqId = gv('eq-id'), newNext = gv('eq-next');
+  // ב.ת שהושלם מהרשומה הקיימת (לבן) לא בא מהתסקיר החדש — לא משווים אותו
+  const newBt = btEl && !btEl.classList.contains('ai-old') ? gv('eq-bt-next') : '';
+  const oldNext = String(dup.nextCheck || '').trim(), oldBt = String(dup.btNext || '').trim();
+  const nd = parseDate(newNext), od = parseDate(oldNext);
+  const f = v => escHtml(formatDate(v));
+  const lines = [];
+  let action;
+  if (nd && od && nd.getTime() === od.getTime() && newEqId && newEqId === String(dup.eqId || '').trim()) {
+    action = 'same';
+    lines.push(`זה <b>אותו תסקיר</b> שכבר שמור במערכת (מס' ${escHtml(newEqId)}, בדיקה הבאה ${f(newNext)}).`);
+    lines.push('<b>המלצה: לא לשמור</b> — אין בו שום דבר חדש.');
+  } else if (nd && od && nd > od) {
+    action = 'replace';
+    lines.push(`התסקיר <b>החדש</b> בתוקף ארוך יותר: בדיקה הבאה ${f(newNext)}, לעומת ${f(oldNext)} בקיים.`);
+    lines.push('<b>המלצה: להחליף</b> את התסקיר הקיים.');
+  } else if (nd && od && nd < od) {
+    action = 'keep';
+    lines.push(`התסקיר <b>הקיים</b> במערכת בתוקף ארוך יותר: בדיקה הבאה ${f(oldNext)}, לעומת ${f(newNext)} בתסקיר שהעלית.`);
+    lines.push('<b>המלצה: לא להחליף</b> — התסקיר שהעלית ישן יותר.');
+  } else if (nd && od) {
+    action = 'keep';
+    lines.push(`לשני התסקירים אותו תוקף (בדיקה הבאה ${f(newNext)}), אבל מספר תסקיר שונה (${escHtml(newEqId || '—')} / ${escHtml(dup.eqId || '—')}).`);
+    lines.push('<b>המלצה: אין יתרון בהחלפה</b> — אפשר להשאיר את הקיים.');
+  } else if (nd && !od) {
+    action = 'replace';
+    lines.push(`לאמצעי הקיים אין תאריך בדיקה הבאה, ובתסקיר החדש יש (${f(newNext)}).`);
+    lines.push('<b>המלצה: להחליף</b>.');
+  } else {
+    action = 'keep';
+    lines.push(`בתסקיר שהעלית לא זוהה תאריך בדיקה הבאה${od ? `, ובקיים שמור ${f(oldNext)}` : ''}.`);
+    lines.push('<b>המלצה: לא להחליף</b> עד שתבדוק את התאריך.');
+  }
+  // ב.ת — רק אם מופיע בשניהם ושונה
+  const nb = parseDate(newBt), ob = parseDate(oldBt);
+  if (nb && ob && nb.getTime() !== ob.getTime()) {
+    lines.push(nb > ob ? `ב.ת: בחדש ${f(newBt)} — מאוחר יותר מהקיים (${f(oldBt)}).`
+                       : `ב.ת: בקיים ${f(oldBt)} — מאוחר יותר מהחדש (${f(newBt)}).`);
+  }
+  if (nd && daysUntil(newNext) < 0) lines.push(`⛔ שים לב: גם התסקיר שהעלית כבר פג תוקף (${f(newNext)}).`);
+  const icon = { replace: '✅', keep: '✋', same: '🟰' }[action];
+  return { action, html: `${icon} ${lines.join('<br>')}` };
 }
 // אזהרות תפוגה לתסקיר שמועלה: התאריך כבר עבר, או שהוא ישן יותר מהתסקיר שכבר שמור במערכת לאותו אמצעי
 function expiryWarnings(newNext, existing) {
@@ -2306,7 +2358,9 @@ function updateExpiryWarning() {
   const target = expiryCompareTarget();
   // בעריכה בלי שינוי התאריך — אין מה להתריע
   if (editingEqId && target && String(el.value || '').trim() === String(target.nextCheck || '').trim()) { box.innerHTML = ''; return; }
-  const w = expiryWarnings(el.value, target);
+  // הוספה של צ' שכבר קיים: ההמלצה בתיבת הכפילות כבר מכסה תוקף ישן/פג
+  if (!editingEqId && target) { box.innerHTML = ''; return; }
+  const w = expiryWarnings(el.value, editingEqId ? target : null);
   box.innerHTML = w.length ? `<div class="expiry-warn">⛔ ${w.join('<br>⛔ ')}</div>` : '';
 }
 // חלון בחירה עם כמה כפתורים; מחזיר את הערך של הכפתור שנלחץ
@@ -2344,14 +2398,16 @@ async function saveEquipment() {
   let replaceTarget = null;
   const dupSerial = findSerialDup(serialNumberVal, editingEqId);
   if (dupSerial) {
+    const rec = dupRecommendation(dupSerial);
     const choice = await choiceDialog('הצ\' הזה כבר קיים במערכת',
       `צ' <b>${escHtml(serialNumberVal)}</b> שייך לאמצעי קיים:<br>
        ${escHtml(displayType(dupSerial.type))} ${escHtml(dupSerial.name || '')} · ${escHtml(getSiteName(dupSerial.siteId))}<br>
        תסקיר ${escHtml(dupSerial.eqId || '—')} · בדיקה אחרונה ${escHtml(dupSerial.lastCheck || '—')} · בדיקה הבאה ${escHtml(dupSerial.nextCheck || '—')}<br><br>
+       <div class="dup-rec rec-${rec.action}" style="margin:10px 0">${rec.html}</div>
        להחליף את התסקיר הקיים בתסקיר החדש? הנתונים של האמצעי יעודכנו לפי התסקיר החדש.`,
-      [{ value: 'replace', label: 'כן, להחליף את התסקיר הקיים', primary: true },
+      [{ value: 'replace', label: (rec.action === 'replace' ? '✅ ' : '') + 'כן, להחליף את התסקיר הקיים', primary: rec.action === 'replace' },
        { value: 'new', label: 'לא, לשמור כאמצעי נפרד' },
-       { value: 'cancel', label: 'ביטול' }]);
+       { value: 'cancel', label: (rec.action !== 'replace' ? '✋ ' : '') + 'ביטול — לא לשמור', primary: rec.action !== 'replace' }]);
     if (choice === 'cancel') return;
     if (choice === 'replace') replaceTarget = dupSerial;
   }
@@ -2365,7 +2421,7 @@ async function saveEquipment() {
     const newNext = document.getElementById('eq-next').value.trim();
     const cmp = targetId ? (appData.equipment.find(e => e.id === targetId) || null) : null;
     const changed = !cmp || newNext !== String(cmp.nextCheck || '').trim();
-    const w = changed ? expiryWarnings(newNext, cmp) : [];
+    const w = changed && !dupSerial ? expiryWarnings(newNext, cmp) : [];
     if (w.length) {
       const choice = await choiceDialog('⚠️ שים לב לתאריך התפוגה',
         w.join('<br><br>') + (cmp && parseDate(newNext) < parseDate(cmp.nextCheck) ? '<br><br>שמירה תחליף את התאריך החדש יותר בתאריך הישן.' : '') + '<br><br>לשמור בכל זאת?',
