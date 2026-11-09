@@ -2354,15 +2354,20 @@ async function saveEquipment() {
       // עד 2 ניסיונות, כל אחד מוגבל בזמן; אם שניהם נכשלים — אפשר לשמור בלי התמונה במקום להיתקע
       let imgRes = null, imgErr = '';
       for (let attempt = 1; attempt <= 2 && !(imgRes && imgRes.ok && imgRes.imageUrl); attempt++) {
-        J.update(20, attempt === 1 ? 'מעלה את תמונת התסקיר ל-Drive...' : 'ההעלאה לא הגיבה — מנסה שוב...');
+        const label = attempt === 1 ? 'מעלה את תמונת התסקיר ל-Drive' : 'ההעלאה לא הגיבה — ניסיון שני';
+        J.update(20, label + '...');
         J.creep(20, 75, 12000);
+        const t0 = Date.now();
+        const tick = setInterval(() => J.update(null, `${label}... ${Math.round((Date.now() - t0) / 1000)} שנ' (עד 30)`), 1000);
         try {
           imgRes = await apiPost({
             action: 'saveImage',
             data: { imageData, filename: 'eq_' + id + '_' + String(eqId).replace(/[^a-zA-Z0-9]/g,'_') }
-          }, 45000);
+          }, 30000);
           if (!(imgRes && imgRes.ok && imgRes.imageUrl)) imgErr = imgRes ? (imgRes.msg || JSON.stringify(imgRes)) : 'אין תגובה';
         } catch (e) { imgRes = null; imgErr = e.message; }
+        finally { clearInterval(tick); }
+        console.log('saveImage attempt', attempt, 'took', Date.now() - t0, 'ms', imgRes || imgErr);
       }
       if (imgRes && imgRes.ok && imgRes.imageUrl) {
         imageUrl = imgRes.imageUrl;
