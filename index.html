@@ -1227,7 +1227,13 @@ async function loadData(silent = false) {
     if (currentUser && currentUser.role === 'admin') {
       toFix.forEach(f => db.collection('equipment').doc(String(f.id)).set({ type: f.type, serialNumber: f.serialNumber }, { merge: true }).catch(err => console.error('normalize eq', f.id, err)));
       const dupTypes = rawTypesList.filter(t => canonicalType(t) !== t);
-      if (dupTypes.length) db.collection('meta').doc('equipmentTypes').set({ types: firebase.firestore.FieldValue.arrayRemove(...dupTypes) }, { merge: true }).catch(err => console.error('normalize types', err));
+      if (dupTypes.length) {
+        const typesRef = db.collection('meta').doc('equipmentTypes');
+        const canonNames = [...new Set(dupTypes.map(canonicalType))];
+        typesRef.set({ types: firebase.firestore.FieldValue.arrayUnion(...canonNames) }, { merge: true })
+          .then(() => typesRef.set({ types: firebase.firestore.FieldValue.arrayRemove(...dupTypes) }, { merge: true }))
+          .catch(err => console.error('normalize types', err));
+      }
       if (toFix.length) console.log('Normalized equipment records:', toFix.length);
     }
     appData.operators = operatorsRaw.map(o => ({
@@ -1805,8 +1811,8 @@ function populateSiteFilter() {
   typeSel.innerHTML = '<option value="">כל הסוגים</option>' + types.map(t => `<option value="${t}">${t}</option>`).join('');
   if (prevType && types.includes(prevType)) typeSel.value = prevType;
 }
-// תצוגה: כל סוגי העגורנים (עגורן זרוע, עגורן אופני נייד...) מוצגים כ"עגורן" בלבד.
-// הסוג המלא נשמר בגיליון ובטופס העריכה ללא שינוי.
+// כל סוגי העגורנים (עגורן זרוע, עגורן אופני נייד...) מאוחדים ל"עגורן" — בתצוגה ובנתונים
+// (canonicalType משתמש בזה, כך שגם שמירה, סריקה והנרמול האוטומטי של המנהל ממירים ל"עגורן").
 const TYPE_FAMILIES = ['עגורן'];
 function displayType(t) {
   const c = String(t || '').trim();
@@ -2202,7 +2208,7 @@ function buildTypeCanon(listTypes, equipmentTypes) {
 function canonicalType(t) {
   const c = cleanType(t);
   if (!c) return '';
-  return (appData.typeCanon && appData.typeCanon[typeKey(c)]) || c;
+  return displayType((appData.typeCanon && appData.typeCanon[typeKey(c)]) || c);
 }
 function normSerial(v) { return String(v || '').replace(/[\s'"׳״`\-]/g, '').replace(/^צ/, '').toLowerCase(); }
 function findSerialDup(serial, excludeId) {
