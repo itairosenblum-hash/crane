@@ -333,6 +333,9 @@ tr:hover td { background: rgba(30,77,183,0.02); }
 /* מסגרת לבנה: ערך שהושלם מהרשומה הקיימת (לא מופיע בתסקיר החדש) */
 .old-val-hint { font-size: 12px; margin-top: 4px; color: var(--text-muted); }
 .old-val-hint.diff { color: #b45309; font-weight: 600; }
+.old-val-hint { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.use-old-btn { font-family: inherit; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 6px; border: 1.5px solid #d97706; background: #fffbeb; color: #92400e; cursor: pointer; }
+.use-old-btn:hover { background: #fef3c7; }
 .ai-old { border: 3px solid #ffffff !important; box-shadow: 0 0 0 2px #94a3b8 !important; background: #f1f5f9 !important; }
 .ai-legend { display:flex; gap:12px; flex-wrap:wrap; font-size:12px; color:var(--text-muted); margin:-0.5rem 0 1rem; }
 .ai-legend span::before { content:''; display:inline-block; width:10px; height:10px; border-radius:3px; margin-inline-end:5px; vertical-align:-1px; }
@@ -2396,8 +2399,25 @@ function updateOldValueHints() {
     if (!hint) { hint = document.createElement('div'); hint.id = id + '-oldhint'; group.appendChild(hint); }
     const shown = escHtml(isDate ? formatDate(oldVal) : oldVal);
     hint.className = 'old-val-hint' + (same ? '' : ' diff');
-    hint.innerHTML = same ? `↺ זהה לקודם (${shown})` : `↺ קודם: ${shown}`;
+    hint.innerHTML = same ? `↺ זהה לקודם (${shown})`
+      : `<span>↺ קודם: ${shown}</span><button type="button" class="use-old-btn" onclick="useOldValue('${id}')">השתמש בקודם</button>`;
   });
+}
+// מחליף את הערך שה-AI קרא בערך הקודם השמור במערכת (למשל כשמספר השילדה נקרא לא נכון)
+function useOldValue(id) {
+  const f = OLD_HINT_FIELDS.find(x => x[0] === id);
+  const target = expiryCompareTarget();
+  const el = document.getElementById(id);
+  if (!f || !target || !el) return;
+  const oldVal = String(target[f[1]] ?? '').trim();
+  if (!oldVal) return;
+  el.value = f[2] ? formatDate(oldVal) : oldVal;
+  el.classList.remove('date-invalid');
+  // אירועי input/change: מנקים את סימון ה-AI ומרעננים אזהרות, המלצה והערך הקודם
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+  if (id === 'eq-name' || id === 'eq-next' || id === 'eq-bt-next') checkSerialDup(); else updateOldValueHints();
+  showToast('הוחזר הערך הקודם ✓');
 }
 function checkSerialDup() {
   const box = document.getElementById('dup-warning');
