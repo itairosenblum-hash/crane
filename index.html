@@ -3395,7 +3395,8 @@ function generateGapsReport() {
     const siteExp = list.filter(g => g.expired).length;
     return `<div class="site-block">
       <h2>📍 ${escHtml(getSiteName(k))} <span>${list.length} פערים${siteExp ? ` · ${siteExp} פגי תוקף` : ''}</span></h2>
-      <table>
+      <table class="gap-table">
+        <colgroup><col style="width:5%"><col style="width:15%"><col style="width:22%"><col style="width:20%"><col style="width:20%"><col style="width:18%"></colgroup>
         <thead><tr><th></th><th>צ'</th><th>סוג / דגם</th><th>בדיקה הבאה</th><th>ב.ת הבא</th><th>סטטוס</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
@@ -3423,12 +3424,14 @@ function generateGapsReport() {
   .s-danger { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
   .s-warn { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
   .site-block { margin-bottom: 18px; page-break-inside: auto; }
+  .gap-table { table-layout: fixed; }
+  .gap-table td { overflow-wrap: anywhere; }
   .site-block h2 { font-size: 14px; margin: 0 0 6px; padding: 6px 10px; background: #1a3a6b; color: white; border-radius: 6px; }
   .site-block h2 span { font-size: 11px; font-weight: 400; color: #cbd5e1; margin-right: 8px; }
   table { width: 100%; border-collapse: collapse; font-size: 10.5px; }
   th { background: #e2e8f0; color: #0f172a; text-align: right; padding: 6px 8px; font-size: 10px; font-weight: 700; }
   td { padding: 6px 8px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
-  td.num { color: #94a3b8; font-weight: 700; width: 24px; }
+  td.num { color: #94a3b8; font-weight: 700; }
   .sub { color: #64748b; font-size: 9.5px; }
   .d-exp { color: #dc2626; font-weight: 700; }
   .d-warn { color: #b45309; font-weight: 700; }
