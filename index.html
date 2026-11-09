@@ -264,6 +264,23 @@ tr:hover td { background: rgba(30,77,183,0.02); }
 .badge-warn::before { background: #d97706; }
 .badge-danger { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
 .badge-danger::before { background: #dc2626; }
+.badge-off { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+.badge-off::before { background: #64748b; }
+.stat-icon.gray { background: rgba(100,116,139,0.12); }
+.stat-value.gray { color: #475569; }
+.alert-item.gray { background: #f8fafc; border-color: #cbd5e1; }
+.alert-dot.gray { background: #64748b; }
+.alert-days.gray { color: #475569; }
+/* ON/OFF switch — השבתה לב.ת */
+.switch { position: relative; display: inline-block; width: 48px; height: 26px; flex-shrink: 0; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch .slider { position: absolute; inset: 0; background: #cbd5e1; border-radius: 26px; cursor: pointer; transition: background 0.2s; }
+.switch .slider::before { content: ''; position: absolute; width: 20px; height: 20px; top: 3px; right: 3px; background: white; border-radius: 50%; transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.25); }
+.switch input:checked + .slider { background: #64748b; }
+.switch input:checked + .slider::before { transform: translateX(-22px); }
+.switch input:disabled + .slider { cursor: default; opacity: 0.6; }
+.disable-box { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: var(--radius-sm); border: 1.5px solid var(--border); background: var(--bg); margin-bottom: 1rem; }
+.disable-box.on { background: #f1f5f9; border-color: #94a3b8; }
 .actions-cell { display: flex; gap: 6px; }
 
 /* FILTER */
@@ -1587,8 +1604,16 @@ const CHECK_FIELDS = [
   { field: 'nextCheck',    label: 'תסקיר', kind: 'check',   waAction: 'לבדיקה',                 waWhat: 'תסקיר הבטיחות' },
   { field: 'btNext',       label: 'ב.ת',   kind: 'bt',      waAction: 'לבדיקה התקופתית (ב.ת)',   waWhat: 'הבדיקה התקופתית (ב.ת)' }
 ];
+// השבתה לב.ת: אמצעי מושבת אינו "חריג" — הסטטוס שלו הוא 'disabled' (לא כשיר),
+// והוא לא נספר בדחוף/קרוב, לא מקבל התראות/תזכורות ולא נכנס לדוח הפערים.
+function isDisabled(e) { return !!(e && e.disabled); }
+function todayStr() { const d = new Date(); return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear(); }
+// מספר הימים שהאמצעי מושבת (יום ההשבתה = יום 0)
+function disabledDays(e) { if (!isDisabled(e) || !e.disabledSince) return 0; const d = -daysUntil(e.disabledSince); return d > 0 && d < 9999 ? d : 0; }
+function disabledDaysText(e) { const d = disabledDays(e); return d === 0 ? 'מושבת מהיום' : d === 1 ? 'מושבת יום אחד' : `מושבת ${d} ימים`; }
 // Overall status considers all tracked dates — whichever is most urgent wins
 function getOverallStatus(e) {
+  if (isDisabled(e)) return 'disabled';
   const order = { danger: 2, warn: 1, ok: 0 };
   let worst = 'ok';
   CHECK_FIELDS.forEach(cf => { const s = getStatus(e[cf.field]); if (order[s] > order[worst]) worst = s; });
@@ -1596,6 +1621,7 @@ function getOverallStatus(e) {
 }
 // Days-until value matching the most urgent tracked date (for badge text)
 function getRelevantDays(e) {
+  if (isDisabled(e)) return 9999;
   let min = 9999;
   CHECK_FIELDS.forEach(cf => { if (e[cf.field]) { const d = daysUntil(e[cf.field]); if (d < min) min = d; } });
   return min;
@@ -1605,6 +1631,7 @@ function getRelevantDays(e) {
 function getDueChecks(eqs, maxDays = 30) {
   const due = [];
   eqs.forEach(e => {
+    if (isDisabled(e)) return;
     CHECK_FIELDS.forEach(cf => {
       const val = e[cf.field];
       if (val && String(val).trim() !== '' && daysUntil(val) <= maxDays) {
@@ -1674,8 +1701,8 @@ function getNextOperatorCheck(o) {
   return best;
 }
 function statusBadge(st, days) {
-  const L = { ok:'תקין', warn:'קרוב לבדיקה', danger: days < 0 ? 'פג תוקף!' : 'דחוף' };
-  const C = { ok:'badge-ok', warn:'badge-warn', danger:'badge-danger' };
+  const L = { ok:'תקין', warn:'קרוב לבדיקה', danger: days < 0 ? 'פג תוקף!' : 'דחוף', disabled:'לא כשיר · ב.ת' };
+  const C = { ok:'badge-ok', warn:'badge-warn', danger:'badge-danger', disabled:'badge-off' };
   return `<span class="badge ${C[st]}">${L[st]}</span>`;
 }
 function getSiteName(id) { const s = appData.sites.find(x => x.id == id); return s ? s.name : '—'; }
@@ -1717,15 +1744,17 @@ function renderDashboard() {
   const eqs = getUserEquipment();
   const danger = eqs.filter(e => getOverallStatus(e) === 'danger').length;
   const warn = eqs.filter(e => getOverallStatus(e) === 'warn').length;
-  const ok = eqs.length - danger - warn;
+  const disabledCount = eqs.filter(isDisabled).length;
+  const ok = eqs.length - danger - warn - disabledCount;
   const active = (f) => dashboardFilter === f ? ' active' : '';
   document.getElementById('stats-grid').innerHTML = `
     <div class="stat-card${active('all')}" onclick="setDashboardFilter('all')"><div class="stat-icon blue">🏗️</div><div class="stat-info"><div class="stat-label">סה"כ אמצעים</div><div class="stat-value blue">${eqs.length}</div></div></div>
     <div class="stat-card${active('danger')}" onclick="setDashboardFilter('danger')"><div class="stat-icon red">🚨</div><div class="stat-info"><div class="stat-label">דחוף / פג תוקף</div><div class="stat-value red">${danger}</div></div></div>
     <div class="stat-card${active('warn')}" onclick="setDashboardFilter('warn')"><div class="stat-icon amber">⏰</div><div class="stat-info"><div class="stat-label">קרוב לבדיקה</div><div class="stat-value amber">${warn}</div></div></div>
-    <div class="stat-card${active('ok')}" onclick="setDashboardFilter('ok')"><div class="stat-icon green">✅</div><div class="stat-info"><div class="stat-label">תקין</div><div class="stat-value green">${ok}</div></div></div>`;
+    <div class="stat-card${active('ok')}" onclick="setDashboardFilter('ok')"><div class="stat-icon green">✅</div><div class="stat-info"><div class="stat-label">תקין</div><div class="stat-value green">${ok}</div></div></div>
+    <div class="stat-card${active('disabled')}" onclick="setDashboardFilter('disabled')"><div class="stat-icon gray">🛠️</div><div class="stat-info"><div class="stat-label">לא כשיר · ב.ת</div><div class="stat-value gray">${disabledCount}</div></div></div>`;
 
-  const titleMap = { all: '⚠️ התראות קרובות', danger: '🚨 דחוף / פג תוקף', warn: '⏰ קרוב לבדיקה', ok: '✅ תקין' };
+  const titleMap = { all: '⚠️ התראות קרובות', danger: '🚨 דחוף / פג תוקף', warn: '⏰ קרוב לבדיקה', ok: '✅ תקין', disabled: '🛠️ לא כשיר · מושבת לב.ת' };
   const clearBtn = dashboardFilter !== 'all' ? ` <button onclick="setDashboardFilter('all')" class="btn-secondary" style="font-size:11px;padding:3px 10px;margin-right:8px;font-weight:500">✕ נקה סינון</button>` : '';
   document.getElementById('alerts-title').innerHTML = titleMap[dashboardFilter] + clearBtn;
 
@@ -1738,7 +1767,13 @@ function renderDashboard() {
   }
   const includeOperators = isAdmin && showOperatorAlerts;
   let items;
-  if (dashboardFilter === 'all') {
+  // אמצעים מושבתים לב.ת — מוצגים בראש הרשימה (בתצוגה הכללית ובסינון "לא כשיר") עם ספירת ימי ההשבתה
+  const disabledItems = (dashboardFilter === 'all' || dashboardFilter === 'disabled')
+    ? eqs.filter(isDisabled).sort((a,b) => disabledDays(b) - disabledDays(a)).map(e => ({ entityType: 'disabled', eq: e }))
+    : [];
+  if (dashboardFilter === 'disabled') {
+    items = [];
+  } else if (dashboardFilter === 'all') {
     items = getDueChecks(eqs, 30).map(d => ({ entityType: 'equipment', ...d }));
     if (includeOperators) {
       items = items.concat(getDueOperatorChecks(getUserOperators(), 30).map(d => ({ entityType: 'operator', ...d })));
@@ -1760,14 +1795,26 @@ function renderDashboard() {
     }
     items.sort((a,b) => a.days - b.days);
   }
+  items = disabledItems.concat(items);
 
   if (!items.length) {
-    const emptyMsg = dashboardFilter === 'all' ? 'אין התראות פעילות — הכל תקין' : 'אין התאמות לסינון זה';
+    const emptyMsg = dashboardFilter === 'all' ? 'אין התראות פעילות — הכל תקין' : dashboardFilter === 'disabled' ? 'אין אמצעים מושבתים' : 'אין התאמות לסינון זה';
     document.getElementById('alerts-list').innerHTML = `<div style="color:var(--text-muted);font-size:14px;padding:0.5rem 0;display:flex;align-items:center;gap:8px"><span style="font-size:20px">✅</span> ${emptyMsg}</div>`;
     return;
   }
 
   document.getElementById('alerts-list').innerHTML = items.map(d => {
+    if (d.entityType === 'disabled') {
+      const e = d.eq;
+      return `<div class="alert-item gray" onclick="viewEquipment(${e.id})">
+        <div class="alert-dot gray"></div>
+        <div class="alert-info">
+          <div class="alert-name"><span class="badge badge-off" style="font-size:10px;margin-left:6px">לא כשיר</span>🏗️ ${getSiteName(e.siteId)} · ${e.serialNumber||'—'} · ${displayType(e.type)||'—'}</div>
+          <div class="alert-meta">שילדה: ${e.name||'—'} · 🛠️ מושבת לב.ת מ-${formatDate(e.disabledSince)}</div>
+        </div>
+        <span class="alert-days gray">${disabledDaysText(e)}</span>
+      </div>`;
+    }
     if (d.entityType === 'operator') {
       const o = d.op;
       const days = d.days;
@@ -1873,7 +1920,7 @@ function renderEquipmentTable() {
             ${items.map(e => {
               const days = getRelevantDays(e);
               const st = getOverallStatus(e);
-              const dot = st === 'danger' ? '🔴' : st === 'warn' ? '🟡' : '🟢';
+              const dot = st === 'disabled' ? '⚫' : st === 'danger' ? '🔴' : st === 'warn' ? '🟡' : '🟢';
               return `<div class="eq-item" onclick="viewEquipment(${e.id})">
                 <div class="eq-item-info">
                   <div class="eq-item-name">${dot} ${e.serialNumber||'—'}</div>
@@ -1893,7 +1940,20 @@ function viewEquipment(id) {
   const e = appData.equipment.find(x => x.id === id);
   if (!e) return;
   const days = getRelevantDays(e); const st = getOverallStatus(e);
+  const isAdminView = currentUser.role === 'admin';
+  const off = isDisabled(e);
+  const disableBox = `<div class="disable-box${off ? ' on' : ''}">
+      <div>
+        <div style="font-size:14px;font-weight:700">🛠️ השבתה לב.ת</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${off ? `לא כשיר · ${disabledDaysText(e)} (מ-${formatDate(e.disabledSince)})` : 'האמצעי פעיל'}</div>
+      </div>
+      <label class="switch" title="${off ? 'החזר לפעילות' : 'השבת לב.ת'}">
+        <input type="checkbox" ${off ? 'checked' : ''} ${isAdminView ? '' : 'disabled'} onchange="toggleEquipmentDisabled(${e.id}, this.checked, this)">
+        <span class="slider"></span>
+      </label>
+    </div>`;
   document.getElementById('view-eq-body').innerHTML = `
+    ${disableBox}
     ${(e.imageUrl && String(e.imageUrl) !== 'null' && String(e.imageUrl).startsWith('http')) ? `
   <div style="margin-bottom:1.5rem">
     <a href="${e.imageUrl}" target="_blank" 
@@ -1936,6 +1996,24 @@ function viewEquipment(id) {
     ${isAdmin ? `<button class="btn-danger-sm" onclick="closeModal('modal-view-eq');deleteEquipment(${e.id})">🗑 מחיקה</button>` : ''}
     <button class="btn-secondary" onclick="closeModal('modal-view-eq')">סגור</button>`;
   openModal('modal-view-eq');
+}
+async function toggleEquipmentDisabled(id, on, el) {
+  const e = appData.equipment.find(x => x.id === id);
+  if (!e || currentUser.role !== 'admin') return;
+  const msg = on ? `להשבית את ${e.serialNumber||'האמצעי'} לב.ת?\nהאמצעי יסומן "לא כשיר" ולא יופיע כחריג.` : `להחזיר את ${e.serialNumber||'האמצעי'} לפעילות?`;
+  if (!confirm(msg)) { if (el) el.checked = !on; return; }
+  const patch = on ? { disabled: true, disabledSince: todayStr() } : { disabled: false, disabledSince: '' };
+  const prev = { disabled: !!e.disabled, disabledSince: e.disabledSince || '' };
+  Object.assign(e, patch);
+  viewEquipment(id); refreshCurrentTab();
+  try {
+    await db.collection('equipment').doc(String(id)).set(patch, { merge: true });
+    showToast(on ? 'האמצעי הושבת לב.ת ✓' : 'האמצעי חזר לפעילות ✓');
+  } catch(err) {
+    Object.assign(e, prev);
+    viewEquipment(id); refreshCurrentTab();
+    alert('שגיאה בשמירה: ' + err.message);
+  }
 }
 async function deleteEquipment(id) {
   if (!confirm('האם למחוק אמצעי זה?')) return;
@@ -3229,7 +3307,7 @@ function operatorWaLink(op) {
 function operatorItemHtml(o, showSite) {
   const days = getOperatorRelevantDays(o);
   const st = getOperatorStatus(o);
-  const dot = st === 'danger' ? '🔴' : st === 'warn' ? '🟡' : '🟢';
+  const dot = st === 'disabled' ? '⚫' : st === 'danger' ? '🔴' : st === 'warn' ? '🟡' : '🟢';
   const craneLine = o.craneLicenseExpiry
     ? `<strong style="color:var(--blue)">🏗️ רישיון מנוף: ${formatDate(o.craneLicenseExpiry)}</strong>`
     : `<span>🏗️ רישיון מנוף: לא רשום</span>`;
@@ -3440,7 +3518,7 @@ function gapDateHtml(v) {
 }
 function generateGapsReport() {
   const sf = document.getElementById('filter-site') ? document.getElementById('filter-site').value : '';
-  let eqs = getUserEquipment();
+  let eqs = getUserEquipment().filter(e => !isDisabled(e)); // מושבת לב.ת אינו פער
   if (sf) eqs = eqs.filter(e => String(e.siteId) === String(sf));
   const gaps = eqs.map(e => {
     const noNext = !String(e.nextCheck || '').trim();
@@ -3589,7 +3667,7 @@ function renderSitesNew() {
             ${eqs.map(e => {
               const days = getRelevantDays(e);
               const st = getOverallStatus(e);
-              const dot = st === 'danger' ? '🔴' : st === 'warn' ? '🟡' : '🟢';
+              const dot = st === 'disabled' ? '⚫' : st === 'danger' ? '🔴' : st === 'warn' ? '🟡' : '🟢';
               return `<div class="eq-item" onclick="viewEquipment(${e.id})">
                 <div class="eq-item-info">
                   <div class="eq-item-name">${dot} ${e.serialNumber||'—'}</div>
