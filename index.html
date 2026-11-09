@@ -1214,7 +1214,22 @@ async function loadData(silent = false) {
       imageUrl: (e.imageUrl && String(e.imageUrl) !== 'null' && String(e.imageUrl) !== 'undefined' && String(e.imageUrl).startsWith('http')) ? String(e.imageUrl) : ''
     }));
     console.log('Equipment with images:', appData.equipment.filter(e=>e.imageUrl).map(e=>({id:e.id,url:e.imageUrl})));
-    appData.equipmentTypes = (typesDoc.exists ? (typesDoc.data().types||[]) : []).map(t => String(t||'').trim()).filter(Boolean);
+    const rawTypesList = (typesDoc.exists ? (typesDoc.data().types||[]) : []).map(t => String(t||'').trim()).filter(Boolean);
+    appData.typeCanon = buildTypeCanon(rawTypesList, appData.equipment.map(e => e.type));
+    appData.equipmentTypes = [...new Set(rawTypesList.map(canonicalType))];
+    const toFix = [];
+    appData.equipment.forEach(e => {
+      const t = canonicalType(e.type), sn = formatSerial(e.serialNumber);
+      if (t !== e.type || sn !== e.serialNumber) toFix.push({ id: e.id, type: t, serialNumber: sn });
+      e.type = t; e.serialNumber = sn;
+    });
+    // מנהל: מאחד גם את הנתונים השמורים (רק שני השדות, merge) כדי שהתצוגה והחיפוש יהיו אחידים בכל מקום
+    if (currentUser && currentUser.role === 'admin') {
+      toFix.forEach(f => db.collection('equipment').doc(String(f.id)).set({ type: f.type, serialNumber: f.serialNumber }, { merge: true }).catch(err => console.error('normalize eq', f.id, err)));
+      const dupTypes = rawTypesList.filter(t => canonicalType(t) !== t);
+      if (dupTypes.length) db.collection('meta').doc('equipmentTypes').set({ types: firebase.firestore.FieldValue.arrayRemove(...dupTypes) }, { merge: true }).catch(err => console.error('normalize types', err));
+      if (toFix.length) console.log('Normalized equipment records:', toFix.length);
+    }
     appData.operators = operatorsRaw.map(o => ({
       ...o,
       id: parseInt(o.id),
@@ -1994,7 +2009,7 @@ const MODAL_EQ_TEMPLATE = `<div class="modal-body">
       <div id="dup-warning"></div>
       <div class="form-row">
         <div class="form-group"><label>מספר תסקיר *</label><input type="text" id="eq-id" placeholder="הזן מספר תסקיר" autocomplete="off"></div>
-        <div class="form-group"><label>מספר רישוי / צ' (רישוי צבאי)</label><input type="text" id="eq-serial" placeholder="הזן מספר רישוי / צ'" autocomplete="off"></div>
+        <div class="form-group"><label>מספר רישוי / צ' (רישוי צבאי)</label><input type="text" id="eq-serial" placeholder="צ-12345" autocomplete="off" onblur="if(this.value.trim()){this.value=formatSerial(this.value);}"></div>
       </div>
       <div class="form-row">
         <div class="form-group"><label>סוג האמצעי</label><select id="eq-type" onchange="handleTypeSelectChange(this)"></select></div>
@@ -2109,7 +2124,7 @@ async function handleTypeSelectChange(selectEl) {
   if (selectEl.value !== '__custom__') return;
   const newType = prompt('הזן סוג אמצעי חדש:');
   if (newType && newType.trim()) {
-    const val = newType.trim();
+    const val = canonicalType(newType);
     const customOpt = selectEl.querySelector('option[value="__custom__"]');
     const existing = Array.from(selectEl.options).find(o => o.value === val);
     if (existing) {
@@ -2145,6 +2160,40 @@ async function compressImage(dataUrl, maxWidth=1200, quality=0.75) {
 }
 
 // השוואת צ' בלי רווחים, גרש/גרשיים ומקפים (צ'10242 = צ׳ 10242 = 10242)
+// תצוגה ושמירה אחידה של צ': תמיד "צ-<מספר>" (צ'10242 / צ׳ 10242 / 10242 → צ-10242)
+function formatSerial(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (!s || s === 'null' || s === 'undefined') return '';
+  let rest = s.replace(/^צ\s*['"׳״`\-–]?\s*/, '').trim();
+  if (!rest) return '';
+  if (/^\d[\d\s]*$/.test(rest)) rest = rest.replace(/\s+/g, '');
+  return 'צ-' + rest;
+}
+// סוג אמצעי אחיד: אותן מילים בסדר אחר (עגורן אופני נייד / עגורן נייד אופני) = אותו סוג
+function typeKey(t) { return String(t || '').trim().split(/\s+/).filter(Boolean).sort().join(' '); }
+function cleanType(t) { return String(t || '').trim().replace(/\s+/g, ' '); }
+function buildTypeCanon(listTypes, equipmentTypes) {
+  const count = {};
+  equipmentTypes.forEach(t => { t = cleanType(t); if (t) count[t] = (count[t] || 0) + 1; });
+  const groups = {};
+  const add = (t, inList) => { t = cleanType(t); if (!t) return; const k = typeKey(t); (groups[k] = groups[k] || {})[t] = (groups[k][t] || false) || inList; };
+  listTypes.forEach(t => add(t, true));
+  equipmentTypes.forEach(t => add(t, false));
+  const canon = {};
+  Object.entries(groups).forEach(([k, variants]) => {
+    // עדיפות: סוג שמופיע ברשימת הסוגים שבהגדרות, ואז הנפוץ ביותר באמצעים
+    const names = Object.keys(variants);
+    const pool = names.some(n => variants[n]) ? names.filter(n => variants[n]) : names;
+    pool.sort((a, b) => (count[b] || 0) - (count[a] || 0) || a.localeCompare(b, 'he'));
+    canon[k] = pool[0];
+  });
+  return canon;
+}
+function canonicalType(t) {
+  const c = cleanType(t);
+  if (!c) return '';
+  return (appData.typeCanon && appData.typeCanon[typeKey(c)]) || c;
+}
 function normSerial(v) { return String(v || '').replace(/[\s'"׳״`\-]/g, '').replace(/^צ/, '').toLowerCase(); }
 function findSerialDup(serial, excludeId) {
   const n = normSerial(serial);
@@ -2284,8 +2333,8 @@ async function saveEquipment() {
   const id = targetId || nextId(appData.equipment);
   const data = {
     eqId, name,
-    serialNumber: gv('eq-serial'),
-    type: gv('eq-type'),
+    serialNumber: formatSerial(gv('eq-serial')),
+    type: canonicalType(gv('eq-type')),
     manufacturer: gv('eq-manufacturer'),
     manufacturingYear: gv('eq-year'),
     siteId: String(parseInt(siteVal)),
@@ -2530,6 +2579,8 @@ function applyScanResult(res) {
       return;
     }
     val = String(val);
+    if (key === 'serialNumber') val = formatSerial(val);
+    if (key === 'type') val = canonicalType(val);
     if (el.tagName === 'SELECT' && !Array.from(el.options).some(o => o.value === val)) {
       const customOpt = el.querySelector('option[value="__custom__"]');
       const opt = document.createElement('option');
@@ -3554,7 +3605,7 @@ async function addNewEquipmentType() {
   const input = document.getElementById('new-type-input');
   const val = (input.value||'').trim();
   if (!val) { alert('נא להזין סוג אמצעי'); return; }
-  if (appData.equipmentTypes.includes(val)) { alert('הסוג הזה כבר קיים ברשימה'); return; }
+  if (appData.equipmentTypes.some(t => typeKey(t) === typeKey(val))) { alert('הסוג הזה כבר קיים ברשימה'); return; }
   appData.equipmentTypes.push(val);
   renderEquipmentTypesSettings();
   input.value = '';
