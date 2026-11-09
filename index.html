@@ -809,6 +809,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
         <div><h2>אמצעי הרמה ובטיחות</h2><p>ניהול ומעקב אחר כלל האמצעים</p></div>
         <div style="display:flex;gap:8px">
           <button class="btn-secondary" onclick="openWorkPlanRangeModal()" style="color:#94a3b8;border-color:rgba(255,255,255,0.2)">📄 תכנית עבודה</button>
+          <button class="btn-secondary" onclick="generateGapsReport()" style="color:#94a3b8;border-color:rgba(255,255,255,0.2)">⚠️ דוח פערים</button>
           <button class="btn-add" id="btn-add-eq" onclick="openAddModal()" style="display:none">+ הוסף אמצעי</button>
         </div>
       </div>
@@ -3341,6 +3342,126 @@ function generateOperatorsReport() {
   <div class="footer">הופק אוטומטית ע"י מערכת תסקירי הבטיחות · ${dateStr}</div>
 </body></html>`;
 
+  const win = window.open('', '_blank');
+  if (!win) { alert('הדפדפן חסם את פתיחת החלון. נא לאפשר חלונות קופצים (Popups) עבור האתר ולנסות שוב.'); return; }
+  win.document.write(html);
+  win.document.close();
+}
+
+// ===== דוח פערים =====
+// אמצעים שבדיקה הבאה או ב.ת שלהם כבר עברו או יפוגו תוך 30 יום (או שאין להם תאריך בדיקה הבאה),
+// בחלוקה לאתרים — חלון הדפסה / שמירה כ-PDF כמו בשאר הדוחות.
+const GAP_DAYS = 30;
+function gapDateHtml(v) {
+  if (!v || !String(v).trim()) return '<span style="color:#94a3b8">—</span>';
+  const d = daysUntil(v), f = escHtml(formatDate(v));
+  if (d < 0) return `<span class="d-exp">${f}<br><small>פג לפני ${Math.abs(d)} ימים</small></span>`;
+  if (d <= GAP_DAYS) return `<span class="d-warn">${f}<br><small>${d === 0 ? 'היום' : 'בעוד ' + d + ' ימים'}</small></span>`;
+  return `<span class="d-ok">${f}</span>`;
+}
+function generateGapsReport() {
+  const sf = document.getElementById('filter-site') ? document.getElementById('filter-site').value : '';
+  let eqs = getUserEquipment();
+  if (sf) eqs = eqs.filter(e => String(e.siteId) === String(sf));
+  const gaps = eqs.map(e => {
+    const noNext = !String(e.nextCheck || '').trim();
+    const dn = noNext ? null : daysUntil(e.nextCheck);
+    const db = String(e.btNext || '').trim() ? daysUntil(e.btNext) : null;
+    const urgent = [dn, db].filter(d => d !== null && d <= GAP_DAYS);
+    if (!noNext && !urgent.length) return null;
+    const minDays = urgent.length ? Math.min(...urgent) : -99999;
+    return { e, noNext, minDays, expired: noNext || urgent.some(d => d < 0) };
+  }).filter(Boolean);
+
+  const bySite = {};
+  gaps.forEach(g => { const k = String(g.e.siteId); (bySite[k] = bySite[k] || []).push(g); });
+  const siteKeys = Object.keys(bySite).sort((a, b) => String(getSiteName(a)).localeCompare(String(getSiteName(b)), 'he'));
+  const expired = gaps.filter(g => g.expired).length;
+
+  const sectionsHtml = siteKeys.map(k => {
+    const list = bySite[k].sort((a, b) => a.minDays - b.minDays);
+    const rows = list.map((g, i) => {
+      const e = g.e;
+      const status = g.expired ? '<span class="badge b-danger">פג תוקף / חסר</span>' : '<span class="badge b-warn">יפוג בקרוב</span>';
+      return `<tr>
+        <td class="num">${i + 1}</td>
+        <td><strong>${escHtml(e.serialNumber ? formatSerial(e.serialNumber) : '—')}</strong></td>
+        <td>${escHtml(displayType(e.type) || '—')}<br><span class="sub">${escHtml([e.manufacturer, e.name].filter(Boolean).join(' '))}</span></td>
+        <td>${g.noNext ? '<span class="d-exp">חסר תאריך</span>' : gapDateHtml(e.nextCheck)}</td>
+        <td>${gapDateHtml(e.btNext)}</td>
+        <td>${status}</td>
+      </tr>`;
+    }).join('');
+    const siteExp = list.filter(g => g.expired).length;
+    return `<div class="site-block">
+      <h2>📍 ${escHtml(getSiteName(k))} <span>${list.length} פערים${siteExp ? ` · ${siteExp} פגי תוקף` : ''}</span></h2>
+      <table>
+        <thead><tr><th></th><th>צ'</th><th>סוג / דגם</th><th>בדיקה הבאה</th><th>ב.ת הבא</th><th>סטטוס</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  }).join('');
+
+  const t = new Date();
+  const dateStr = String(t.getDate()).padStart(2,'0') + '/' + String(t.getMonth()+1).padStart(2,'0') + '/' + t.getFullYear();
+  const html = `<!DOCTYPE html>
+<html lang="he" dir="rtl"><head><meta charset="UTF-8">
+<title>דוח פערים — מדור צהר"מ זרוע הים</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; color: #0f172a; }
+  @page { size: A4 portrait; margin: 14mm; }
+  .print-bar { margin-bottom: 16px; }
+  .print-bar button { background: #1e4db7; color: white; border: none; border-radius: 6px; padding: 10px 22px; font-size: 14px; cursor: pointer; font-family: inherit; font-weight: 600; }
+  .cover-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #dc2626; padding-bottom: 12px; margin-bottom: 16px; }
+  .cover-header h1 { font-size: 19px; margin: 0 0 4px; color: #0a1628; }
+  .cover-header p { margin: 0; font-size: 12px; color: #64748b; }
+  .meta { text-align: left; font-size: 11px; color: #64748b; white-space: nowrap; }
+  .summary { display: flex; gap: 10px; margin-bottom: 14px; font-size: 11px; flex-wrap: wrap; }
+  .summary span { padding: 4px 10px; border-radius: 20px; font-weight: 600; }
+  .s-total { background: #eff6ff; color: #1e4db7; border: 1px solid #bfdbfe; }
+  .s-danger { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+  .s-warn { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+  .site-block { margin-bottom: 18px; page-break-inside: auto; }
+  .site-block h2 { font-size: 14px; margin: 0 0 6px; padding: 6px 10px; background: #1a3a6b; color: white; border-radius: 6px; }
+  .site-block h2 span { font-size: 11px; font-weight: 400; color: #cbd5e1; margin-right: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 10.5px; }
+  th { background: #e2e8f0; color: #0f172a; text-align: right; padding: 6px 8px; font-size: 10px; font-weight: 700; }
+  td { padding: 6px 8px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+  td.num { color: #94a3b8; font-weight: 700; width: 24px; }
+  .sub { color: #64748b; font-size: 9.5px; }
+  .d-exp { color: #dc2626; font-weight: 700; }
+  .d-warn { color: #b45309; font-weight: 700; }
+  .d-ok { color: #15803d; }
+  small { font-weight: 400; font-size: 9px; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  .badge { display: inline-block; padding: 3px 9px; border-radius: 12px; font-size: 9.5px; font-weight: 700; white-space: nowrap; }
+  .b-warn { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+  .b-danger { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+  tr { page-break-inside: avoid; }
+  thead { display: table-header-group; }
+  .empty { text-align: center; color: #15803d; font-size: 15px; padding: 2rem; }
+  .footer { margin-top: 16px; font-size: 10px; color: #94a3b8; text-align: center; }
+  @media print { .print-bar { display: none; } body { padding: 0; } }
+</style></head>
+<body>
+  <div class="print-bar"><button onclick="window.print()">🖨️ הדפס / שמור כ-PDF</button></div>
+  <div class="cover-header">
+    <div>
+      <h1>⚠️ דוח פערים — אמצעים הדורשים טיפול</h1>
+      <p>מערכת תסקירי הבטיחות — מדור צהר"מ זרוע הים${sf ? ' · אתר: ' + escHtml(getSiteName(sf)) : ''}</p>
+    </div>
+    <div class="meta">תאריך הפקה: ${dateStr}<br>פער = בדיקה הבאה או ב.ת שעברו / יפוגו תוך ${GAP_DAYS} יום</div>
+  </div>
+  <div class="summary">
+    <span class="s-total">סה"כ פערים: ${gaps.length}</span>
+    <span class="s-danger">פג תוקף / חסר: ${expired}</span>
+    <span class="s-warn">יפוג תוך ${GAP_DAYS} יום: ${gaps.length - expired}</span>
+    <span class="s-total">אתרים: ${siteKeys.length}</span>
+  </div>
+  ${sectionsHtml || '<div class="empty">✅ אין פערים — כל האמצעים בתוקף</div>'}
+  <div class="footer">הופק אוטומטית ע"י מערכת תסקירי הבטיחות · ${dateStr}</div>
+</body></html>`;
   const win = window.open('', '_blank');
   if (!win) { alert('הדפדפן חסם את פתיחת החלון. נא לאפשר חלונות קופצים (Popups) עבור האתר ולנסות שוב.'); return; }
   win.document.write(html);
