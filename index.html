@@ -2344,6 +2344,7 @@ function clearPrefill() {
   });
   prefilledFrom = null;
   const lg = document.querySelector('#modal-eq-body .ai-legend'); if (lg) lg.classList.remove('has-old');
+  updateOldValueHints();
 }
 function prefillFromExisting(dup) {
   if (prefilledFrom === dup.id) return 0;
@@ -2393,13 +2394,17 @@ function updateOldValueHints() {
     const cur = String(el.value || '').trim();
     const norm = v => isDate ? (parseDate(v) ? parseDate(v).getTime() : v) : normChassis(v);
     const same = !!cur && norm(cur) === norm(oldVal);
-    // שדה שהושלם מהרשומה הקיימת כבר מסומן אפור; בעריכה בלי סריקה מציגים רק כשהערך שונה
-    const show = oldVal && !el.classList.contains('ai-old') && (!editingEqId || scannedInForm || !same);
+    // בעריכה בלי סריקה מציגים רק כשהערך שונה; אחרי סריקה / העלאה לצ' קיים — תמיד, גם כשאין ערך קודם
+    const active = target && (!editingEqId || scannedInForm);
+    const show = active || (oldVal && !same);
     if (!show) { if (hint) hint.remove(); return; }
     if (!hint) { hint = document.createElement('div'); hint.id = id + '-oldhint'; group.appendChild(hint); }
     const shown = escHtml(isDate ? formatDate(oldVal) : oldVal);
-    hint.className = 'old-val-hint' + (same ? '' : ' diff');
-    hint.innerHTML = same ? `↺ זהה לקודם (${shown})`
+    const prefilled = el.classList.contains('ai-old');
+    hint.className = 'old-val-hint' + (same || !oldVal ? '' : ' diff');
+    hint.innerHTML = !oldVal ? '↺ אין ערך קודם שמור במערכת'
+      : prefilled ? `↺ לא בתסקיר החדש — הושלם מהערך הקודם (${shown})`
+      : same ? `↺ זהה לקודם (${shown})`
       : `<span>↺ קודם: ${shown}</span><button type="button" class="use-old-btn" onclick="useOldValue('${id}')">השתמש בקודם</button>`;
   });
 }
