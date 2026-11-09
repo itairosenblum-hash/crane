@@ -331,6 +331,8 @@ tr:hover td { background: rgba(30,77,183,0.02); }
 .ai-low { border: 2px solid #f59e0b !important; background: #fffbeb !important; }
 .ai-missing { border: 2px solid #dc2626 !important; background: #fef2f2 !important; }
 /* מסגרת לבנה: ערך שהושלם מהרשומה הקיימת (לא מופיע בתסקיר החדש) */
+.old-val-hint { font-size: 12px; margin-top: 4px; color: var(--text-muted); }
+.old-val-hint.diff { color: #b45309; font-weight: 600; }
 .ai-old { border: 3px solid #ffffff !important; box-shadow: 0 0 0 2px #94a3b8 !important; background: #f1f5f9 !important; }
 .ai-legend { display:flex; gap:12px; flex-wrap:wrap; font-size:12px; color:var(--text-muted); margin:-0.5rem 0 1rem; }
 .ai-legend span::before { content:''; display:inline-block; width:10px; height:10px; border-radius:3px; margin-inline-end:5px; vertical-align:-1px; }
@@ -2149,6 +2151,11 @@ const MODAL_EQ_TEMPLATE = `<div class="modal-body">
 function rebuildModalBody() {
   const container = document.getElementById('modal-eq-body');
   container.innerHTML = MODAL_EQ_TEMPLATE;
+  scannedInForm = false;
+  ['input', 'change'].forEach(ev => container.addEventListener(ev, e => {
+    const tid = e.target && e.target.id ? e.target.id.replace(/-picker$/, '') : '';
+    if (OLD_HINT_FIELDS.some(f => f[0] === tid)) updateOldValueHints();
+  }));
   // Re-attach file input handlers
   ['file-input-camera','file-input-gallery','file-input-pdf'].forEach(id => {
     const el = document.getElementById(id);
@@ -2368,6 +2375,30 @@ function prefillFromExisting(dup) {
   }
   return n;
 }
+// מעלים תסקיר לאמצעי קיים: ליד שדות התאריכים ומספר השילדה מוצג הערך הקודם שהיה שמור במערכת
+const OLD_HINT_FIELDS = [['eq-name', 'name', false], ['eq-last', 'lastCheck', true], ['eq-next', 'nextCheck', true], ['eq-bt-next', 'btNext', true]];
+let scannedInForm = false; // נסרק תסקיר חדש בטופס הנוכחי
+function updateOldValueHints() {
+  const target = expiryCompareTarget();
+  OLD_HINT_FIELDS.forEach(([id, key, isDate]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const group = el.closest('.form-group');
+    if (!group) return;
+    let hint = document.getElementById(id + '-oldhint');
+    const oldVal = target ? String(target[key] ?? '').trim() : '';
+    const cur = String(el.value || '').trim();
+    const norm = v => isDate ? (parseDate(v) ? parseDate(v).getTime() : v) : normChassis(v);
+    const same = !!cur && norm(cur) === norm(oldVal);
+    // שדה שהושלם מהרשומה הקיימת כבר מסומן אפור; בעריכה בלי סריקה מציגים רק כשהערך שונה
+    const show = oldVal && !el.classList.contains('ai-old') && (!editingEqId || scannedInForm || !same);
+    if (!show) { if (hint) hint.remove(); return; }
+    if (!hint) { hint = document.createElement('div'); hint.id = id + '-oldhint'; group.appendChild(hint); }
+    const shown = escHtml(isDate ? formatDate(oldVal) : oldVal);
+    hint.className = 'old-val-hint' + (same ? '' : ' diff');
+    hint.innerHTML = same ? `↺ זהה לקודם (${shown})` : `↺ קודם: ${shown}`;
+  });
+}
 function checkSerialDup() {
   const box = document.getElementById('dup-warning');
   const el = document.getElementById('eq-serial');
@@ -2379,6 +2410,7 @@ function checkSerialDup() {
   const ch = findChassisDup((document.getElementById('eq-name') || {}).value, [editingEqId, dup && dup.id]);
   if (ch) box.innerHTML += `<div class="dup-warn">⚠️ מספר שילדה <b>${escHtml(ch.name)}</b> כבר רשום על אמצעי אחר: צ' ${escHtml(ch.serialNumber || '—')} · ${escHtml(displayType(ch.type))} · ${escHtml(getSiteName(ch.siteId))} · בדיקה הבאה ${escHtml(ch.nextCheck || '—')}.<br>בדוק שהצ' ומספר השילדה נכונים — ייתכן שזה אותו כלי.</div>`;
   updateExpiryWarning();
+  updateOldValueHints();
 }
 // המלצה כשמעלים תסקיר לצ' שכבר קיים: להחליף / לא להחליף / זהה — לפי התוקף של כל אחד
 // action: 'replace' | 'keep' | 'same'
@@ -2792,6 +2824,7 @@ function applyScanResult(res) {
   const conf = (res && res.confidence) || {};
   clearPrefill();
   clearAiMarks();
+  scannedInForm = true;
   let ok = 0, low = 0, missing = 0;
   SCAN_FIELD_MAP.forEach(([id, key]) => {
     const el = document.getElementById(id);
