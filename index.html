@@ -2281,10 +2281,19 @@ async function compressImage(dataUrl, maxWidth=1200, quality=0.75) {
 
 // השוואת צ' בלי רווחים, גרש/גרשיים ומקפים (צ'10242 = צ׳ 10242 = 10242)
 // תצוגה ושמירה אחידה של צ': תמיד "צ-<מספר>" (צ'10242 / צ׳ 10242 / 10242 → צ-10242)
+function stripTsadi(v) {
+  let r = String(v || '').trim(), prev;
+  do {
+    prev = r;
+    r = r.replace(/^צ\s*['"׳״`\-–]?\s*/, '').replace(/\s*['"׳״`\-–]?\s*צ\s*['"׳״`]?$/, '').trim();
+  } while (r !== prev);
+  return r;
+}
 function formatSerial(v) {
   const s = String(v == null ? '' : v).trim();
   if (!s || s === 'null' || s === 'undefined') return '';
-  let rest = s.replace(/^צ\s*['"׳״`\-–]?\s*/, '').trim();
+  // ה-AI מחזיר לפעמים את הצ' גם בסוף (91154-צ / 91154 צ' — סדר קריאה RTL) — מסירים צ' משני הצדדים
+  let rest = stripTsadi(s);
   if (!rest) return '';
   if (/^\d[\d\s]*$/.test(rest)) rest = rest.replace(/\s+/g, '');
   return 'צ-' + rest;
@@ -2315,7 +2324,7 @@ function canonicalType(t) {
   return displayType((appData.typeCanon && appData.typeCanon[typeKey(c)]) || c);
 }
 // צ' מנורמל: בלי רווחים/מקפים/גרשיים, בלי האות צ ובלי אפסים מובילים (091145 = 91145)
-function normSerial(v) { return String(v || '').replace(/[\s'"׳״`\-]/g, '').replace(/^צ/, '').replace(/^0+/, '').toLowerCase(); }
+function normSerial(v) { return stripTsadi(v).replace(/[\s'"׳״`\-–]/g, '').replace(/^0+/, '').toLowerCase(); }
 function normChassis(v) { return String(v || '').replace(/[\s\-_.\/]/g, '').toUpperCase(); }
 // אמצעי אחר עם אותו מספר שילדה (excludeIds: הרשומה הנערכת / הרשומה עם אותו צ')
 function findChassisDup(chassis, excludeIds) {
