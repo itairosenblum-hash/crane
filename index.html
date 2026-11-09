@@ -1799,9 +1799,25 @@ function populateSiteFilter() {
   const sites = currentUser.role === 'admin' ? appData.sites : appData.sites.filter(s => s.id == currentUser.siteId);
   document.getElementById('filter-site').innerHTML = '<option value="">כל האתרים</option>' + sites.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
   // Populate type filter
-  const types = [...new Set(getUserEquipment().map(e => e.type).filter(Boolean))].sort();
-  document.getElementById('filter-type').innerHTML = '<option value="">כל הסוגים</option>' + types.map(t => `<option value="${t}">${t}</option>`).join('');
+  const types = [...new Set(getUserEquipment().map(e => e.type).filter(Boolean))].sort((a,b) => a.localeCompare(b, 'he'));
+  const typeSel = document.getElementById('filter-type');
+  const prevType = typeSel.value;
+  // משפחות סוגים: "עגורן" בסינון מציג את כל העגורנים (עגורן זרוע, עגורן אופני נייד וכו')
+  const opts = [];
+  types.forEach(t => {
+    const fam = TYPE_FAMILIES.find(f => typeInFamily(t, f));
+    if (fam && !opts.includes(fam + '*')) opts.push(fam + '*');
+    if (!fam || t !== fam) opts.push(t);
+  });
+  typeSel.innerHTML = '<option value="">כל הסוגים</option>' + opts.map(o => o.endsWith('*')
+    ? `<option value="${o}">${o.slice(0, -1)} (כל ה${o.slice(0, -1)}ים)</option>`
+    : `<option value="${o}">${o}</option>`).join('');
+  if (prevType && opts.includes(prevType)) typeSel.value = prevType;
 }
+const TYPE_FAMILIES = ['עגורן'];
+function typeInFamily(t, fam) { const c = String(t || '').trim(); return c === fam || c.startsWith(fam + ' '); }
+function typeMatchesFilter(t, tf) { return tf.endsWith('*') ? typeInFamily(t, tf.slice(0, -1)) : t === tf; }
+function typeFilterLabel(tf) { return tf.endsWith('*') ? tf.slice(0, -1) + ' (כל ה' + tf.slice(0, -1) + 'ים)' : tf; }
 let equipmentStatusFilter = ''; // replaces the removed status dropdown; set by clicking a stat card
 function getFilteredEquipment() {
   let eqs = getUserEquipment();
@@ -1809,7 +1825,7 @@ function getFilteredEquipment() {
   const tf = document.getElementById('filter-type') ? document.getElementById('filter-type').value : '';
   const q = document.getElementById('filter-search').value.toLowerCase();
   if (sf) eqs = eqs.filter(e => e.siteId == sf);
-  if (tf) eqs = eqs.filter(e => e.type === tf);
+  if (tf) eqs = eqs.filter(e => typeMatchesFilter(e.type, tf));
   if (equipmentStatusFilter) eqs = eqs.filter(e => getOverallStatus(e) === equipmentStatusFilter);
   if (q) eqs = eqs.filter(e => String(e.name||'').toLowerCase().includes(q) || String(e.eqId||'').toLowerCase().includes(q) || String(e.serialNumber||'').toLowerCase().includes(q) || String(e.type||'').toLowerCase().includes(q) || String(e.manufacturer||'').toLowerCase().includes(q) || String(getSiteName(e.siteId)||'').toLowerCase().includes(q));
   return eqs;
@@ -3412,7 +3428,7 @@ function generateEquipmentPageWorkPlan(rangeStart, rangeEnd) {
   const personName = sf ? getSiteName(sf) : (currentUser.role === 'admin' ? 'כל האתרים' : (currentUser.fullname || currentUser.username));
   const statusLabels = { ok: 'תקין', warn: 'קרוב לבדיקה', danger: 'דחוף / פג תוקף' };
   const filterParts = [];
-  if (tf) filterParts.push('סוג: ' + tf);
+  if (tf) filterParts.push('סוג: ' + typeFilterLabel(tf));
   if (stf) filterParts.push('סטטוס: ' + (statusLabels[stf] || stf));
   if (q) filterParts.push(`חיפוש: "${q}"`);
   const filterSubtitle = filterParts.length ? ' · ' + filterParts.join(' · ') : '';
