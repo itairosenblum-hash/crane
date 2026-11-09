@@ -382,10 +382,14 @@ tr:hover td { background: rgba(30,77,183,0.02); }
 
 /* DATE PICKER */
 .date-input-wrap { position: relative; }
-.date-input-wrap input[type="text"] { padding-left: 40px; }
+.date-input-wrap input[type="text"] { padding-left: 44px; direction: ltr; text-align: right; }
+.date-input-wrap input.date-invalid { border-color: var(--danger) !important; background: var(--danger-light) !important; }
+.date-pick-box { position: absolute; left: 4px; top: 50%; transform: translateY(-50%); width: 36px; height: 36px; overflow: hidden; z-index: 2; }
+.date-hint { font-size: 11px; color: var(--danger); margin-top: 4px; display: none; }
+.date-input-wrap input.date-invalid ~ .date-hint { display: block; }
 .date-pick-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 16px; color: var(--text-muted); pointer-events: none; z-index: 1; line-height: 1; }
-.date-picker-overlay { position: absolute; left: 4px; top: 50%; transform: translateY(-50%); width: 30px; height: 30px; opacity: 0; cursor: pointer; border: none; padding: 0; margin: 0; background: transparent; z-index: 2; -webkit-appearance: none; }
-.date-picker-overlay::-webkit-calendar-picker-indicator { cursor: pointer; width: 30px; height: 30px; }
+.date-picker-overlay { position: absolute; inset: 0; width: 36px !important; min-width: 0 !important; max-width: 36px !important; height: 36px; opacity: 0; cursor: pointer; border: none; padding: 0; margin: 0; background: transparent; z-index: 2; -webkit-appearance: none; }
+.date-picker-overlay::-webkit-calendar-picker-indicator { cursor: pointer; width: 36px; height: 36px; margin: 0; padding: 0; }
 
 .site-card { background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 1.5rem; overflow: hidden; }
 .site-card-header { background: linear-gradient(135deg, var(--blue-mid), var(--blue-dark)); padding: 1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; }
@@ -1156,13 +1160,21 @@ let editingEqId = null;
 function getScriptUrl() { return localStorage.getItem(SCRIPT_URL_STORE) || DEFAULT_SCRIPT_URL; }
 
 // ===== IMAGE API (Apps Script → Drive בלבד) =====
-async function apiPost(body) {
-  const resp = await fetch(getScriptUrl(), {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify(body)
-  });
-  return resp.json();
+// timeoutMs: בלי מגבלת זמן בקשה שנתקעה ב-Apps Script השאירה את השמירה תקועה לתמיד (75%)
+async function apiPost(body, timeoutMs = 60000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const resp = await fetch(getScriptUrl(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(body),
+      signal: ctrl.signal
+    });
+    return await resp.json();
+  } catch (e) {
+    throw e.name === 'AbortError' ? new Error('השרת לא הגיב בזמן (timeout)') : e;
+  } finally { clearTimeout(t); }
 }
 
 // ===== FIRESTORE HELPERS =====
@@ -1431,15 +1443,71 @@ function onDatePicked(id, pickerEl) {
   if (!iso) return;
   const [y,m,d] = iso.split('-');
   const text = document.getElementById(id);
-  if (text) text.value = `${d}/${m}/${y}`;
+  if (text) { text.value = `${d}/${m}/${y}`; text.classList.remove('date-invalid'); }
 }
+// ===== Manual typing with automatic DD/MM/YYYY formatting =====
+// Accepts digits; slashes are inserted automatically. Typing "/" (or "." / "-") after a single digit pads it (1/ → 01/).
+function formatDateTyping(value, isDelete) {
+  const raw = String(value || '').replace(/[.\-\s]/g, '/').replace(/[^\d\/]/g, '');
+  const max = [2, 2, 4]; const out = ['', '', '']; let idx = 0;
+  for (let i = 0; i < raw.length && idx < 3; i++) {
+    const c = raw[i];
+    if (c === '/') {
+      if (idx < 2 && out[idx].length > 0) { if (out[idx].length === 1) out[idx] = '0' + out[idx]; idx++; }
+      continue;
+    }
+    if (out[idx].length >= max[idx]) { idx++; if (idx >= 3) break; }
+    out[idx] += c;
+  }
+  let r = out[0];
+  if (idx >= 1 || (out[0].length === 2 && !isDelete)) r += '/';
+  if (idx >= 1) {
+    r += out[1];
+    if (idx >= 2 || (out[1].length === 2 && !isDelete)) r += '/';
+  }
+  if (idx >= 2) r += out[2];
+  return r;
+}
+// On leaving the field: complete short forms (1/2/26 → 01/02/2026) and validate
+function finalizeDateValue(value) {
+  const s = String(value || '').trim();
+  if (!s) return { value: '', valid: true };
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
+  if (!m) return { value: s, valid: false };
+  const d = parseInt(m[1], 10), mo = parseInt(m[2], 10);
+  let y = parseInt(m[3], 10); if (m[3].length === 2) y += 2000;
+  const dt = new Date(y, mo - 1, d);
+  const valid = dt.getFullYear() === y && dt.getMonth() === mo - 1 && dt.getDate() === d;
+  const v = String(d).padStart(2, '0') + '/' + String(mo).padStart(2, '0') + '/' + y;
+  return { value: valid ? v : s, valid };
+}
+document.addEventListener('input', function(e) {
+  const el = e.target;
+  if (!el || !el.dataset || !el.dataset.dateField) return;
+  const isDelete = !!(e.inputType && e.inputType.indexOf('delete') === 0);
+  const atEnd = el.selectionStart === el.value.length;
+  const formatted = formatDateTyping(el.value, isDelete);
+  if (formatted !== el.value) {
+    el.value = formatted;
+    if (atEnd) { try { el.setSelectionRange(formatted.length, formatted.length); } catch(_) {} }
+  }
+  el.classList.remove('date-invalid');
+});
+document.addEventListener('focusout', function(e) {
+  const el = e.target;
+  if (!el || !el.dataset || !el.dataset.dateField) return;
+  const r = finalizeDateValue(el.value);
+  el.value = r.value;
+  el.classList.toggle('date-invalid', !r.valid);
+});
 // Builds a DD/MM/YYYY text field with a 📅 calendar-picker button overlaid on it
 function dateFieldHtml(id, labelHtml) {
   return `<div class="form-group"><label>${labelHtml}</label>
     <div class="date-input-wrap">
-      <input type="text" id="${id}" placeholder="DD/MM/YYYY" autocomplete="off">
+      <input type="text" id="${id}" data-date-field="1" inputmode="numeric" maxlength="10" placeholder="DD/MM/YYYY" autocomplete="off">
       <span class="date-pick-icon">📅</span>
-      <input type="date" id="${id}-picker" class="date-picker-overlay" tabindex="-1" aria-label="בחר תאריך מלוח שנה" onfocus="syncDatePickerFromText('${id}')" onchange="onDatePicked('${id}', this)">
+      <span class="date-pick-box"><input type="date" id="${id}-picker" class="date-picker-overlay" tabindex="-1" aria-label="בחר תאריך מלוח שנה" onfocus="syncDatePickerFromText('${id}')" onchange="onDatePicked('${id}', this)"></span>
+      <div class="date-hint">תאריך לא תקין — יש להזין DD/MM/YYYY</div>
     </div>
   </div>`;
 }
@@ -2234,18 +2302,26 @@ async function saveEquipment() {
   };
   try {
     if (imageData) {
-      J.update(20, 'מעלה את תמונת התסקיר ל-Drive...');
-      J.creep(20, 75, 12000);
-      const imgRes = await apiPost({
-        action: 'saveImage',
-        data: { imageData, filename: 'eq_' + id + '_' + String(eqId).replace(/[^a-zA-Z0-9]/g,'_') }
-      });
+      // עד 2 ניסיונות, כל אחד מוגבל בזמן; אם שניהם נכשלים — אפשר לשמור בלי התמונה במקום להיתקע
+      let imgRes = null, imgErr = '';
+      for (let attempt = 1; attempt <= 2 && !(imgRes && imgRes.ok && imgRes.imageUrl); attempt++) {
+        J.update(20, attempt === 1 ? 'מעלה את תמונת התסקיר ל-Drive...' : 'ההעלאה לא הגיבה — מנסה שוב...');
+        J.creep(20, 75, 12000);
+        try {
+          imgRes = await apiPost({
+            action: 'saveImage',
+            data: { imageData, filename: 'eq_' + id + '_' + String(eqId).replace(/[^a-zA-Z0-9]/g,'_') }
+          }, 45000);
+          if (!(imgRes && imgRes.ok && imgRes.imageUrl)) imgErr = imgRes ? (imgRes.msg || JSON.stringify(imgRes)) : 'אין תגובה';
+        } catch (e) { imgRes = null; imgErr = e.message; }
+      }
       if (imgRes && imgRes.ok && imgRes.imageUrl) {
         imageUrl = imgRes.imageUrl;
       } else {
         J.fail('העלאת התמונה נכשלה');
-        alert('שגיאה בהעלאת תמונה: ' + (imgRes ? JSON.stringify(imgRes) : 'אין תגובה'));
-        return;
+        if (!confirm('העלאת תמונת התסקיר ל-Drive נכשלה: ' + imgErr + '\n\nלשמור את האמצעי בלי התמונה? (אפשר להוסיף אותה אחר כך בעריכה)')) return;
+        J.start(wasEditing ? 'מעדכן אמצעי' : 'שומר אמצעי', 'שומר בלי תמונה...', 80);
+        imageUrl = targetId ? existingRec.imageUrl || '' : '';
       }
     }
     J.update(85, 'שומר במערכת...');
@@ -2693,12 +2769,12 @@ const MODAL_OP_TEMPLATE = `<div class="modal-body">
         <div class="form-group"><label>פרופיל</label><input type="text" id="op-profile" placeholder="פרופיל" autocomplete="off"></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>תוקף רישיון אזרחי (DD/MM/YYYY)</label><input type="text" id="op-civilian-expiry" placeholder="DD/MM/YYYY" autocomplete="off"></div>
-        <div class="form-group"><label>תוקף רישיון צבאי (DD/MM/YYYY)</label><input type="text" id="op-military-expiry" placeholder="DD/MM/YYYY" autocomplete="off"></div>
+        ${dateFieldHtml('op-civilian-expiry', 'תוקף רישיון אזרחי (DD/MM/YYYY)')}
+        ${dateFieldHtml('op-military-expiry', 'תוקף רישיון צבאי (DD/MM/YYYY)')}
       </div>
       <div class="form-row">
-        <div class="form-group"><label>תוקף רישיון מנוף נייד (DD/MM/YYYY)</label><input type="text" id="op-crane-expiry" placeholder="DD/MM/YYYY" autocomplete="off"></div>
-        <div class="form-group"><label>תת"ש (DD/MM/YYYY)</label><input type="text" id="op-tatash" placeholder="DD/MM/YYYY" autocomplete="off"></div>
+        ${dateFieldHtml('op-crane-expiry', 'תוקף רישיון מנוף נייד (DD/MM/YYYY)')}
+        ${dateFieldHtml('op-tatash', 'תת"ש (DD/MM/YYYY)')}
       </div>
       <div class="form-group"><label>טלפון</label><input type="tel" id="op-phone" placeholder="050-000-0000" oninput="maskPhone(this)" maxlength="12"></div>
     </form>
