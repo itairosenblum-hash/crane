@@ -2088,6 +2088,8 @@ function rebuildModalBody() {
   prefilledFrom = null;
   const serialEl = document.getElementById('eq-serial');
   if (serialEl) serialEl.addEventListener('input', checkSerialDup);
+  const chassisEl = document.getElementById('eq-name');
+  if (chassisEl) chassisEl.addEventListener('input', checkSerialDup);
   const nextEl = document.getElementById('eq-next');
   if (nextEl) { nextEl.addEventListener('input', updateExpiryWarning); nextEl.addEventListener('change', updateExpiryWarning); }
 }
@@ -2219,7 +2221,15 @@ function canonicalType(t) {
   if (!c) return '';
   return displayType((appData.typeCanon && appData.typeCanon[typeKey(c)]) || c);
 }
-function normSerial(v) { return String(v || '').replace(/[\s'"׳״`\-]/g, '').replace(/^צ/, '').toLowerCase(); }
+// צ' מנורמל: בלי רווחים/מקפים/גרשיים, בלי האות צ ובלי אפסים מובילים (091145 = 91145)
+function normSerial(v) { return String(v || '').replace(/[\s'"׳״`\-]/g, '').replace(/^צ/, '').replace(/^0+/, '').toLowerCase(); }
+function normChassis(v) { return String(v || '').replace(/[\s\-_.\/]/g, '').toUpperCase(); }
+// אמצעי אחר עם אותו מספר שילדה (excludeIds: הרשומה הנערכת / הרשומה עם אותו צ')
+function findChassisDup(chassis, excludeIds) {
+  const n = normChassis(chassis);
+  if (!n) return null;
+  return appData.equipment.find(e => !excludeIds.includes(e.id) && normChassis(e.name) === n) || null;
+}
 function findSerialDup(serial, excludeId) {
   const n = normSerial(serial);
   if (!n) return null;
@@ -2283,6 +2293,8 @@ function checkSerialDup() {
   // השלמה מהרשומה הקיימת רק בהוספה (לא בעריכת אמצעי קיים)
   if (!editingEqId) { if (dup) prefillFromExisting(dup); else if (prefilledFrom != null) clearPrefill(); }
   box.innerHTML = dup ? `<div class="dup-warn">⚠️ צ' <b>${escHtml(el.value.trim())}</b> כבר קיים במערכת: ${escHtml(displayType(dup.type))} ${escHtml(dup.name || '')} · ${escHtml(getSiteName(dup.siteId))} · תסקיר ${escHtml(dup.eqId || '—')} · בדיקה הבאה ${escHtml(dup.nextCheck || '—')}.<br>בשמירה תישאל אם להחליף את התסקיר הקיים.</div>${(() => { const r = dupRecommendation(dup); return `<div class="dup-rec rec-${r.action}">${r.html}</div>`; })()}` : '';
+  const ch = findChassisDup((document.getElementById('eq-name') || {}).value, [editingEqId, dup && dup.id]);
+  if (ch) box.innerHTML += `<div class="dup-warn">⚠️ מספר שילדה <b>${escHtml(ch.name)}</b> כבר רשום על אמצעי אחר: צ' ${escHtml(ch.serialNumber || '—')} · ${escHtml(displayType(ch.type))} · ${escHtml(getSiteName(ch.siteId))} · בדיקה הבאה ${escHtml(ch.nextCheck || '—')}.<br>בדוק שהצ' ומספר השילדה נכונים — ייתכן שזה אותו כלי.</div>`;
   updateExpiryWarning();
 }
 // המלצה כשמעלים תסקיר לצ' שכבר קיים: להחליף / לא להחליף / זהה — לפי התוקף של כל אחד
@@ -2416,6 +2428,17 @@ async function saveEquipment() {
   if (dupEqId) {
     const proceed = confirm(`⚠️ מספר תסקיר "${eqId}" כבר קיים במערכת עבור: ${dupEqId.name} (${getSiteName(dupEqId.siteId)})\n\nהאם להמשיך בכל זאת ולשמור?`);
     if (!proceed) return;
+  }
+  const chassisDup = findChassisDup(name, [targetId, dupSerial && dupSerial.id]);
+  if (chassisDup) {
+    const c = await choiceDialog('מספר השילדה כבר קיים במערכת',
+      `שילדה <b>${escHtml(name)}</b> כבר רשומה על אמצעי אחר:<br>
+       צ' ${escHtml(chassisDup.serialNumber || '—')} · ${escHtml(displayType(chassisDup.type))} · ${escHtml(getSiteName(chassisDup.siteId))}<br>
+       תסקיר ${escHtml(chassisDup.eqId || '—')} · בדיקה הבאה ${escHtml(chassisDup.nextCheck || '—')}<br><br>
+       ייתכן שזה אותו כלי עם צ' שונה, או שמספר השילדה נקרא לא נכון.`,
+      [{ value: 'cancel', label: 'ביטול — לבדוק קודם', primary: true },
+       { value: 'save', label: 'לשמור בכל זאת' }]);
+    if (c !== 'save') return;
   }
   {
     const newNext = document.getElementById('eq-next').value.trim();
