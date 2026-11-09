@@ -336,6 +336,7 @@ tr:hover td { background: rgba(30,77,183,0.02); }
 .bulk-wait { display:flex; align-items:center; gap:10px; color:var(--blue); font-size:14px; padding:0.5rem 0 1rem; }
 .bulk-err { background:#fef2f2; border:1.5px solid #fecaca; color:#b91c1c; border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:1rem; font-size:13px; line-height:1.5; }
 .retry-btn { display:inline-flex; align-items:center; gap:6px; margin-top:8px; font-family:inherit; font-size:14px; font-weight:700; padding:9px 16px; border-radius:10px; border:none; background:var(--blue); color:#fff; cursor:pointer; }
+.expiry-warn { background:#fef2f2; border:1.5px solid #fca5a5; color:#991b1b; border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:1rem; font-size:13px; line-height:1.6; font-weight:500; }
 .dup-warn { background:#fff7ed; border:1.5px solid #fdba74; color:#9a3412; border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:1rem; font-size:13px; line-height:1.5; }
 .choice-overlay { position:fixed; inset:0; background:rgba(10,22,40,0.55); z-index:1100; display:flex; align-items:center; justify-content:center; padding:16px; }
 .choice-box { background:var(--card); border-radius:14px; max-width:440px; width:100%; padding:18px; box-shadow:0 20px 40px rgba(0,0,0,0.3); direction:rtl; }
@@ -2023,6 +2024,7 @@ const MODAL_EQ_TEMPLATE = `<div class="modal-body">
         <div class="ai-legend"><span class="ok">ירוק — קריאה בטוחה</span><span class="low">כתום — כדאי לבדוק</span><span class="missing">אדום — לא מופיע במסמך, להשלים ידנית</span><span class="old">לבן — הושלם מהנתונים הקיימים במערכת</span></div>
       </div>
       <div id="dup-warning"></div>
+      <div id="expiry-warning"></div>
       <div class="form-row">
         <div class="form-group"><label>מספר תסקיר *</label><input type="text" id="eq-id" placeholder="הזן מספר תסקיר" autocomplete="off"></div>
         <div class="form-group"><label>מספר רישוי / צ' (רישוי צבאי)</label><input type="text" id="eq-serial" placeholder="צ-12345" autocomplete="off" onblur="if(this.value.trim()){this.value=formatSerial(this.value);}"></div>
@@ -2081,6 +2083,8 @@ function rebuildModalBody() {
   prefilledFrom = null;
   const serialEl = document.getElementById('eq-serial');
   if (serialEl) serialEl.addEventListener('input', checkSerialDup);
+  const nextEl = document.getElementById('eq-next');
+  if (nextEl) { nextEl.addEventListener('input', updateExpiryWarning); nextEl.addEventListener('change', updateExpiryWarning); }
 }
 
 function openAddModal() {
@@ -2274,6 +2278,35 @@ function checkSerialDup() {
   // השלמה מהרשומה הקיימת רק בהוספה (לא בעריכת אמצעי קיים)
   if (!editingEqId) { if (dup) prefillFromExisting(dup); else if (prefilledFrom != null) clearPrefill(); }
   box.innerHTML = dup ? `<div class="dup-warn">⚠️ צ' <b>${escHtml(el.value.trim())}</b> כבר קיים במערכת: ${escHtml(displayType(dup.type))} ${escHtml(dup.name || '')} · ${escHtml(getSiteName(dup.siteId))} · תסקיר ${escHtml(dup.eqId || '—')} · בדיקה הבאה ${escHtml(dup.nextCheck || '—')}.<br>בשמירה תישאל אם להחליף את התסקיר הקיים.</div>` : '';
+  updateExpiryWarning();
+}
+// אזהרות תפוגה לתסקיר שמועלה: התאריך כבר עבר, או שהוא ישן יותר מהתסקיר שכבר שמור במערכת לאותו אמצעי
+function expiryWarnings(newNext, existing) {
+  const out = [];
+  const v = String(newNext || '').trim();
+  const nd = parseDate(v);
+  if (!nd) return out;
+  const od = existing ? parseDate(existing.nextCheck) : null;
+  if (od && nd < od) out.push(`התסקיר הזה <b>ישן יותר</b> מהתסקיר שכבר שמור במערכת: בדיקה הבאה ${escHtml(v)}, ובמערכת שמור ${escHtml(formatDate(existing.nextCheck))}.`);
+  const d = daysUntil(v);
+  if (d < 0) out.push(`תאריך הבדיקה הבאה בתסקיר (${escHtml(v)}) <b>כבר עבר</b> — התסקיר פג תוקף לפני ${Math.abs(d)} ימים.`);
+  return out;
+}
+// הרשומה הקיימת להשוואה: בעריכה — האמצעי הנערך; בהוספה — אמצעי עם אותו צ'
+function expiryCompareTarget() {
+  if (editingEqId) return appData.equipment.find(e => e.id === editingEqId) || null;
+  const el = document.getElementById('eq-serial');
+  return el ? findSerialDup(el.value, null) : null;
+}
+function updateExpiryWarning() {
+  const box = document.getElementById('expiry-warning');
+  const el = document.getElementById('eq-next');
+  if (!box || !el) return;
+  const target = expiryCompareTarget();
+  // בעריכה בלי שינוי התאריך — אין מה להתריע
+  if (editingEqId && target && String(el.value || '').trim() === String(target.nextCheck || '').trim()) { box.innerHTML = ''; return; }
+  const w = expiryWarnings(el.value, target);
+  box.innerHTML = w.length ? `<div class="expiry-warn">⛔ ${w.join('<br>⛔ ')}</div>` : '';
 }
 // חלון בחירה עם כמה כפתורים; מחזיר את הערך של הכפתור שנלחץ
 function choiceDialog(title, bodyHtml, buttons) {
@@ -2326,6 +2359,19 @@ async function saveEquipment() {
   if (dupEqId) {
     const proceed = confirm(`⚠️ מספר תסקיר "${eqId}" כבר קיים במערכת עבור: ${dupEqId.name} (${getSiteName(dupEqId.siteId)})\n\nהאם להמשיך בכל זאת ולשמור?`);
     if (!proceed) return;
+  }
+  {
+    const newNext = document.getElementById('eq-next').value.trim();
+    const cmp = targetId ? (appData.equipment.find(e => e.id === targetId) || null) : null;
+    const changed = !cmp || newNext !== String(cmp.nextCheck || '').trim();
+    const w = changed ? expiryWarnings(newNext, cmp) : [];
+    if (w.length) {
+      const choice = await choiceDialog('⚠️ שים לב לתאריך התפוגה',
+        w.join('<br><br>') + (cmp && parseDate(newNext) < parseDate(cmp.nextCheck) ? '<br><br>שמירה תחליף את התאריך החדש יותר בתאריך הישן.' : '') + '<br><br>לשמור בכל זאת?',
+        [{ value: 'save', label: 'כן, לשמור בכל זאת' },
+         { value: 'cancel', label: 'ביטול — לא לשמור', primary: true }]);
+      if (choice !== 'save') return;
+    }
   }
   if (saving) return;
   saving = true;
@@ -4034,6 +4080,7 @@ function closeModal(id) {
     const bar = document.getElementById('bulk-bar'); if (bar) { bar.style.display = 'none'; bar.innerHTML = ''; }
     const bs = document.getElementById('bulk-status'); if (bs) bs.innerHTML = '';
     const dw = document.getElementById('dup-warning'); if (dw) dw.innerHTML = '';
+    const xw = document.getElementById('expiry-warning'); if (xw) xw.innerHTML = '';
     clearAiMarks();
   }
   // If closing the operator modal, reset it fully
