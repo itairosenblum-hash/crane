@@ -2009,6 +2009,11 @@ async function toggleEquipmentDisabled(id, on, el) {
   try {
     await db.collection('equipment').doc(String(id)).set(patch, { merge: true });
     showToast(on ? 'האמצעי הושבת לב.ת ✓' : 'האמצעי חזר לפעילות ✓');
+    // חזרה מב.ת: תזכורת לעדכן מועדים ולהעלות תסקיר עדכני, עם קיצור לטופס העריכה
+    if (!on && confirm(`⚠️ ${e.serialNumber||'האמצעי'} חזר מב.ת\n\nלא לשכוח לעדכן:\n• מועד בדיקה הבאה\n• מועד ב.ת הבא\n• תסקיר עדכני\n\nלפתוח עכשיו את טופס העריכה?`)) {
+      closeModal('modal-view-eq');
+      editEquipment(id);
+    }
   } catch(err) {
     Object.assign(e, prev);
     viewEquipment(id); refreshCurrentTab();
