@@ -1781,7 +1781,7 @@ function renderDashboard() {
     return `<div class="alert-item ${cls}" onclick="viewEquipment(${e.id})">
       <div class="alert-dot ${cls}"></div>
       <div class="alert-info">
-        <div class="alert-name">${kindTag}🏗️ ${getSiteName(e.siteId)} · ${e.serialNumber||'—'} · ${e.type||'—'}</div>
+        <div class="alert-name">${kindTag}🏗️ ${getSiteName(e.siteId)} · ${e.serialNumber||'—'} · ${displayType(e.type)||'—'}</div>
         <div class="alert-meta">${metaLine}</div>
       </div>
       <span class="alert-days ${cls}">${daysTxt}</span>
@@ -1799,25 +1799,20 @@ function populateSiteFilter() {
   const sites = currentUser.role === 'admin' ? appData.sites : appData.sites.filter(s => s.id == currentUser.siteId);
   document.getElementById('filter-site').innerHTML = '<option value="">כל האתרים</option>' + sites.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
   // Populate type filter
-  const types = [...new Set(getUserEquipment().map(e => e.type).filter(Boolean))].sort((a,b) => a.localeCompare(b, 'he'));
+  const types = [...new Set(getUserEquipment().map(e => displayType(e.type)).filter(Boolean))].sort((a,b) => a.localeCompare(b, 'he'));
   const typeSel = document.getElementById('filter-type');
   const prevType = typeSel.value;
-  // משפחות סוגים: "עגורן" בסינון מציג את כל העגורנים (עגורן זרוע, עגורן אופני נייד וכו')
-  const opts = [];
-  types.forEach(t => {
-    const fam = TYPE_FAMILIES.find(f => typeInFamily(t, f));
-    if (fam && !opts.includes(fam + '*')) opts.push(fam + '*');
-    if (!fam || t !== fam) opts.push(t);
-  });
-  typeSel.innerHTML = '<option value="">כל הסוגים</option>' + opts.map(o => o.endsWith('*')
-    ? `<option value="${o}">${o.slice(0, -1)} (כל ה${o.slice(0, -1)}ים)</option>`
-    : `<option value="${o}">${o}</option>`).join('');
-  if (prevType && opts.includes(prevType)) typeSel.value = prevType;
+  typeSel.innerHTML = '<option value="">כל הסוגים</option>' + types.map(t => `<option value="${t}">${t}</option>`).join('');
+  if (prevType && types.includes(prevType)) typeSel.value = prevType;
 }
+// תצוגה: כל סוגי העגורנים (עגורן זרוע, עגורן אופני נייד...) מוצגים כ"עגורן" בלבד.
+// הסוג המלא נשמר בגיליון ובטופס העריכה ללא שינוי.
 const TYPE_FAMILIES = ['עגורן'];
-function typeInFamily(t, fam) { const c = String(t || '').trim(); return c === fam || c.startsWith(fam + ' '); }
-function typeMatchesFilter(t, tf) { return tf.endsWith('*') ? typeInFamily(t, tf.slice(0, -1)) : t === tf; }
-function typeFilterLabel(tf) { return tf.endsWith('*') ? tf.slice(0, -1) + ' (כל ה' + tf.slice(0, -1) + 'ים)' : tf; }
+function displayType(t) {
+  const c = String(t || '').trim();
+  const fam = TYPE_FAMILIES.find(f => c === f || c.startsWith(f + ' '));
+  return fam || c;
+}
 let equipmentStatusFilter = ''; // replaces the removed status dropdown; set by clicking a stat card
 function getFilteredEquipment() {
   let eqs = getUserEquipment();
@@ -1825,7 +1820,7 @@ function getFilteredEquipment() {
   const tf = document.getElementById('filter-type') ? document.getElementById('filter-type').value : '';
   const q = document.getElementById('filter-search').value.toLowerCase();
   if (sf) eqs = eqs.filter(e => e.siteId == sf);
-  if (tf) eqs = eqs.filter(e => typeMatchesFilter(e.type, tf));
+  if (tf) eqs = eqs.filter(e => displayType(e.type) === tf);
   if (equipmentStatusFilter) eqs = eqs.filter(e => getOverallStatus(e) === equipmentStatusFilter);
   if (q) eqs = eqs.filter(e => String(e.name||'').toLowerCase().includes(q) || String(e.eqId||'').toLowerCase().includes(q) || String(e.serialNumber||'').toLowerCase().includes(q) || String(e.type||'').toLowerCase().includes(q) || String(e.manufacturer||'').toLowerCase().includes(q) || String(getSiteName(e.siteId)||'').toLowerCase().includes(q));
   return eqs;
@@ -1847,7 +1842,7 @@ function renderEquipmentTable() {
   const eqs = getFilteredEquipment();
   const byType = {};
   eqs.forEach(e => {
-    const t = e.type || 'אחר';
+    const t = displayType(e.type) || 'אחר';
     if (!byType[t]) byType[t] = [];
     byType[t].push(e);
   });
@@ -1904,7 +1899,7 @@ function viewEquipment(id) {
       ['מספר רישוי / צ\' (רישוי צבאי)',`<strong style="color:var(--blue)">${e.serialNumber||'—'}</strong>`],
       ['מספר תסקיר', e.eqId||'—'],
       ['שנת יצור', e.manufacturingYear||'—'],
-      ['סוג', e.type||'—'],
+      ['סוג', displayType(e.type)||'—'],
       ['יצרן', e.manufacturer||'—'],
       ['מס\' שילדה', e.name||'—'],
       ['מיקום', e.location||'—'],
@@ -2272,7 +2267,7 @@ function checkSerialDup() {
   const dup = findSerialDup(el.value, editingEqId);
   // השלמה מהרשומה הקיימת רק בהוספה (לא בעריכת אמצעי קיים)
   if (!editingEqId) { if (dup) prefillFromExisting(dup); else if (prefilledFrom != null) clearPrefill(); }
-  box.innerHTML = dup ? `<div class="dup-warn">⚠️ צ' <b>${escHtml(el.value.trim())}</b> כבר קיים במערכת: ${escHtml(dup.type || '')} ${escHtml(dup.name || '')} · ${escHtml(getSiteName(dup.siteId))} · תסקיר ${escHtml(dup.eqId || '—')} · בדיקה הבאה ${escHtml(dup.nextCheck || '—')}.<br>בשמירה תישאל אם להחליף את התסקיר הקיים.</div>` : '';
+  box.innerHTML = dup ? `<div class="dup-warn">⚠️ צ' <b>${escHtml(el.value.trim())}</b> כבר קיים במערכת: ${escHtml(displayType(dup.type))} ${escHtml(dup.name || '')} · ${escHtml(getSiteName(dup.siteId))} · תסקיר ${escHtml(dup.eqId || '—')} · בדיקה הבאה ${escHtml(dup.nextCheck || '—')}.<br>בשמירה תישאל אם להחליף את התסקיר הקיים.</div>` : '';
 }
 // חלון בחירה עם כמה כפתורים; מחזיר את הערך של הכפתור שנלחץ
 function choiceDialog(title, bodyHtml, buttons) {
@@ -2311,7 +2306,7 @@ async function saveEquipment() {
   if (dupSerial) {
     const choice = await choiceDialog('הצ\' הזה כבר קיים במערכת',
       `צ' <b>${escHtml(serialNumberVal)}</b> שייך לאמצעי קיים:<br>
-       ${escHtml(dupSerial.type || '')} ${escHtml(dupSerial.name || '')} · ${escHtml(getSiteName(dupSerial.siteId))}<br>
+       ${escHtml(displayType(dupSerial.type))} ${escHtml(dupSerial.name || '')} · ${escHtml(getSiteName(dupSerial.siteId))}<br>
        תסקיר ${escHtml(dupSerial.eqId || '—')} · בדיקה אחרונה ${escHtml(dupSerial.lastCheck || '—')} · בדיקה הבאה ${escHtml(dupSerial.nextCheck || '—')}<br><br>
        להחליף את התסקיר הקיים בתסקיר החדש? הנתונים של האמצעי יעודכנו לפי התסקיר החדש.`,
       [{ value: 'replace', label: 'כן, להחליף את התסקיר הקיים', primary: true },
@@ -3326,7 +3321,7 @@ function renderSitesNew() {
     // Group by type
     const byType = {};
     siteEqs.forEach(e => {
-      const t = e.type || 'אחר';
+      const t = displayType(e.type) || 'אחר';
       if (!byType[t]) byType[t] = [];
       byType[t].push(e);
     });
@@ -3428,7 +3423,7 @@ function generateEquipmentPageWorkPlan(rangeStart, rangeEnd) {
   const personName = sf ? getSiteName(sf) : (currentUser.role === 'admin' ? 'כל האתרים' : (currentUser.fullname || currentUser.username));
   const statusLabels = { ok: 'תקין', warn: 'קרוב לבדיקה', danger: 'דחוף / פג תוקף' };
   const filterParts = [];
-  if (tf) filterParts.push('סוג: ' + typeFilterLabel(tf));
+  if (tf) filterParts.push('סוג: ' + tf);
   if (stf) filterParts.push('סטטוס: ' + (statusLabels[stf] || stf));
   if (q) filterParts.push(`חיפוש: "${q}"`);
   const filterSubtitle = filterParts.length ? ' · ' + filterParts.join(' · ') : '';
@@ -3461,7 +3456,7 @@ function generateEquipmentPageWorkPlan(rangeStart, rangeEnd) {
       if (monthIdx < startMonthIdx) return; // before the selected range — not relevant
       const daysFromToday = Math.round((d - today) / 86400000);
       const cls = daysFromToday <= 14 ? 'danger' : daysFromToday <= 30 ? 'warn' : 'ok';
-      const text = `${getSiteName(e.siteId)} · ${e.serialNumber || e.eqId || '—'} · ${e.type || '—'} · ${cf.label}`;
+      const text = `${getSiteName(e.siteId)} · ${e.serialNumber || e.eqId || '—'} · ${displayType(e.type) || '—'} · ${cf.label}`;
       const item = { text, cls };
       totalEvents++;
       if (monthIdx > endMonthIdx) { beyondHorizon.push({ text: `${text} — ${formatDate(val)}`, cls }); return; }
@@ -3918,7 +3913,7 @@ function loadExpiryReminders() {
     const greeting = name ? `שלום ${name},\n\n` : 'שלום,\n\n';
     const lines = items.map((d, i) => {
       const e = d.eq;
-      return `${i+1}. 🔧 *רישוי: ${e.serialNumber||'—'}* (${e.type||''})\n   🪪 שילדה: ${e.name||'—'}  |  📋 תסקיר: ${e.eqId}\n   📍 ${getSiteName(e.siteId)}\n   📅 ${d.label}: ${formatDate(d.date)} — ${dLabelFor(d.days)}`;
+      return `${i+1}. 🔧 *רישוי: ${e.serialNumber||'—'}* (${displayType(e.type)})\n   🪪 שילדה: ${e.name||'—'}  |  📋 תסקיר: ${e.eqId}\n   📍 ${getSiteName(e.siteId)}\n   📅 ${d.label}: ${formatDate(d.date)} — ${dLabelFor(d.days)}`;
     }).join('\n\n');
     return greeting + `תזכורת — האמצעים הבאים דורשים תיאום בדיקה:\n\n${lines}\n\nנא לתאם בהקדם האפשרי.\n\nמערכת תסקירי הבטיחות — מדור צהר"מ זרוע הים`;
   }
@@ -3926,7 +3921,7 @@ function loadExpiryReminders() {
   function buildSingleMsg(d) {
     const e = d.eq;
     const what = d.waWhat || 'תסקיר הבטיחות';
-    return `שלום,\n\nתזכורת: ${what} של האמצעי הבא עומד לפוג:\n\n🔧 *רישוי: ${e.serialNumber||'—'}* (${e.type||''})\n🪪 שילדה: ${e.name||'—'}\n📋 תסקיר: ${e.eqId}\n📍 אתר: ${getSiteName(e.siteId)}\n📅 ${d.label}: ${formatDate(d.date)} (${dLabelFor(d.days)})\n\nנא לתאם בדיקה חדשה בהקדם.\n\nמערכת תסקירי הבטיחות — מדור צהר"מ זרוע הים`;
+    return `שלום,\n\nתזכורת: ${what} של האמצעי הבא עומד לפוג:\n\n🔧 *רישוי: ${e.serialNumber||'—'}* (${displayType(e.type)})\n🪪 שילדה: ${e.name||'—'}\n📋 תסקיר: ${e.eqId}\n📍 אתר: ${getSiteName(e.siteId)}\n📅 ${d.label}: ${formatDate(d.date)} (${dLabelFor(d.days)})\n\nנא לתאם בדיקה חדשה בהקדם.\n\nמערכת תסקירי הבטיחות — מדור צהר"מ זרוע הים`;
   }
 
   let html = '';
@@ -3962,7 +3957,7 @@ function loadExpiryReminders() {
       html += `<div class="alert-item ${cls}" style="margin-bottom:8px">
         <div class="alert-dot ${cls}"></div>
         <div class="alert-info">
-          <div class="alert-name">${kindTag}${getSiteName(e.siteId)} · ${e.serialNumber||'—'} · ${e.type||'—'}</div>
+          <div class="alert-name">${kindTag}${getSiteName(e.siteId)} · ${e.serialNumber||'—'} · ${displayType(e.type)||'—'}</div>
           <div class="alert-meta">שילדה: ${e.name||'—'} · 📅 ${d.label}: ${formatDate(d.date)} · ${dLabel}</div>
           ${responsible
             ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">אחראי: ${responsible.fullname||responsible.username} ${formatPhone(responsible.phone)}</div>`
