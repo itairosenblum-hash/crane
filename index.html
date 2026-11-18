@@ -371,6 +371,30 @@ tr:hover td { background: rgba(30,77,183,0.02); }
 .choice-box .choice-btns { display:flex; flex-direction:column; gap:8px; }
 .choice-box .choice-btns button { font-family:inherit; font-size:15px; padding:12px; border-radius:10px; border:1.5px solid var(--border); background:var(--card); cursor:pointer; font-weight:600; }
 .choice-box .choice-btns button.primary { background:var(--blue); border-color:var(--blue); color:#fff; }
+/* ===== CAMERA AUTO-CROP & DESKEW ===== */
+.autocrop-toggle { display:flex; align-items:center; justify-content:center; gap:8px; margin-top:10px; font-size:13px; color:var(--text); cursor:pointer; user-select:none; }
+.autocrop-toggle input { width:18px; height:18px; accent-color:var(--blue); cursor:pointer; }
+.autocrop-toggle small { color:var(--text-muted); font-size:11px; }
+#crop-overlay { position:fixed; inset:0; z-index:1050; background:#0a1628; display:none; flex-direction:column; direction:rtl; color:white; touch-action:none; }
+#crop-overlay.open { display:flex; }
+.crop-head { padding:10px 14px; padding-top:calc(10px + env(safe-area-inset-top)); font-size:15px; font-weight:700; border-bottom:2px solid var(--accent); }
+.crop-head span { display:block; font-size:12px; font-weight:400; color:#94a3b8; margin-top:2px; }
+.crop-stage { flex:1; min-height:0; display:flex; align-items:center; justify-content:center; padding:18px; position:relative; overflow:hidden; }
+.crop-box { position:relative; }
+.crop-box canvas { display:block; }
+.crop-box svg { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible; }
+.crop-h { position:absolute; width:44px; height:44px; margin:-22px 0 0 -22px; touch-action:none; cursor:grab; z-index:2; }
+.crop-h::after { content:''; position:absolute; inset:11px; border-radius:50%; background:rgba(245,158,11,0.35); border:3px solid #f59e0b; box-shadow:0 0 0 2px rgba(0,0,0,0.35); }
+.crop-h.drag::after { background:rgba(245,158,11,0.7); }
+.crop-loupe { position:absolute; top:12px; width:110px; height:110px; border-radius:50%; border:3px solid #f59e0b; box-shadow:0 4px 14px rgba(0,0,0,0.5); display:none; z-index:3; pointer-events:none; background:#000; }
+.crop-tools { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; padding:8px 12px; }
+.crop-tools button, .crop-tools label { font-family:inherit; font-size:13px; padding:7px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.08); color:#e2e8f0; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+.crop-tools input { width:16px; height:16px; accent-color:#f59e0b; }
+.crop-actions { display:grid; grid-template-columns:1fr 1fr 1.4fr; gap:8px; padding:10px 12px; padding-bottom:calc(10px + env(safe-area-inset-bottom)); border-top:1px solid rgba(255,255,255,0.1); }
+.crop-actions button { font-family:inherit; font-size:14px; font-weight:600; padding:12px 8px; border-radius:10px; border:1.5px solid rgba(255,255,255,0.2); background:transparent; color:#e2e8f0; cursor:pointer; }
+.crop-actions button.primary { background:var(--blue); border-color:var(--blue); color:white; }
+.crop-actions button:disabled { opacity:0.5; }
+.crop-msg { text-align:center; font-size:12px; color:#fbbf24; min-height:16px; padding:0 12px; }
 #job-panel { position:fixed; top:12px; left:50%; transform:translateX(-50%); z-index:1000; width:min(420px, calc(100% - 32px)); background:var(--card); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.25); padding:12px 14px; display:none; direction:rtl; border:1px solid var(--border); }
 #job-panel.show { display:block; }
 #job-panel .jp-head { display:flex; align-items:center; gap:8px; font-weight:700; font-size:14px; color:var(--text); }
@@ -2109,6 +2133,7 @@ const MODAL_EQ_TEMPLATE = `<div class="modal-body">
             <span style="font-size:26px">📄</span>PDF
           </button>
         </div>
+        <label class="autocrop-toggle"><input type="checkbox" id="autocrop-toggle" onchange="setAutoCrop(this.checked)"> ✂️ חיתוך ויישור אוטומטי בצילום <small>(Auto-crop &amp; Deskew)</small></label>
       </div>
       <img id="img-preview" class="img-preview">
       <div id="ai-loading" style="display:none"><div class="loading"><div class="spinner"></div>AI מנתח את התמונה...</div></div>
@@ -2162,8 +2187,15 @@ function rebuildModalBody() {
   // Re-attach file input handlers
   ['file-input-camera','file-input-gallery','file-input-pdf'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.onchange = function() { handlePickedFiles(this.files); this.value = ''; };
+    if (el) el.onchange = function() {
+      const files = Array.from(this.files || []);
+      this.value = '';
+      if (id === 'file-input-camera' && files.length === 1 && !bulk && autoCropEnabled() && files[0].type.startsWith('image/')) openCropEditor(files[0]);
+      else handlePickedFiles(files);
+    };
   });
+  const acT = document.getElementById('autocrop-toggle');
+  if (acT) acT.checked = autoCropEnabled();
   // Re-attach drop zone events
   const zone = document.getElementById('upload-zone');
   if (zone) {
@@ -2711,6 +2743,361 @@ function handlePickedFiles(fileList) {
   if (editingEqId) { alert('טעינה של כמה תסקירים אפשרית רק בהוספת אמצעים חדשים'); return; }
   startBulk(files);
 }
+// ===== צילום: חיתוך ויישור אוטומטי (Auto-crop & Deskew) =====
+const AUTOCROP_KEY = 'camera_autocrop';
+function autoCropEnabled() { return localStorage.getItem(AUTOCROP_KEY) !== '0'; }
+function setAutoCrop(on) { localStorage.setItem(AUTOCROP_KEY, on ? '1' : '0'); showToast(on ? 'חיתוך ויישור אוטומטי הופעל ✂️' : 'חיתוך ויישור אוטומטי כובה'); }
+
+let cropState = null;
+
+function loadImageFile(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('לא ניתן לקרוא את התמונה')); };
+    img.src = url;
+  });
+}
+
+// --- זיהוי שולי המסמך: סף Otsu → הרכיב הבהיר (המסמך) → קמור → צמצום ל-4 פינות ---
+function detectDocumentQuad(src) {
+  const S = 360;
+  const r = Math.min(1, S / Math.max(src.width, src.height));
+  const w = Math.max(8, Math.round(src.width * r)), h = Math.max(8, Math.round(src.height * r));
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const cx = c.getContext('2d'); cx.drawImage(src, 0, 0, w, h);
+  const px = cx.getImageData(0, 0, w, h).data;
+  let g = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) g[i] = 0.299 * px[i * 4] + 0.587 * px[i * 4 + 1] + 0.114 * px[i * 4 + 2];
+  // טשטוש (box blur 5x5, פעמיים) כדי שהטקסט לא יחורר את המסמך
+  const tmp = new Float32Array(w * h), R = 2;
+  for (let pass = 0; pass < 2; pass++) {
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      let s = 0, n = 0; for (let k = -R; k <= R; k++) { const xx = x + k; if (xx >= 0 && xx < w) { s += g[y * w + xx]; n++; } }
+      tmp[y * w + x] = s / n;
+    }
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      let s = 0, n = 0; for (let k = -R; k <= R; k++) { const yy = y + k; if (yy >= 0 && yy < h) { s += tmp[yy * w + x]; n++; } }
+      g[y * w + x] = s / n;
+    }
+  }
+  // Otsu
+  const hist = new Array(256).fill(0);
+  for (let i = 0; i < w * h; i++) hist[Math.min(255, g[i] | 0)]++;
+  let sum = 0; for (let i = 0; i < 256; i++) sum += i * hist[i];
+  let sB = 0, wB = 0, best = 0, t = 128;
+  for (let i = 0; i < 256; i++) {
+    wB += hist[i]; if (!wB) continue; const wF = w * h - wB; if (!wF) break;
+    sB += i * hist[i]; const mB = sB / wB, mF = (sum - sB) / wF; const v = wB * wF * (mB - mF) * (mB - mF);
+    if (v > best) { best = v; t = i; }
+  }
+  const fg = new Uint8Array(w * h); for (let i = 0; i < w * h; i++) fg[i] = g[i] > t ? 1 : 0;
+  // רכיבים קשירים — מעדיפים את הרכיב שבמרכז התמונה, אחרת הגדול ביותר
+  const lab = new Int32Array(w * h), stack = new Int32Array(w * h);
+  const areas = [0]; let nl = 0;
+  for (let i = 0; i < w * h; i++) {
+    if (!fg[i] || lab[i]) continue;
+    nl++; let sp = 0, a = 0; stack[sp++] = i; lab[i] = nl;
+    while (sp) {
+      const p = stack[--sp]; a++; const x = p % w, y = (p / w) | 0;
+      if (x > 0 && fg[p - 1] && !lab[p - 1]) { lab[p - 1] = nl; stack[sp++] = p - 1; }
+      if (x < w - 1 && fg[p + 1] && !lab[p + 1]) { lab[p + 1] = nl; stack[sp++] = p + 1; }
+      if (y > 0 && fg[p - w] && !lab[p - w]) { lab[p - w] = nl; stack[sp++] = p - w; }
+      if (y < h - 1 && fg[p + w] && !lab[p + w]) { lab[p + w] = nl; stack[sp++] = p + w; }
+    }
+    areas.push(a);
+  }
+  if (!nl) return null;
+  let pick = 0, maxA = 0;
+  for (let l = 1; l <= nl; l++) if (areas[l] > maxA) { maxA = areas[l]; pick = l; }
+  const centerL = lab[((h / 2) | 0) * w + ((w / 2) | 0)];
+  if (centerL && areas[centerL] >= 0.15 * w * h) pick = centerL;
+  if (areas[pick] < 0.12 * w * h) return null;
+  // נקודות שוליים (שמאל/ימין בכל שורה) → קמור
+  const pts = [];
+  for (let y = 0; y < h; y++) {
+    let L = -1, Rr = -1;
+    for (let x = 0; x < w; x++) if (lab[y * w + x] === pick) { if (L < 0) L = x; Rr = x; }
+    if (L >= 0) { pts.push([L, y]); if (Rr !== L) pts.push([Rr, y]); }
+  }
+  for (let x = 0; x < w; x++) {
+    let T = -1, B = -1;
+    for (let y = 0; y < h; y++) if (lab[y * w + x] === pick) { if (T < 0) T = y; B = y; }
+    if (T >= 0) { pts.push([x, T]); if (B !== T) pts.push([x, B]); }
+  }
+  let hull = convexHull(pts);
+  if (hull.length < 4) return null;
+  // צמצום הקמור ל-4 קודקודים: מסירים כל פעם את הקודקוד שתורם הכי מעט שטח
+  const triA = (a, b, c2) => Math.abs((b[0] - a[0]) * (c2[1] - a[1]) - (c2[0] - a[0]) * (b[1] - a[1])) / 2;
+  while (hull.length > 4) {
+    let mi = 0, mv = Infinity;
+    for (let i = 0; i < hull.length; i++) {
+      const v = triA(hull[(i - 1 + hull.length) % hull.length], hull[i], hull[(i + 1) % hull.length]);
+      if (v < mv) { mv = v; mi = i; }
+    }
+    hull.splice(mi, 1);
+  }
+  const quad = orderQuad(hull.map(p => p.slice()));
+  const refined = refineQuad(quad, pts, w, h);
+  const final = (refined || quad).map(p => [Math.max(0, Math.min(src.width, p[0] / r)), Math.max(0, Math.min(src.height, p[1] / r))]);
+  return polyArea(final) < 0.12 * src.width * src.height ? null : final;
+}
+// מדייק את הפינות: מתאים קו ישר לכל צלע (לפי נקודות השוליים שלידה) וחותך בין צלעות סמוכות
+function refineQuad(q, pts, w, h) {
+  const diag = Math.hypot(w, h), tol = diag * 0.03;
+  const lines = [];
+  for (let e = 0; e < 4; e++) {
+    const a = q[e], b = q[(e + 1) % 4];
+    const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy); if (len < 4) return null;
+    const ux = dx / len, uy = dy / len;
+    const sel = pts.filter(p => {
+      const t = ((p[0] - a[0]) * ux + (p[1] - a[1]) * uy) / len;
+      if (t < 0.12 || t > 0.88) return false;
+      // לא להשתמש בנקודות שעל גבול התמונה (מסמך חתוך במסגרת)
+      if (p[0] <= 0 || p[1] <= 0 || p[0] >= w - 1 || p[1] >= h - 1) return false;
+      return Math.abs((p[0] - a[0]) * uy - (p[1] - a[1]) * ux) < tol;
+    });
+    if (sel.length < 6) { lines.push(null); continue; }
+    let mx = 0, my = 0; sel.forEach(p => { mx += p[0]; my += p[1]; }); mx /= sel.length; my /= sel.length;
+    let sxx = 0, syy = 0, sxy = 0; sel.forEach(p => { const X = p[0] - mx, Y = p[1] - my; sxx += X * X; syy += Y * Y; sxy += X * Y; });
+    const ang = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+    lines.push({ px: mx, py: my, dx: Math.cos(ang), dy: Math.sin(ang) });
+  }
+  const out = [];
+  for (let i = 0; i < 4; i++) {
+    const L1 = lines[(i + 3) % 4], L2 = lines[i];
+    if (!L1 || !L2) { out.push(q[i].slice()); continue; }
+    const den = L1.dx * L2.dy - L1.dy * L2.dx;
+    if (Math.abs(den) < 0.15) { out.push(q[i].slice()); continue; }
+    const t = ((L2.px - L1.px) * L2.dy - (L2.py - L1.py) * L2.dx) / den;
+    const p = [L1.px + t * L1.dx, L1.py + t * L1.dy];
+    if (Math.hypot(p[0] - q[i][0], p[1] - q[i][1]) > diag * 0.08) { out.push(q[i].slice()); continue; }
+    out.push(p);
+  }
+  return out;
+}
+function convexHull(points) {
+  const p = points.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  if (p.length < 3) return p;
+  const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lo = [], up = [];
+  for (const q of p) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); }
+  for (let i = p.length - 1; i >= 0; i--) { const q = p[i]; while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); }
+  up.pop(); lo.pop();
+  return lo.concat(up);
+}
+function polyArea(q) { let a = 0; for (let i = 0; i < q.length; i++) { const j = (i + 1) % q.length; a += q[i][0] * q[j][1] - q[j][0] * q[i][1]; } return Math.abs(a) / 2; }
+// סדר קבוע: שמאל-עליון, ימין-עליון, ימין-תחתון, שמאל-תחתון
+function orderQuad(q) {
+  const cx = q.reduce((s, p) => s + p[0], 0) / 4, cy = q.reduce((s, p) => s + p[1], 0) / 4;
+  const s = q.slice().sort((a, b) => Math.atan2(a[1] - cy, a[0] - cx) - Math.atan2(b[1] - cy, b[0] - cx));
+  let k = 0; for (let i = 1; i < 4; i++) if (s[i][0] + s[i][1] < s[k][0] + s[k][1]) k = i;
+  return [0, 1, 2, 3].map(i => s[(k + i) % 4].slice());
+}
+function fullQuad(src, inset) {
+  const dx = src.width * (inset || 0), dy = src.height * (inset || 0);
+  return [[dx, dy], [src.width - dx, dy], [src.width - dx, src.height - dy], [dx, src.height - dy]];
+}
+
+// --- יישור פרספקטיבה (homography) ---
+function solveHomography(from, to) {
+  // מוצא H כך ש-to = H·from (8 נעלמים)
+  const A = [], b = [];
+  for (let i = 0; i < 4; i++) {
+    const [x, y] = from[i], [u, v] = to[i];
+    A.push([x, y, 1, 0, 0, 0, -u * x, -u * y]); b.push(u);
+    A.push([0, 0, 0, x, y, 1, -v * x, -v * y]); b.push(v);
+  }
+  for (let c = 0; c < 8; c++) {
+    let m = c; for (let r2 = c + 1; r2 < 8; r2++) if (Math.abs(A[r2][c]) > Math.abs(A[m][c])) m = r2;
+    [A[c], A[m]] = [A[m], A[c]]; [b[c], b[m]] = [b[m], b[c]];
+    const d = A[c][c]; if (Math.abs(d) < 1e-12) return null;
+    for (let r2 = 0; r2 < 8; r2++) {
+      if (r2 === c) continue; const f = A[r2][c] / d; if (!f) continue;
+      for (let k = c; k < 8; k++) A[r2][k] -= f * A[c][k]; b[r2] -= f * b[c];
+    }
+  }
+  return b.map((v, i) => v / A[i][i]);
+}
+function warpQuad(src, quad) {
+  const q = orderQuad(quad);
+  const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+  let W = Math.max(dist(q[0], q[1]), dist(q[3], q[2])), H = Math.max(dist(q[0], q[3]), dist(q[1], q[2]));
+  const k = Math.min(1, 2400 / Math.max(W, H));
+  W = Math.max(16, Math.round(W * k)); H = Math.max(16, Math.round(H * k));
+  const h = solveHomography([[0, 0], [W, 0], [W, H], [0, H]], q);
+  if (!h) return null;
+  const sw = src.width, sh = src.height;
+  const sd = src.getContext('2d').getImageData(0, 0, sw, sh).data;
+  const out = document.createElement('canvas'); out.width = W; out.height = H;
+  const octx = out.getContext('2d'); const od = octx.createImageData(W, H); const o = od.data;
+  for (let y = 0; y < H; y++) {
+    const yy = y + 0.5;
+    for (let x = 0; x < W; x++) {
+      const xx = x + 0.5;
+      const d = h[6] * xx + h[7] * yy + 1;
+      let sx = (h[0] * xx + h[1] * yy + h[2]) / d - 0.5, sy = (h[3] * xx + h[4] * yy + h[5]) / d - 0.5;
+      if (sx < 0) sx = 0; else if (sx > sw - 1.001) sx = sw - 1.001;
+      if (sy < 0) sy = 0; else if (sy > sh - 1.001) sy = sh - 1.001;
+      const x0 = sx | 0, y0 = sy | 0, fx = sx - x0, fy = sy - y0;
+      const i00 = (y0 * sw + x0) * 4, i10 = i00 + 4, i01 = i00 + sw * 4, i11 = i01 + 4;
+      const oi = (y * W + x) * 4;
+      for (let c = 0; c < 3; c++) {
+        const top = sd[i00 + c] + (sd[i10 + c] - sd[i00 + c]) * fx;
+        const bot = sd[i01 + c] + (sd[i11 + c] - sd[i01 + c]) * fx;
+        o[oi + c] = top + (bot - top) * fy;
+      }
+      o[oi + 3] = 255;
+    }
+  }
+  octx.putImageData(od, 0, 0);
+  return out;
+}
+// הבהרת מסמך: מתיחת ניגודיות לפי אחוזונים (שומר על צבע החותמות)
+function enhanceDocument(canvas) {
+  const ctx = canvas.getContext('2d');
+  const im = ctx.getImageData(0, 0, canvas.width, canvas.height), d = im.data, n = d.length / 4;
+  const hist = new Uint32Array(256);
+  for (let i = 0; i < d.length; i += 4) hist[(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) | 0]++;
+  let acc = 0, lo = 0, hi = 255;
+  for (let i = 0; i < 256; i++) { acc += hist[i]; if (acc >= n * 0.02) { lo = i; break; } }
+  acc = 0; for (let i = 255; i >= 0; i--) { acc += hist[i]; if (acc >= n * 0.10) { hi = i; break; } }
+  if (hi - lo < 40) return canvas;
+  const lut = new Uint8ClampedArray(256);
+  for (let i = 0; i < 256; i++) lut[i] = (i - lo) * 255 / (hi - lo);
+  for (let i = 0; i < d.length; i += 4) { d[i] = lut[d[i]]; d[i + 1] = lut[d[i + 1]]; d[i + 2] = lut[d[i + 2]]; }
+  ctx.putImageData(im, 0, 0);
+  return canvas;
+}
+
+// --- מסך העריכה ---
+function ensureCropOverlay() {
+  let ov = document.getElementById('crop-overlay');
+  if (ov) return ov;
+  ov = document.createElement('div');
+  ov.id = 'crop-overlay';
+  ov.innerHTML = `
+    <div class="crop-head">✂️ חיתוך ויישור התסקיר<span>הפינות זוהו אוטומטית — אפשר לגרור כל פינה לשולי המסמך</span></div>
+    <div class="crop-stage" id="crop-stage">
+      <div class="crop-box" id="crop-box">
+        <canvas id="crop-canvas"></canvas>
+        <svg id="crop-svg"><path id="crop-mask" fill="rgba(10,22,40,0.6)" fill-rule="evenodd"/><polygon id="crop-poly" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linejoin="round"/></svg>
+        <div class="crop-h" data-i="0"></div><div class="crop-h" data-i="1"></div><div class="crop-h" data-i="2"></div><div class="crop-h" data-i="3"></div>
+      </div>
+      <canvas class="crop-loupe" id="crop-loupe" width="220" height="220"></canvas>
+    </div>
+    <div class="crop-msg" id="crop-msg"></div>
+    <div class="crop-tools">
+      <button type="button" onclick="cropReset('auto')">🎯 זיהוי אוטומטי</button>
+      <button type="button" onclick="cropReset('full')">⛶ כל התמונה</button>
+      <label><input type="checkbox" id="crop-enhance" checked> ☀️ הבהרת מסמך</label>
+    </div>
+    <div class="crop-actions">
+      <button type="button" onclick="cropCancel()">ביטול</button>
+      <button type="button" onclick="cropSkip()">ללא חיתוך</button>
+      <button type="button" class="primary" id="crop-apply-btn" onclick="cropApply()">✓ חתוך ויישר</button>
+    </div>`;
+  document.body.appendChild(ov);
+  ov.querySelectorAll('.crop-h').forEach(hd => {
+    const i = +hd.dataset.i;
+    hd.addEventListener('pointerdown', e => {
+      if (!cropState) return;
+      e.preventDefault(); hd.setPointerCapture(e.pointerId); hd.classList.add('drag');
+      const box = document.getElementById('crop-box').getBoundingClientRect();
+      const p = cropState.quad[i];
+      cropState.drag = { i, offX: e.clientX - (box.left + p[0] * cropState.scale), offY: e.clientY - (box.top + p[1] * cropState.scale) };
+      cropMove(e);
+    });
+    hd.addEventListener('pointermove', e => { if (cropState && cropState.drag && cropState.drag.i === i) cropMove(e); });
+    const end = () => { hd.classList.remove('drag'); if (cropState) cropState.drag = null; document.getElementById('crop-loupe').style.display = 'none'; };
+    hd.addEventListener('pointerup', end); hd.addEventListener('pointercancel', end);
+  });
+  window.addEventListener('resize', () => { if (cropState) cropLayout(); });
+  return ov;
+}
+function cropMove(e) {
+  const st = cropState, dr = st.drag; if (!dr) return;
+  const box = document.getElementById('crop-box').getBoundingClientRect();
+  let x = (e.clientX - dr.offX - box.left) / st.scale, y = (e.clientY - dr.offY - box.top) / st.scale;
+  x = Math.max(0, Math.min(st.src.width, x)); y = Math.max(0, Math.min(st.src.height, y));
+  st.quad[dr.i] = [x, y];
+  cropRender();
+  // זכוכית מגדלת לדיוק באצבע
+  const lp = document.getElementById('crop-loupe'), lc = lp.getContext('2d');
+  const reg = 55 / (st.scale * 3); // חצי רוחב האזור בפיקסלי מקור — הגדלה פי 3
+  lc.fillStyle = '#000'; lc.fillRect(0, 0, 220, 220);
+  lc.drawImage(st.src, x - reg, y - reg, reg * 2, reg * 2, 0, 0, 220, 220);
+  lc.strokeStyle = '#f59e0b'; lc.lineWidth = 2; lc.beginPath(); lc.moveTo(110, 80); lc.lineTo(110, 140); lc.moveTo(80, 110); lc.lineTo(140, 110); lc.stroke();
+  const stage = document.getElementById('crop-stage').getBoundingClientRect();
+  lp.style.display = 'block';
+  lp.style.left = (e.clientX - stage.left < stage.width / 2) ? (stage.width - 122) + 'px' : '12px';
+}
+function cropLayout() {
+  const st = cropState; if (!st) return;
+  const stage = document.getElementById('crop-stage');
+  const aw = Math.max(50, stage.clientWidth - 36), ah = Math.max(50, stage.clientHeight - 36);
+  st.scale = Math.min(aw / st.src.width, ah / st.src.height);
+  const cw = Math.round(st.src.width * st.scale), ch = Math.round(st.src.height * st.scale);
+  const box = document.getElementById('crop-box'); box.style.width = cw + 'px'; box.style.height = ch + 'px';
+  const cv = document.getElementById('crop-canvas'), dpr = Math.min(2, window.devicePixelRatio || 1);
+  cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr); cv.style.width = cw + 'px'; cv.style.height = ch + 'px';
+  cv.getContext('2d').drawImage(st.src, 0, 0, cv.width, cv.height);
+  document.getElementById('crop-svg').setAttribute('viewBox', `0 0 ${cw} ${ch}`);
+  cropRender();
+}
+function cropRender() {
+  const st = cropState; if (!st) return;
+  const s = st.scale, cw = st.src.width * s, ch = st.src.height * s;
+  const pts = st.quad.map(p => [p[0] * s, p[1] * s]);
+  const ps = pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+  document.getElementById('crop-poly').setAttribute('points', ps);
+  document.getElementById('crop-mask').setAttribute('d', `M0,0H${cw}V${ch}H0Z M${pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' L')}Z`);
+  document.querySelectorAll('#crop-box .crop-h').forEach(hd => { const p = pts[+hd.dataset.i]; hd.style.left = p[0] + 'px'; hd.style.top = p[1] + 'px'; });
+}
+async function openCropEditor(file) {
+  let img;
+  try { img = await loadImageFile(file); } catch (e) { handleFile(file); return; }
+  const MAX = 3000, r = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
+  const src = document.createElement('canvas');
+  src.width = Math.round(img.naturalWidth * r); src.height = Math.round(img.naturalHeight * r);
+  src.getContext('2d').drawImage(img, 0, 0, src.width, src.height);
+  let auto = null; try { auto = detectDocumentQuad(src); } catch (e) { console.warn('autocrop detect failed', e); }
+  cropState = { file, src, auto, quad: (auto || fullQuad(src, 0.04)).map(p => p.slice()), scale: 1, drag: null };
+  ensureCropOverlay().classList.add('open');
+  document.getElementById('crop-msg').textContent = auto ? '' : 'לא זוהו שולי מסמך ברורים — גרור את הפינות ידנית';
+  document.getElementById('crop-apply-btn').disabled = false;
+  requestAnimationFrame(cropLayout);
+}
+function cropReset(mode) {
+  if (!cropState) return;
+  if (mode === 'auto' && !cropState.auto) { document.getElementById('crop-msg').textContent = 'לא זוהו שולי מסמך ברורים — גרור את הפינות ידנית'; return; }
+  cropState.quad = (mode === 'auto' ? cropState.auto : fullQuad(cropState.src, 0)).map(p => p.slice());
+  document.getElementById('crop-msg').textContent = '';
+  cropRender();
+}
+function closeCrop() { const ov = document.getElementById('crop-overlay'); if (ov) ov.classList.remove('open'); cropState = null; }
+function cropCancel() { closeCrop(); }
+function cropSkip() { const f = cropState && cropState.file; closeCrop(); if (f) handleFile(f); }
+function cropApply() {
+  const st = cropState; if (!st) return;
+  if (polyArea(st.quad) < 0.02 * st.src.width * st.src.height) { document.getElementById('crop-msg').textContent = 'האזור שנבחר קטן מדי'; return; }
+  const btn = document.getElementById('crop-apply-btn'); btn.disabled = true; btn.textContent = 'מיישר...';
+  const enhance = document.getElementById('crop-enhance').checked;
+  setTimeout(() => {
+    let out = null;
+    try { out = warpQuad(st.src, st.quad); if (out && enhance) enhanceDocument(out); } catch (e) { console.error('warp failed', e); }
+    btn.textContent = '✓ חתוך ויישר';
+    if (!out) { btn.disabled = false; document.getElementById('crop-msg').textContent = 'היישור נכשל — נסה לסדר את הפינות או בחר "ללא חיתוך"'; return; }
+    out.toBlob(b => {
+      const name = (st.file.name || 'camera').replace(/\.[^.]+$/, '') + '-scan.jpg';
+      const f = new File([b], name, { type: 'image/jpeg' });
+      closeCrop();
+      handleFile(f);
+    }, 'image/jpeg', 0.92);
+  }, 30);
+}
+
 function setAiLoading(text) {
   // מחוון הטעינה עבר לחלונית ההתקדמות (jobPanel); נשאר כדי לנקות מצב ישן
   const box = document.getElementById('ai-loading');
